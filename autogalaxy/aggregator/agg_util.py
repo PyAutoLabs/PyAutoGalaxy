@@ -172,7 +172,7 @@ def adapt_images_from(
 
 
 def mesh_grids_of_planes_list_from(
-    fit: af.Fit, total_fits: int, use_preloaded_grid: bool
+    fit: af.Fit, total_fits: int
 ) -> List[Optional[aa.Grid2D]]:
     """
     Returns the image-plane pixelization grid(s) used by the fit.
@@ -196,69 +196,15 @@ def mesh_grids_of_planes_list_from(
         an output directory or from an sqlite database..
     total_fits
         The total number of `Analysis` objects summed to create the fit.
-    use_preloaded_grid
-        Certain pixelization's construct their mesh in the source-plane from a stochastic KMeans algorithm. This grid
-        may be output to hard-disk after the model-fit and loaded via the database to ensure the same grid is used
-        as the fit.
 
     Returns
     -------
     The list of image-plane mesh centres used when creating the overall fit.
     """
-
-    if use_preloaded_grid:
-        if not fit.children:
-            return [fit.value(name="preload_mesh_grids_of_planes")]
-        else:
-            try:
-                return fit.child_values(name="preload_mesh_grids_of_planes")
-            except AttributeError:
-                return [None] * total_fits
+    if not fit.children:
+        return [fit.value(name="preload_mesh_grids_of_planes")]
     else:
-        return [None] * total_fits
-
-
-def preloads_from(
-    preloads_cls,
-    use_preloaded_grid: bool,
-    mesh_grids_of_planes: List,
-) -> aa.Preloads:
-    """
-    Returns a `Preloads` object associated with a fit loaded via the database.
-
-    When loading results via the database, the preloads class may have certain attributes associated with it
-    in order to perform the fit. The main purpose is to use the same image-plane mesh centres for pixelization where
-    the mesh is computed in the image-plane (see `agg_util.mesh_grids_of_planes_list_from`).
-
-    Parameters
-    ----------
-    preloads_cls
-        The `Preloads` object used to create the preloads (this varies across
-        projects like `autogalaxy` and `autolens`).
-    use_preloaded_grid
-        Certain pixelization's construct their mesh in the source-plane from a stochastic KMeans algorithm. This grid
-        may be output to hard-disk after the model-fit and loaded via the database to ensure the same grid is used
-        as the fit.
-    mesh_grids_of_planes
-        The list of image-plane mesh centres used when creating the overall fit which are associated with the
-        preloads.
-
-    Returns
-    -------
-    The preloads object associated with the fit loaded via the database.
-    """
-    preloads = preloads_cls()
-
-    if use_preloaded_grid:
-        if mesh_grids_of_planes is not None:
-            preloads = preloads_cls(
-                image_plane_mesh_grid_pg_list=mesh_grids_of_planes,
-            )
-
-            if len(preloads.image_plane_mesh_grid_pg_list) == 2:
-                if type(preloads.image_plane_mesh_grid_pg_list[1]) != list:
-                    preloads.image_plane_mesh_grid_pg_list[1] = [
-                        preloads.image_plane_mesh_grid_pg_list[1]
-                    ]
-
-    return preloads
+        try:
+            return fit.child_values(name="preload_mesh_grids_of_planes")
+        except AttributeError:
+            return [None] * total_fits

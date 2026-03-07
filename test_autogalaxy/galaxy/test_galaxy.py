@@ -638,7 +638,7 @@ def test__output_to_and_load_from_json():
         light=ag.lp.Sersic(intensity=1.0),
         mass=ag.mp.Isothermal(einstein_radius=1.0),
         pixelization=ag.Pixelization(
-            mesh=ag.mesh.Delaunay(),
+            mesh=ag.mesh.Delaunay(pixels=9),
             regularization=ag.reg.Constant(),
         ),
     )

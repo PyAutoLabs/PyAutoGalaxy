@@ -205,10 +205,12 @@ class NFW(gNFW, MassProfileCSE):
 
         return self._convergence_2d_via_cse_from(grid_radii=elliptical_radii)
 
-    def convergence_func(self, grid_radius: float) -> float:
+    def convergence_func(self, grid_radius: float, xp=np) -> float:
         grid_radius = (1.0 / self.scale_radius) * grid_radius.array + 0j
-        return np.real(
-            2.0 * self.kappa_s * np.array(self.coord_func_g(grid_radius=grid_radius))
+        return xp.real(
+            2.0
+            * self.kappa_s
+            * xp.array(self.coord_func_g(grid_radius=grid_radius, xp=xp))
         )
 
     @aa.over_sample

@@ -62,6 +62,27 @@ class LensingCosmology:
         """
         return self.kpc_proper_per_arcsec(z=redshift, xp=xp)
 
+    def luminosity_distance(self, z: float, xp=np) -> float:
+        """
+        Luminosity distance to redshift z in Mpc.
+
+        For a flat universe:
+
+            D_L(z) = (1 + z)^2 * D_A(0, z)
+
+        where D_A(0, z) is the angular diameter distance from Earth.
+
+        Returns Mpc, matching the convention of astropy.cosmology.FlatLambdaCDM.luminosity_distance(z).value.
+
+        Parameters
+        ----------
+        z
+            Redshift at which the luminosity distance is calculated.
+        """
+        D_A_kpc = self.angular_diameter_distance_to_earth_in_kpc_from(redshift=z, xp=xp)
+        D_A_Mpc = D_A_kpc / xp.asarray(1.0e3)
+        return (xp.asarray(1.0) + xp.asarray(z)) ** 2 * D_A_Mpc
+
     def angular_diameter_distance_to_earth_in_kpc_from(
         self, redshift: float, xp=np
     ) -> float:

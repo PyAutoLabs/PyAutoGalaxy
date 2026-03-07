@@ -18,7 +18,6 @@ class Analysis(af.Analysis):
     def __init__(
         self,
         cosmology: LensingCosmology = None,
-        preloads: aa.Preloads = None,
         use_jax: bool = True,
         **kwargs,
     ):
@@ -39,7 +38,6 @@ class Analysis(af.Analysis):
         from autogalaxy.cosmology.model import Planck15
 
         self.cosmology = cosmology or Planck15()
-        self.preloads = preloads
 
         super().__init__(use_jax=use_jax, **kwargs)
 

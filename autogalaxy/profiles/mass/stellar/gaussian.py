@@ -33,7 +33,6 @@ class Gaussian(MassProfile, StellarProfile):
             The sigma value of the Gaussian.
         """
 
-        super(Gaussian, self).__init__(centre=centre, ell_comps=ell_comps)
         super(MassProfile, self).__init__(centre=centre, ell_comps=ell_comps)
         self.mass_to_light_ratio = mass_to_light_ratio
         self.intensity = intensity
@@ -152,11 +151,13 @@ class Gaussian(MassProfile, StellarProfile):
 
         """
         return self.convergence_func(
-            self.eccentric_radii_grid_from(grid=grid, xp=xp, **kwargs)
+            self.eccentric_radii_grid_from(grid=grid, xp=xp, **kwargs), xp=xp
         )
 
-    def convergence_func(self, grid_radius: float) -> float:
-        return self.mass_to_light_ratio * self.image_2d_via_radii_from(grid_radius)
+    def convergence_func(self, grid_radius: float, xp=np) -> float:
+        return self.mass_to_light_ratio * self.image_2d_via_radii_from(
+            grid_radius, xp=xp
+        )
 
     @aa.grid_dec.to_array
     def potential_2d_from(self, grid: aa.type.Grid2DLike, xp=np, **kwargs):
@@ -214,7 +215,8 @@ class Gaussian(MassProfile, StellarProfile):
 
         return xp.where(ind_pos_y, core, xp.conj(core))
 
-    def wofz(self, z, xp=np):
+    @staticmethod
+    def wofz(z, xp=np):
         """
         JAX-compatible Faddeeva function w(z) = exp(-z^2) * erfc(-i z)
         Based on the Poppe–Wijers / Zaghloul–Ali rational approximations.
@@ -258,7 +260,11 @@ class Gaussian(MassProfile, StellarProfile):
         for v in V5:
             s = v + z2 * s
 
-        w5 = xp.exp(-z2) + 1j * z * t / s
+        real_exp = xp.clip(-xp.real(z2), None, 700.0)
+        imag_exp = -xp.imag(z2)
+        w5 = (
+            xp.exp(real_exp + 1j * imag_exp) + 1j * z * t / s
+        )  # clip prevents overflow error
 
         # ---------- Region 6 ----------
         U6 = xp.asarray(

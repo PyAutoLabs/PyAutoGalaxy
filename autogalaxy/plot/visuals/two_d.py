@@ -184,18 +184,19 @@ class Visuals2D(aplt.Visuals2D):
         vis.Visuals2D
             A collection of attributes that can be plotted by a `Plotter` object.
         """
+        from autogalaxy.operate.lens_calc import LensCalc
 
-        tangential_critical_curves = mass_obj.tangential_critical_curve_list_from(
-            grid=grid
-        )
+        od = LensCalc.from_mass_obj(mass_obj)
+
+        tangential_critical_curves = od.tangential_critical_curve_list_from(grid=grid)
 
         radial_critical_curves = None
-        radial_critical_curve_area_list = mass_obj.radial_critical_curve_area_list_from(
+        radial_critical_curve_area_list = od.radial_critical_curve_area_list_from(
             grid=grid
         )
 
         if any([area > grid.pixel_scale for area in radial_critical_curve_area_list]):
-            radial_critical_curves = mass_obj.radial_critical_curve_list_from(grid=grid)
+            radial_critical_curves = od.radial_critical_curve_list_from(grid=grid)
 
         return self + self.__class__(
             tangential_critical_curves=tangential_critical_curves,
@@ -226,9 +227,12 @@ class Visuals2D(aplt.Visuals2D):
         vis.Visuals2D
             A collection of attributes that can be plotted by a `Plotter` object.
         """
+        from autogalaxy.operate.lens_calc import LensCalc
 
-        tangential_caustics = mass_obj.tangential_caustic_list_from(grid=grid)
-        radial_caustics = mass_obj.radial_caustic_list_from(grid=grid)
+        od = LensCalc.from_mass_obj(mass_obj)
+
+        tangential_caustics = od.tangential_caustic_list_from(grid=grid)
+        radial_caustics = od.radial_caustic_list_from(grid=grid)
 
         return self + self.__class__(
             tangential_caustics=tangential_caustics,

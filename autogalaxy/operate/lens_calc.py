@@ -7,7 +7,6 @@ from autoconf import conf
 
 import autoarray as aa
 
-from autogalaxy.util.shear_field import ShearYX2D
 from autogalaxy.util.shear_field import ShearYX2DIrregular
 
 logger = logging.getLogger(__name__)
@@ -32,17 +31,6 @@ def grid_scaled_2d_for_marching_squares_from(
     grid_scaled_1d[:, 1] += pixel_scales[1] / 2.0
 
     return aa.Grid2DIrregular(values=grid_scaled_1d)
-
-
-def precompute_jacobian(func):
-    @wraps(func)
-    def wrapper(lensing_obj, grid, jacobian=None):
-        if jacobian is None:
-            jacobian = lensing_obj.jacobian_from(grid=grid)
-
-        return func(lensing_obj, grid, jacobian)
-
-    return wrapper
 
 
 def evaluation_grid(func):
@@ -90,51 +78,111 @@ def evaluation_grid(func):
     return wrapper
 
 
-class OperateDeflections:
+class LensCalc:
     """
-    Packages methods which manipulate the 2D deflection angle map returned from the `deflections_yx_2d_from` function
-    of a mass object (e.g. a `MassProfile`, `Galaxy`).
+    Computes lensing quantities from a deflection-angle callable and an optional potential callable.
 
-    The majority of methods are those which from the 2D deflection angle map compute lensing quantities like a 2D
-    shear field, magnification map or the Einstein Radius.
-
-    The methods in `CalcLens` are passed to the mass object to provide a concise API.
+    The deflection callable is used to compute the Hessian, Jacobian, convergence, shear,
+    magnification, critical curves, caustics, and Einstein radius/mass.  If a potential
+    callable is also supplied, ``fermat_potential_from`` is available as well.
 
     Parameters
     ----------
     deflections_yx_2d_from
-        The function which returns the mass object's 2D deflection angles.
+        A callable with signature ``(grid, xp=np, **kwargs)`` that returns the 2D deflection
+        angles on the given grid.  Typically a bound method of a ``MassProfile``, ``Galaxy``,
+        or ``Galaxies`` instance.
+    potential_2d_from
+        Optional callable with signature ``(grid, xp=np, **kwargs)`` that returns the 2D
+        lensing potential on the given grid.  Required only for ``fermat_potential_from``.
     """
 
-    def deflections_yx_2d_from(self, grid: aa.type.Grid2DLike, **kwargs):
-        raise NotImplementedError
+    def __init__(self, deflections_yx_2d_from, potential_2d_from=None):
+        self.deflections_yx_2d_from = deflections_yx_2d_from
+        self.potential_2d_from = potential_2d_from
 
-    def __eq__(self, other):
-        return self.__dict__ == other.__dict__ and self.__class__ is other.__class__
+    @classmethod
+    def from_mass_obj(cls, mass_obj):
+        """Construct from any object that has a ``deflections_yx_2d_from`` method.
+
+        If the object also exposes ``potential_2d_from``, it is captured so that
+        ``fermat_potential_from`` is available on the returned instance.
+        """
+        return cls(
+            deflections_yx_2d_from=mass_obj.deflections_yx_2d_from,
+            potential_2d_from=getattr(mass_obj, "potential_2d_from", None),
+        )
+
+    @classmethod
+    def from_tracer(
+        cls, tracer, use_multi_plane: bool = True, plane_i: int = 0, plane_j: int = -1
+    ):
+        """
+        Construct from a PyAutoLens ``Tracer`` object.
+
+        The ``Tracer`` type is deliberately left unannotated: ``autogalaxy`` does not
+        depend on ``autolens``, so no import of ``Tracer`` is performed here.  Callers
+        (which live inside ``autolens``) are responsible for passing the correct object.
+
+        Parameters
+        ----------
+        tracer
+            A PyAutoLens ``Tracer`` instance.  Must expose ``deflections_yx_2d_from``
+            and, when ``use_multi_plane=True``, ``deflections_between_planes_from``.
+        use_multi_plane
+            If ``True`` the stored callable is
+            ``tracer.deflections_between_planes_from`` with ``plane_i`` and ``plane_j``
+            bound via ``functools.partial``, matching the multi-plane ray-tracing path.
+            If ``False`` the stored callable is ``tracer.deflections_yx_2d_from``,
+            i.e. the standard two-plane path.
+        plane_i
+            Index of the first plane used by ``deflections_between_planes_from``.
+            Ignored when ``use_multi_plane=False``.  Defaults to ``0`` (image plane).
+        plane_j
+            Index of the second plane used by ``deflections_between_planes_from``.
+            Ignored when ``use_multi_plane=False``.  Defaults to ``-1`` (source plane).
+        """
+        potential_2d_from = getattr(tracer, "potential_2d_from", None)
+
+        if use_multi_plane:
+            from functools import partial
+
+            return cls(
+                deflections_yx_2d_from=partial(
+                    tracer.deflections_between_planes_from,
+                    plane_i=plane_i,
+                    plane_j=plane_j,
+                ),
+                potential_2d_from=potential_2d_from,
+            )
+        return cls(
+            deflections_yx_2d_from=tracer.deflections_yx_2d_from,
+            potential_2d_from=potential_2d_from,
+        )
 
     def time_delay_geometry_term_from(self, grid, xp=np) -> aa.Array2D:
         """
-            Returns the geometric time delay term of the Fermat potential for a given grid of image-plane positions.
+        Returns the geometric time delay term of the Fermat potential for a given grid of image-plane positions.
 
-            This term is given by:
+        This term is given by:
 
         .. math::
-                \[\tau_{\text{geom}}(\boldsymbol{\theta}) = \frac{1}{2} |\boldsymbol{\theta} - \boldsymbol{\beta}|^2\]
+            \[\tau_{\text{geom}}(\boldsymbol{\theta}) = \frac{1}{2} |\boldsymbol{\theta} - \boldsymbol{\beta}|^2\]
 
-            where:
-            - \( \boldsymbol{\theta} \) is the image-plane coordinate,
-            - \( \boldsymbol{\beta} = \boldsymbol{\theta} - \boldsymbol{\alpha}(\boldsymbol{\theta}) \) is the source-plane coordinate,
-            - \( \boldsymbol{\alpha} \) is the deflection angle at each image-plane coordinate.
+        where:
+        - \( \boldsymbol{\theta} \) is the image-plane coordinate,
+        - \( \boldsymbol{\beta} = \boldsymbol{\theta} - \boldsymbol{\alpha}(\boldsymbol{\theta}) \) is the source-plane coordinate,
+        - \( \boldsymbol{\alpha} \) is the deflection angle at each image-plane coordinate.
 
-            Parameters
-            ----------
-            grid
-                The 2D grid of (y,x) arc-second coordinates the deflection angles and time delay geometric term are computed
-                on.
+        Parameters
+        ----------
+        grid
+            The 2D grid of (y,x) arc-second coordinates the deflection angles and time delay geometric term are computed
+            on.
 
-            Returns
-            -------
-            The geometric time delay term at each grid position.
+        Returns
+        -------
+        The geometric time delay term at each grid position.
         """
         deflections = self.deflections_yx_2d_from(grid=grid, xp=xp)
 
@@ -151,38 +199,36 @@ class OperateDeflections:
         """
         Returns the Fermat potential for a given grid of image-plane positions.
 
-        This is the sum of the geometric time delay term and the gravitational (Shapiro) delay term (i.e. the lensing
-        potential), and is given by:
+        This is the sum of the geometric time delay term and the gravitational (Shapiro) delay
+        term (i.e. the lensing potential), and is given by:
 
         .. math::
-            \[\phi(\boldsymbol{\theta}) = \frac{1}{2} |\boldsymbol{\theta} - \boldsymbol{\beta}|^2 - \psi(\boldsymbol{\theta})\]
+            \\phi(\\boldsymbol{\\theta}) = \\frac{1}{2} |\\boldsymbol{\\theta} - \\boldsymbol{\\beta}|^2
+            - \\psi(\\boldsymbol{\\theta})
 
-        where:
-        - \( \boldsymbol{\theta} \) is the image-plane coordinate,
-        - \( \boldsymbol{\beta} = \boldsymbol{\theta} - \boldsymbol{\alpha}(\boldsymbol{\theta}) \) is the source-plane coordinate,
-        - \( \psi(\boldsymbol{\theta}) \) is the lensing potential,
-        - \( \phi(\boldsymbol{\theta}) \) is the Fermat potential.
+        Requires that ``potential_2d_from`` was supplied at construction (e.g. via
+        ``LensCalc.from_mass_obj`` or ``LensCalc.from_tracer``).
 
         Parameters
         ----------
         grid
             The 2D grid of (y,x) arc-second coordinates the Fermat potential is computed on.
-
-        Returns
-        -------
-        The Fermat potential at each grid position.
+        xp
+            The array module (``numpy`` or ``jax.numpy``).
         """
-        time_delay_geometry_term = self.time_delay_geometry_term_from(grid=grid, xp=xp)
+        if self.potential_2d_from is None:
+            raise ValueError(
+                "fermat_potential_from requires a potential_2d_from callable. "
+                "Construct LensCalc with potential_2d_from, or use from_mass_obj / from_tracer."
+            )
+        time_delay = self.time_delay_geometry_term_from(grid=grid, xp=xp)
         potential = self.potential_2d_from(grid=grid, xp=xp)
-
-        fermat_potential = time_delay_geometry_term - potential
-
+        fermat_potential = time_delay - potential
         if isinstance(grid, aa.Grid2DIrregular):
             return aa.ArrayIrregular(values=fermat_potential)
         return aa.Array2D(values=fermat_potential, mask=grid.mask)
 
-    @precompute_jacobian
-    def tangential_eigen_value_from(self, grid, jacobian=None) -> aa.Array2D:
+    def tangential_eigen_value_from(self, grid, xp=np) -> aa.Array2D:
         """
         Returns the tangential eigen values of lensing jacobian, which are given by the expression:
 
@@ -193,105 +239,177 @@ class OperateDeflections:
         grid
             The 2D grid of (y,x) arc-second coordinates the deflection angles and tangential eigen values are computed
             on.
-        jacobian
-            A precomputed lensing jacobian, which is passed throughout the `CalcLens` functions for efficiency.
+        xp
+            The array module (``numpy`` or ``jax.numpy``). Passed through to ``convergence_2d_via_hessian_from``
+            and ``shear_yx_2d_via_hessian_from``. When ``xp`` is not ``numpy`` the result is a raw array rather
+            than an ``aa.Array2D`` wrapper.
         """
-        convergence = self.convergence_2d_via_jacobian_from(
-            grid=grid, jacobian=jacobian
-        )
+        convergence = self.convergence_2d_via_hessian_from(grid=grid, xp=xp)
+        shear_yx = self.shear_yx_2d_via_hessian_from(grid=grid, xp=xp)
 
-        shear_yx = self.shear_yx_2d_via_jacobian_from(grid=grid, jacobian=jacobian)
+        if xp is np:
+            return aa.Array2D(
+                values=1 - convergence - shear_yx.magnitudes, mask=grid.mask
+            )
+        magnitudes = xp.sqrt(shear_yx[:, 0] ** 2 + shear_yx[:, 1] ** 2)
+        return 1 - convergence - magnitudes
 
-        return aa.Array2D(values=1 - convergence - shear_yx.magnitudes, mask=grid.mask)
-
-    @precompute_jacobian
-    def radial_eigen_value_from(self, grid, jacobian=None) -> aa.Array2D:
+    def radial_eigen_value_from(self, grid, xp=np) -> aa.Array2D:
         """
         Returns the radial eigen values of lensing jacobian, which are given by the expression:
 
-        radial_eigen_value = 1 - convergence + shear
+        `radial_eigen_value = 1 - convergence + shear`
 
         Parameters
         ----------
         grid
             The 2D grid of (y,x) arc-second coordinates the deflection angles and radial eigen values are computed on.
-        jacobian
-            A precomputed lensing jacobian, which is passed throughout the `CalcLens` functions for efficiency.
+        xp
+            The array module (``numpy`` or ``jax.numpy``). Passed through to ``convergence_2d_via_hessian_from``
+            and ``shear_yx_2d_via_hessian_from``. When ``xp`` is not ``numpy`` the result is a raw array rather
+            than an ``aa.Array2D`` wrapper.
         """
-        convergence = self.convergence_2d_via_jacobian_from(
-            grid=grid, jacobian=jacobian
-        )
+        convergence = self.convergence_2d_via_hessian_from(grid=grid, xp=xp)
+        shear = self.shear_yx_2d_via_hessian_from(grid=grid, xp=xp)
 
-        shear = self.shear_yx_2d_via_jacobian_from(grid=grid, jacobian=jacobian)
+        if xp is np:
+            return aa.Array2D(
+                values=1 - convergence + shear.magnitudes, mask=grid.mask
+            )
+        magnitudes = xp.sqrt(shear[:, 0] ** 2 + shear[:, 1] ** 2)
+        return 1 - convergence + magnitudes
 
-        return aa.Array2D(values=1 - convergence + shear.magnitudes, mask=grid.mask)
-
-    def magnification_2d_from(self, grid) -> aa.Array2D:
+    def magnification_2d_from(self, grid, xp=np) -> aa.Array2D:
         """
         Returns the 2D magnification map of lensing object, which is computed as the inverse of the determinant of the
-        jacobian.
+        lensing Jacobian, expressed via the Hessian components.
 
         Parameters
         ----------
         grid
             The 2D grid of (y,x) arc-second coordinates the deflection angles and magnification map are computed on.
+        xp
+            The array module (``numpy`` or ``jax.numpy``). Passed through to ``hessian_from``. When ``xp`` is
+            not ``numpy`` the result is a raw array rather than an ``aa.Array2D`` wrapper.
         """
-        jacobian = self.jacobian_from(grid=grid)
+        hessian_yy, hessian_xy, hessian_yx, hessian_xx = self.hessian_from(
+            grid=grid, xp=xp
+        )
 
-        det_jacobian = jacobian[0][0] * jacobian[1][1] - jacobian[0][1] * jacobian[1][0]
+        det_A = (1 - hessian_xx) * (1 - hessian_yy) - hessian_xy * hessian_yx
 
-        return aa.Array2D(values=1 / det_jacobian, mask=grid.mask)
+        if xp is np:
+            return aa.Array2D(values=1 / det_A, mask=grid.mask)
+        return 1 / det_A
 
-    def hessian_from(
-        self, grid, buffer: float = 0.01, deflections_func=None, xp=np
-    ) -> Tuple:
+    def deflections_yx_scalar(self, y, x, pixel_scales):
+        """
+        Returns the deflection angles at a single (y, x) arc-second coordinate as a JAX array of
+        shape (2,), where index 0 is the y-deflection and index 1 is the x-deflection.
+
+        This is an internal method used by `hessian_from` to enable JAX auto-differentiation via
+        `jax.jacfwd`. The function must accept y and x as two separate scalar inputs (rather than
+        a single combined array) so that JAX treats the function as R² -> R² and computes a proper
+        2x2 Jacobian matrix.
+
+        Parameters
+        ----------
+        y
+            The y arc-second coordinate (scalar).
+        x
+            The x arc-second coordinate (scalar).
+        pixel_scales
+            The pixel scales used to construct the internal (1, 1) Mask2D.
+        """
+        import jax.numpy as jnp
+
+        mask = aa.Mask2D.all_false(shape_native=(1, 1), pixel_scales=pixel_scales)
+        grid = aa.Grid2D(
+            values=jnp.stack((y.reshape(1), x.reshape(1)), axis=-1), mask=mask
+        )
+        return self.deflections_yx_2d_from(grid, xp=jnp).squeeze()
+
+    def hessian_from(self, grid, xp=np) -> Tuple:
         """
         Returns the Hessian of the lensing object, where the Hessian is the second partial derivatives of the
         potential (see equation 55 https://inspirehep.net/literature/419263):
 
         `hessian_{i,j} = d^2 / dtheta_i dtheta_j`
 
-        The Hessian is computed by evaluating the 2D deflection angles around every (y,x) coordinate on the input 2D
-        grid map in four directions (positive y, negative y, positive x, negative x), exploiting how the deflection
-        angles are the derivative of the potential.
+        The Hessian is returned as a 4-entry tuple reflecting its structure as a 2x2 matrix:
+        (hessian_yy, hessian_xy, hessian_yx, hessian_xx).
 
-        By using evaluating the deflection angles around each grid coordinate, the Hessian can therefore be computed
-        using uniform or irregular 2D grids of (y,x). This can be slower, because x4 more deflection angle calculations
-        are required, however it is more flexible in and therefore used throughout **PyAutoLens** by default.
+        Two computational paths are available, selected via the `xp` parameter:
 
-        The Hessian is returned as a 4 entry tuple, which reflect its structure as a 2x2 matrix.
+        - **NumPy** (``xp=np``, default): finite-difference approximation. Deflection angles are
+          evaluated at four shifted positions around each grid coordinate (±y, ±x) and the
+          central difference is taken. JAX is not imported.
+
+        - **JAX** (``xp=jnp``): exact derivatives via ``jax.jacfwd`` applied to
+          ``deflections_yx_scalar``, vectorised over the grid with ``jnp.vectorize``.
+
+        Both paths support uniform ``Grid2D`` and irregular ``Grid2DIrregular`` grids.
 
         Parameters
         ----------
         grid
-            The 2D grid of (y,x) arc-second coordinates the deflection angles and Hessian are computed on.
-        buffer
-            The spacing in the y and x directions around each grid coordinate where deflection angles are computed and
-            used to estimate the derivative.
+            The 2D grid of (y,x) arc-second coordinates the Hessian is computed on.
+        xp
+            The array module (``numpy`` or ``jax.numpy``). Controls which computational path is
+            used and the type of the returned arrays.
         """
-        if deflections_func is None:
-            deflections_func = self.deflections_yx_2d_from
+        if xp is np:
+            return self._hessian_via_finite_difference(grid=grid)
+        return self._hessian_via_jax(grid=grid, xp=xp)
 
+    def _hessian_via_jax(self, grid, xp) -> Tuple:
+        import jax
+        import jax.numpy as jnp
+
+        pixel_scales = getattr(grid, "pixel_scales", (0.05, 0.05))
+
+        y = jnp.array(grid[:, 0])
+        x = jnp.array(grid[:, 1])
+
+        def _hessian_single(y_scalar, x_scalar):
+            return jnp.stack(
+                jax.jacfwd(self.deflections_yx_scalar, argnums=(0, 1))(
+                    y_scalar, x_scalar, pixel_scales
+                )
+            )
+
+        h = jnp.vectorize(_hessian_single, signature="(),()->(i,i)")(y, x)
+
+        # h has shape (N, 2, 2):
+        #   h[..., 0, 0] = d(defl_y)/dy  = hessian_yy
+        #   h[..., 0, 1] = d(defl_x)/dy  = hessian_xy
+        #   h[..., 1, 0] = d(defl_y)/dx  = hessian_yx
+        #   h[..., 1, 1] = d(defl_x)/dx  = hessian_xx
+        return (
+            xp.array(h[..., 0, 0]),
+            xp.array(h[..., 0, 1]),
+            xp.array(h[..., 1, 0]),
+            xp.array(h[..., 1, 1]),
+        )
+
+    def _hessian_via_finite_difference(self, grid, buffer: float = 0.01) -> Tuple:
         grid_shift_y_up = aa.Grid2DIrregular(
-            values=xp.stack([grid[:, 0] + buffer, grid[:, 1]], axis=1)
+            values=np.stack([grid[:, 0] + buffer, grid[:, 1]], axis=1)
         )
-
         grid_shift_y_down = aa.Grid2DIrregular(
-            values=xp.stack([grid[:, 0] - buffer, grid[:, 1]], axis=1)
+            values=np.stack([grid[:, 0] - buffer, grid[:, 1]], axis=1)
         )
-
         grid_shift_x_left = aa.Grid2DIrregular(
-            values=xp.stack([grid[:, 0], grid[:, 1] - buffer], axis=1)
+            values=np.stack([grid[:, 0], grid[:, 1] - buffer], axis=1)
         )
-
         grid_shift_x_right = aa.Grid2DIrregular(
-            values=xp.stack([grid[:, 0], grid[:, 1] + buffer], axis=1)
+            values=np.stack([grid[:, 0], grid[:, 1] + buffer], axis=1)
         )
 
-        deflections_up = deflections_func(grid=grid_shift_y_up, xp=xp)
-        deflections_down = deflections_func(grid=grid_shift_y_down, xp=xp)
-        deflections_left = deflections_func(grid=grid_shift_x_left, xp=xp)
-        deflections_right = deflections_func(grid=grid_shift_x_right, xp=xp)
+        deflections_up = self.deflections_yx_2d_from(grid=grid_shift_y_up)
+        deflections_down = self.deflections_yx_2d_from(grid=grid_shift_y_down)
+        deflections_left = self.deflections_yx_2d_from(grid=grid_shift_x_left)
+        deflections_right = self.deflections_yx_2d_from(grid=grid_shift_x_right)
 
         hessian_yy = 0.5 * (deflections_up[:, 0] - deflections_down[:, 0]) / buffer
         hessian_xy = 0.5 * (deflections_up[:, 1] - deflections_down[:, 1]) / buffer
@@ -300,9 +418,38 @@ class OperateDeflections:
 
         return hessian_yy, hessian_xy, hessian_yx, hessian_xx
 
-    def convergence_2d_via_hessian_from(
-        self, grid, buffer: float = 0.01
-    ) -> aa.ArrayIrregular:
+    def jacobian_from(self, grid, xp=np) -> List:
+        """
+        Returns the lensing Jacobian of the lensing object as a 2x2 list of lists.
+
+        The Jacobian is the matrix `A = I - H`, where `H` is the Hessian matrix of the
+        deflection angles:
+
+        ``A = [[1 - hessian_xx, -hessian_xy], [-hessian_yx, 1 - hessian_yy]]``
+
+        It is computed from `hessian_from`, so it supports both uniform and irregular
+        grids and accepts the same `xp` parameter for JAX acceleration.
+
+        Parameters
+        ----------
+        grid
+            The 2D grid of (y,x) arc-second coordinates the Jacobian is computed on.
+        xp
+            The array module (``numpy`` or ``jax.numpy``). Passed through to
+            ``hessian_from``.
+        """
+        hessian_yy, hessian_xy, hessian_yx, hessian_xx = self.hessian_from(
+            grid=grid, xp=xp
+        )
+
+        a11 = 1 - hessian_xx
+        a12 = -hessian_xy
+        a21 = -hessian_yx
+        a22 = 1 - hessian_yy
+
+        return [[a11, a12], [a21, a22]]
+
+    def convergence_2d_via_hessian_from(self, grid, xp=np) -> aa.ArrayIrregular:
         """
         Returns the convergence of the lensing object, which is computed from the 2D deflection angle map via the
         Hessian using the expression (see equation 56 https://inspirehep.net/literature/419263):
@@ -319,19 +466,22 @@ class OperateDeflections:
         ----------
         grid
             The 2D grid of (y,x) arc-second coordinates the deflection angles and Hessian are computed on.
-        buffer
-            The spacing in the y and x directions around each grid coordinate where deflection angles are computed and
-            used to estimate the derivative.
+        xp
+            The array module to use for the computation (e.g. `numpy` or `jax.numpy`). Passed through to
+            `hessian_from`. When `xp` is not `numpy` (e.g. inside a `jax.jit` trace) the result is returned
+            as a raw array rather than an `aa.ArrayIrregular` wrapper.
         """
         hessian_yy, hessian_xy, hessian_yx, hessian_xx = self.hessian_from(
-            grid=grid, buffer=buffer
+            grid=grid, xp=xp
         )
 
-        return aa.ArrayIrregular(values=0.5 * (hessian_yy + hessian_xx))
+        convergence = 0.5 * (hessian_yy + hessian_xx)
 
-    def shear_yx_2d_via_hessian_from(
-        self, grid, buffer: float = 0.01
-    ) -> ShearYX2DIrregular:
+        if xp is np:
+            return aa.ArrayIrregular(values=convergence)
+        return convergence
+
+    def shear_yx_2d_via_hessian_from(self, grid, xp=np) -> ShearYX2DIrregular:
         """
         Returns the 2D (y,x) shear vectors of the lensing object, which are computed from the 2D deflection angle map
         via the Hessian using the expressions (see equation 57 https://inspirehep.net/literature/419263):
@@ -355,28 +505,26 @@ class OperateDeflections:
         ----------
         grids
             The 2D grid of (y,x) arc-second coordinates the deflection angles and Hessian are computed on.
-        buffer
-            The spacing in the y and x directions around each grid coordinate where deflection angles are computed and
-            used to estimate the derivative.
+        xp
+            The array module to use for the computation (e.g. `numpy` or `jax.numpy`). Passed through to
+            `hessian_from`. When `xp` is not `numpy` (e.g. inside a `jax.jit` trace) the result is returned
+            as a raw array of shape `(N, 2)` rather than a `ShearYX2DIrregular` wrapper.
         """
 
         hessian_yy, hessian_xy, hessian_yx, hessian_xx = self.hessian_from(
-            grid=grid, buffer=buffer
+            grid=grid, xp=xp
         )
 
         gamma_1 = 0.5 * (hessian_xx - hessian_yy)
         gamma_2 = hessian_xy
 
-        shear_yx_2d = np.zeros(shape=(grid.shape_slim, 2))
+        shear_yx_2d = xp.stack([gamma_2, gamma_1], axis=-1)
 
-        shear_yx_2d[:, 0] = gamma_2
-        shear_yx_2d[:, 1] = gamma_1
+        if xp is np:
+            return ShearYX2DIrregular(values=shear_yx_2d, grid=grid)
+        return shear_yx_2d
 
-        return ShearYX2DIrregular(values=shear_yx_2d, grid=grid)
-
-    def magnification_2d_via_hessian_from(
-        self, grid, buffer: float = 0.01, deflections_func=None, xp=np
-    ) -> aa.ArrayIrregular:
+    def magnification_2d_via_hessian_from(self, grid, xp=np) -> aa.ArrayIrregular:
         """
         Returns the 2D magnification map of lensing object, which is computed from the 2D deflection angle map
         via the Hessian using the expressions (see equation 60 https://inspirehep.net/literature/419263):
@@ -397,12 +545,14 @@ class OperateDeflections:
             The 2D grid of (y,x) arc-second coordinates the deflection angles and magnification map are computed on.
         """
         hessian_yy, hessian_xy, hessian_yx, hessian_xx = self.hessian_from(
-            grid=grid, buffer=buffer, deflections_func=deflections_func, xp=xp
+            grid=grid, xp=xp
         )
 
         det_A = (1 - hessian_xx) * (1 - hessian_yy) - hessian_xy * hessian_yx
 
-        return aa.ArrayIrregular(values=1.0 / det_A)
+        if xp is np:
+            return aa.ArrayIrregular(values=1.0 / det_A)
+        return 1.0 / det_A
 
     def contour_list_from(self, grid, contour_array):
         grid_contour = aa.Grid2DContour(
@@ -781,107 +931,3 @@ class OperateDeflections:
             )
 
         return einstein_mass_angular_list[0]
-
-    def jacobian_from(self, grid):
-        """
-        Returns the Jacobian of the lensing object, which is computed by taking the gradient of the 2D deflection
-        angle map in four direction (positive y, negative y, positive x, negative x).
-
-        By using the `np.gradient` method the Jacobian can therefore only be computed using uniform 2D grids of (y,x)
-        coordinates, and does not support irregular grids. For this reason, calculations by default use the Hessian,
-        which is slower to compute because more deflection angle calculations are necessary but more flexible in
-        general.
-
-        The Jacobian is returned as a list of lists, which reflect its structure as a 2x2 matrix.
-
-        Parameters
-        ----------
-        grid
-            The 2D grid of (y,x) arc-second coordinates the deflection angles and Jacobian are computed on.
-        """
-
-        deflections = self.deflections_yx_2d_from(grid=grid)
-
-        # TODO : Can probably make this work on irregular grid? Is there any point?
-
-        a11 = aa.Array2D(
-            values=1.0
-            - np.gradient(deflections.native[:, :, 1], grid.native[0, :, 1], axis=1),
-            mask=grid.mask,
-        )
-
-        a12 = aa.Array2D(
-            values=-1.0
-            * np.gradient(deflections.native[:, :, 1], grid.native[:, 0, 0], axis=0),
-            mask=grid.mask,
-        )
-
-        a21 = aa.Array2D(
-            values=-1.0
-            * np.gradient(deflections.native[:, :, 0], grid.native[0, :, 1], axis=1),
-            mask=grid.mask,
-        )
-
-        a22 = aa.Array2D(
-            values=1
-            - np.gradient(deflections.native[:, :, 0], grid.native[:, 0, 0], axis=0),
-            mask=grid.mask,
-        )
-
-        return [[a11, a12], [a21, a22]]
-
-    @precompute_jacobian
-    def convergence_2d_via_jacobian_from(self, grid, jacobian=None) -> aa.Array2D:
-        """
-        Returns the convergence of the lensing object, which is computed from the 2D deflection angle map via the
-        Jacobian using the expression (see equation 58 https://inspirehep.net/literature/419263):
-
-        `convergence = 1.0 - 0.5 * (jacobian_{0,0} + jacobian_{1,1}) = 0.5 * (jacobian_xx + jacobian_yy)`
-
-        By going via the Jacobian, the convergence must be calculated using 2D uniform grid.
-
-        This calculation of the convergence is independent of analytic calculations defined within `MassProfile`
-        objects and the calculation via the Hessian. It can therefore be used as a cross-check.
-
-        Parameters
-        ----------
-        grid
-            The 2D grid of (y,x) arc-second coordinates the deflection angles and Jacobian are computed on.
-        jacobian
-            A precomputed lensing jacobian, which is passed throughout the `CalcLens` functions for efficiency.
-        """
-        convergence = 1 - 0.5 * (jacobian[0][0] + jacobian[1][1])
-
-        return aa.Array2D(values=convergence, mask=grid.mask)
-
-    @precompute_jacobian
-    def shear_yx_2d_via_jacobian_from(
-        self, grid, jacobian=None
-    ) -> Union[ShearYX2D, ShearYX2DIrregular]:
-        """
-        Returns the 2D (y,x) shear vectors of the lensing object, which are computed from the 2D deflection angle map
-        via the Jacobian using the expression (see equation 58 https://inspirehep.net/literature/419263):
-
-        `shear_y = -0.5 * (jacobian_{0,1} + jacobian_{1,0} = -0.5 * (jacobian_yx + jacobian_xy)`
-        `shear_x = 0.5 * (jacobian_{1,1} + jacobian_{0,0} = 0.5 * (jacobian_yy + jacobian_xx)`
-
-        By going via the Jacobian, the convergence must be calculated using 2D uniform grid.
-
-        This calculation of the shear vectors is independent of analytic calculations defined within `MassProfile`
-        objects and the calculation via the Hessian. It can therefore be used as a cross-check.
-
-        Parameters
-        ----------
-        grid
-            The 2D grid of (y,x) arc-second coordinates the deflection angles and Jacobian are computed on.
-        jacobian
-            A precomputed lensing jacobian, which is passed throughout the `CalcLens` functions for efficiency.
-        """
-
-        shear_yx_2d = np.zeros(shape=(grid.shape_slim, 2))
-        shear_yx_2d[:, 0] = -0.5 * (jacobian[0][1] + jacobian[1][0])
-        shear_yx_2d[:, 1] = 0.5 * (jacobian[1][1] - jacobian[0][0])
-
-        if isinstance(grid, aa.Grid2DIrregular):
-            return ShearYX2DIrregular(values=shear_yx_2d, grid=grid)
-        return ShearYX2D(values=shear_yx_2d, grid=grid, mask=grid.mask)

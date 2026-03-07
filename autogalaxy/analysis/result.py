@@ -76,7 +76,13 @@ class ResultDataset(Result):
         being fitted.
         """
 
-        galaxy_model_image_dict = self.max_log_likelihood_fit.galaxy_model_image_dict
+        try:
+            galaxy_model_image_dict = (
+                self.max_log_likelihood_fit.galaxy_model_image_dict
+            )
+        except AttributeError:
+            # Interferometer do not have a `galaxy_model_image_dict`, so use `galaxy_image_dict`
+            galaxy_model_image_dict = self.max_log_likelihood_fit.galaxy_image_dict
 
         return {
             galaxy_path: galaxy_model_image_dict[galaxy]
@@ -112,9 +118,15 @@ class ResultDataset(Result):
         dataset being fitted.
         """
 
-        galaxy_subtracted_signal_to_noise_map_dict = (
-            self.max_log_likelihood_fit.subtracted_signal_to_noise_maps_of_galaxies_dict
-        )
+        try:
+            galaxy_subtracted_signal_to_noise_map_dict = (
+                self.max_log_likelihood_fit.subtracted_signal_to_noise_maps_of_galaxies_dict
+            )
+        except AttributeError:
+            # Interferometer do not have a `galaxy_model_image_dict`, so use ` galaxy_signal_to_noise_map_dict`
+            galaxy_subtracted_signal_to_noise_map_dict = (
+                self.max_log_likelihood_fit.galaxy_signal_to_noise_map_dict
+            )
 
         return {
             galaxy_path: galaxy_subtracted_signal_to_noise_map_dict[galaxy]

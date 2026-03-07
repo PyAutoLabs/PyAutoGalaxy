@@ -4,18 +4,29 @@ from typing import Tuple
 import autoarray as aa
 
 from autogalaxy.profiles.mass.dark.abstract import AbstractgNFW
+from autogalaxy.profiles.mass import MGEDecomposer
 
 
 class gNFW(AbstractgNFW):
     def deflections_yx_2d_from(self, grid: aa.type.Grid2DLike, xp=np, **kwargs):
-        return self.deflections_2d_via_mge_from(grid=grid, **kwargs)
+        return self.deflections_2d_via_mge_from(grid=grid, xp=xp, **kwargs)
 
-    @aa.grid_dec.to_vector_yx
-    @aa.grid_dec.transform
     def deflections_2d_via_mge_from(self, grid: aa.type.Grid2DLike, xp=np, **kwargs):
-        return self._deflections_2d_via_mge_from(
-            grid=grid, sigmas_factor=self.axis_ratio(xp)
+        radii_min = self.scale_radius / 20000.0
+        radii_max = self.scale_radius * 200.0
+        log_sigmas = xp.linspace(xp.log(radii_min), xp.log(radii_max), 30)
+        sigmas = xp.exp(log_sigmas)
+
+        mge_decomp = MGEDecomposer(mass_profile=self)
+
+        deflections_via_mge = mge_decomp.deflections_2d_via_mge_from(
+            grid=grid,
+            xp=xp,
+            sigma_log_list=sigmas,
+            ellipticity_convention="major",
+            three_D=True,
         )
+        return deflections_via_mge
 
     @aa.grid_dec.to_vector_yx
     @aa.grid_dec.transform
@@ -129,14 +140,14 @@ class gNFW(AbstractgNFW):
         ) * (_eta_u - r1) / (r2 - r1)
         return kap / (1.0 - (1.0 - axis_ratio**2) * u) ** (npow + 0.5)
 
-    def convergence_func(self, grid_radius: float) -> float:
+    def convergence_func(self, grid_radius: float, xp=np) -> float:
 
         from scipy.integrate import quad
 
         def integral_y(y, eta):
-            return (y + eta) ** (self.inner_slope - 4) * (1 - np.sqrt(1 - y**2))
+            return (y + eta) ** (self.inner_slope - 4) * (1 - xp.sqrt(1 - y**2))
 
-        grid_radius = np.array((1.0 / self.scale_radius) * grid_radius.array)
+        grid_radius = xp.array((1.0 / self.scale_radius) * grid_radius.array)
 
         for index in range(grid_radius.shape[0]):
             integral_y_value = quad(

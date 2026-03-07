@@ -23,7 +23,6 @@ class AbstractToInversion:
         dataset: Optional[Union[aa.Imaging, aa.Interferometer, aa.DatasetInterface]],
         adapt_images: Optional[AdaptImages] = None,
         settings: aa.Settings = None,
-        preloads: aa.Preloads = None,
         xp=np,
     ):
         """
@@ -76,8 +75,6 @@ class AbstractToInversion:
         self.adapt_images = adapt_images
 
         self.settings = settings or aa.Settings()
-
-        self.preloads = preloads
 
         self.use_jax = xp is not np
 
@@ -202,7 +199,6 @@ class GalaxiesToInversion(AbstractToInversion):
         galaxies: List[Galaxy],
         adapt_images: Optional[AdaptImages] = None,
         settings: aa.Settings = None,
-        preloads: aa.Preloads = None,
         xp=np,
     ):
         """
@@ -245,7 +241,6 @@ class GalaxiesToInversion(AbstractToInversion):
             dataset=dataset,
             adapt_images=adapt_images,
             settings=settings,
-            preloads=preloads,
             xp=xp,
         )
 
@@ -477,7 +472,6 @@ class GalaxiesToInversion(AbstractToInversion):
             source_plane_data_grid=source_plane_data_grid,
             source_plane_mesh_grid=source_plane_mesh_grid,
             adapt_data=adapt_galaxy_image,
-            preloads=self.preloads,
             xp=self._xp,
         )
 
@@ -486,7 +480,6 @@ class GalaxiesToInversion(AbstractToInversion):
             image_plane_mesh_grid=image_plane_mesh_grid,
             regularization=regularization,
             settings=self.settings,
-            preloads=self.preloads,
             xp=self._xp,
         )
 
@@ -569,7 +562,6 @@ class GalaxiesToInversion(AbstractToInversion):
             dataset=self.dataset,
             linear_obj_list=self.linear_obj_list,
             settings=self.settings,
-            preloads=self.preloads,
             xp=self._xp,
         )
 

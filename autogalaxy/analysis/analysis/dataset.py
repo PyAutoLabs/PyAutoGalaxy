@@ -24,7 +24,6 @@ class AnalysisDataset(Analysis):
         adapt_images: Optional[AdaptImages] = None,
         cosmology: LensingCosmology = None,
         settings: aa.Settings = None,
-        preloads: aa.Preloads = None,
         title_prefix: str = None,
         use_jax: bool = True,
         **kwargs,
@@ -54,7 +53,6 @@ class AnalysisDataset(Analysis):
         """
         super().__init__(
             cosmology=cosmology,
-            preloads=preloads,
             use_jax=use_jax,
             **kwargs,
         )

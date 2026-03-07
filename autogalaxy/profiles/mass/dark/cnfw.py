@@ -3,11 +3,80 @@ import numpy as np
 from typing import Tuple
 
 from autogalaxy.profiles.mass.dark.abstract import AbstractgNFW
+from autogalaxy.profiles.mass.abstract.mge import MGEDecomposer
 
 import autoarray as aa
 
 
-class cNFWSph(AbstractgNFW):
+class cNFW(AbstractgNFW):
+    def __init__(
+            self,
+            centre: Tuple[float, float] = (0.0, 0.0),
+            ell_comps: Tuple[float, float] = (0.0, 0.0),
+            kappa_s: float = 0.05,
+            scale_radius: float = 1.0,
+            core_radius: float = 0.01,
+    ):
+        """
+        Represents a cored NFW density distribution
+
+        Parameters
+        ----------
+        centre
+            The (y,x) arc-second coordinates of the profile centre.
+        ell_comps
+            The first and second ellipticity components of the elliptical coordinate system.
+        kappa_s
+            The overall normalization of the dark matter halo
+            (kappa_s = (rho_0 * D_d * scale_radius)/lensing_critical_density)
+        scale_radius
+            The cored NFW scale radius `theta_s`, as an angle on the sky in arcseconds.
+        core_radius
+            The cored NFW core radius `theta_c`, as an angle on the sky in arcseconds.
+        """
+
+        super().__init__(centre=centre, ell_comps=ell_comps)
+
+        self.kappa_s = kappa_s
+        self.scale_radius = scale_radius
+        self.core_radius = core_radius
+
+
+    def deflections_yx_2d_from(self, grid: aa.type.Grid2DLike, xp=np, **kwargs):
+        return self.deflections_2d_via_mge_from(grid=grid, xp=xp, **kwargs)
+
+    def deflections_2d_via_mge_from(self, grid: aa.type.Grid2DLike, xp=np, **kwargs):
+        radii_min = self.scale_radius / 1000.0
+        radii_max = self.scale_radius * 200.0
+        log_sigmas = xp.linspace(xp.log(radii_min), xp.log(radii_max), 20)
+        sigmas = xp.exp(log_sigmas)
+
+        mge_decomp = MGEDecomposer(mass_profile=self)
+
+        deflections_via_mge = mge_decomp.deflections_2d_via_mge_from(
+            grid=grid,
+            xp=xp,
+            sigma_log_list=sigmas,
+            ellipticity_convention='major',
+            three_D=True
+        )
+        return deflections_via_mge
+
+    def density_3d_func(self, r, xp=np):
+
+        rho_at_scale_radius = (
+            self.kappa_s / self.scale_radius
+        )  # density parameter of 3D gNFW
+
+        return (
+            rho_at_scale_radius
+            * self.scale_radius**3.0
+            * (r.array + self.core_radius) ** (-1.0)
+            * (r.array + self.scale_radius) ** (-2.0)
+        )
+
+
+class cNFWSph(cNFW):
     def __init__(
         self,
         centre: Tuple[float, float] = (0.0, 0.0),
@@ -23,7 +92,7 @@ class cNFWSph(AbstractgNFW):
         centre
             The (y,x) arc-second coordinates of the profile centre.
         kappa_s
-            The overall normalization of the dark matter halo \|
+            The overall normalization of the dark matter halo
             (kappa_s = (rho_0 * D_d * scale_radius)/lensing_critical_density)
         scale_radius
             The cored NFW scale radius `theta_s`, as an angle on the sky in arcseconds.

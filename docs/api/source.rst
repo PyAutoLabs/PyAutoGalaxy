@@ -31,7 +31,7 @@ Operators
    :recursive:
 
    OperateImage
-   OperateDeflections
+   LensCalc
 
 Total [ag.mp]
 -------------

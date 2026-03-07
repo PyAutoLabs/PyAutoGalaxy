@@ -25,7 +25,6 @@ class FitImaging(aa.FitImaging, AbstractFitInversion):
         dataset_model: Optional[aa.DatasetModel] = None,
         adapt_images: Optional[AdaptImages] = None,
         settings: aa.Settings = None,
-        preloads: aa.Preloads = None,
         xp=np,
     ):
         """
@@ -84,8 +83,6 @@ class FitImaging(aa.FitImaging, AbstractFitInversion):
         self.adapt_images = adapt_images
         self.settings = settings or aa.Settings()
 
-        self.preloads = preloads
-
     @property
     def blurred_image(self) -> aa.Array2D:
         """
@@ -132,7 +129,6 @@ class FitImaging(aa.FitImaging, AbstractFitInversion):
             galaxies=self.galaxies,
             adapt_images=self.adapt_images,
             settings=self.settings,
-            preloads=self.preloads,
             xp=self._xp,
         )
 

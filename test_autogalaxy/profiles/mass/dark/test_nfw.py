@@ -227,49 +227,6 @@ def test__deflections_yx_2d_from():
     assert deflections == pytest.approx(deflections_via_integral.array, 1.0e-4)
 
 
-def test__convergence_2d_via_mge_from():
-    # r = 2.0 (> 1.0)
-    # F(r) = (1/(sqrt(3))*atan(sqrt(3)) = 0.60459978807
-    # kappa(r) = 2 * kappa_s * (1 - 0.60459978807) / (4-1) = 0.263600141
-
-    nfw = ag.mp.NFWSph(centre=(0.0, 0.0), kappa_s=1.0, scale_radius=1.0)
-
-    convergence = nfw.convergence_2d_via_mge_from(grid=ag.Grid2DIrregular([[2.0, 0.0]]))
-
-    assert convergence == pytest.approx(0.263600141, 1e-2)
-
-    nfw = ag.mp.NFWSph(centre=(0.0, 0.0), kappa_s=1.0, scale_radius=1.0)
-
-    convergence = nfw.convergence_2d_via_mge_from(grid=ag.Grid2DIrregular([[0.5, 0.0]]))
-
-    assert convergence == pytest.approx(1.388511, 1e-2)
-
-    nfw = ag.mp.NFWSph(centre=(0.0, 0.0), kappa_s=2.0, scale_radius=1.0)
-
-    convergence = nfw.convergence_2d_via_mge_from(grid=ag.Grid2DIrregular([[0.5, 0.0]]))
-
-    assert convergence == pytest.approx(2.0 * 1.388511, 1e-2)
-
-    nfw = ag.mp.NFWSph(centre=(0.0, 0.0), kappa_s=1.0, scale_radius=2.0)
-
-    convergence = nfw.convergence_2d_via_mge_from(grid=ag.Grid2DIrregular([[1.0, 0.0]]))
-
-    assert convergence == pytest.approx(1.388511, 1e-2)
-
-    nfw = ag.mp.NFW(
-        centre=(0.0, 0.0),
-        ell_comps=(0.0, 0.333333),
-        kappa_s=1.0,
-        scale_radius=1.0,
-    )
-
-    convergence = nfw.convergence_2d_via_mge_from(
-        grid=ag.Grid2DIrregular([[0.25, 0.0]])
-    )
-
-    assert convergence == pytest.approx(1.388511, 1e-3)
-
-
 def test__convergence_2d_via_cse_from():
     # r = 2.0 (> 1.0)
     # F(r) = (1/(sqrt(3))*atan(sqrt(3)) = 0.60459978807

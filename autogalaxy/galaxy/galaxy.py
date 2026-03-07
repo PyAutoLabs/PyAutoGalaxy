@@ -8,7 +8,6 @@ import autoarray as aa
 import autofit as af
 
 from autogalaxy import exc
-from autogalaxy.operate.deflections import OperateDeflections
 from autogalaxy.operate.image import OperateImageList
 from autogalaxy.profiles.geometry_profiles import GeometryProfile
 from autogalaxy.profiles.light.abstract import LightProfile
@@ -17,7 +16,7 @@ from autogalaxy.profiles.light.snr.abstract import LightProfileSNR
 from autogalaxy.profiles.mass.abstract.abstract import MassProfile
 
 
-class Galaxy(af.ModelObject, OperateImageList, OperateDeflections):
+class Galaxy(af.ModelObject, OperateImageList):
     """
     @DynamicAttrs
     """

@@ -133,6 +133,7 @@ def ludlow16_cosmology_jax(
         mass_at_200,
         redshift_object,
         redshift_source,
+        vmap_method="sequential",
     )
 
 

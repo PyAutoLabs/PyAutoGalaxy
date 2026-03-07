@@ -1,3 +1,88 @@
+cNFWMCRLudlow:
+  centre_0:
+    type: Gaussian
+    mean: 0.0
+    sigma: 0.1
+    width_modifier:
+      type: Absolute
+      value: 0.05
+    limits:
+      lower: -inf
+      upper: inf
+  centre_1:
+    type: Gaussian
+    mean: 0.0
+    sigma: 0.1
+    width_modifier:
+      type: Absolute
+      value: 0.05
+    limits:
+      lower: -inf
+      upper: inf
+  ell_comps_0:
+    type: TruncatedGaussian
+    mean: 0.0
+    sigma: 0.3
+    lower_limit: -1.0
+    upper_limit: 1.0
+    width_modifier:
+      type: Absolute
+      value: 0.2
+    limits:
+      lower: -1.0
+      upper: 1.0
+  ell_comps_1:
+    type: TruncatedGaussian
+    mean: 0.0
+    sigma: 0.3
+    lower_limit: -1.0
+    upper_limit: 1.0
+    width_modifier:
+      type: Absolute
+      value: 0.2
+    limits:
+      lower: -1.0
+      upper: 1.0
+  mass_at_200:
+    type: LogUniform
+    lower_limit: 100000000.0
+    upper_limit: 1000000000000000.0
+    width_modifier:
+      type: Relative
+      value: 0.5
+    limits:
+      lower: 0.0
+      upper: inf
+  f_c:
+    type: Uniform
+    lower_limit: 0.0001
+    upper_limit: 0.5
+    width_modifier:
+      type: Relative
+      value: 0.2
+    limits:
+      lower: 0.0001
+      upper: inf
+  redshift_object:
+    type: Uniform
+    lower_limit: 0.0
+    upper_limit: 1.0
+    width_modifier:
+      type: Relative
+      value: 0.5
+    limits:
+      lower: 0.0
+      upper: inf
+  redshift_source:
+    type: Uniform
+    lower_limit: 0.0
+    upper_limit: 1.0
+    width_modifier:
+      type: Relative
+      value: 0.5
+    limits:
+      lower: 0.0
+      upper: inf
 cNFWMCRLudlowSph:
   centre_0:
     type: Gaussian

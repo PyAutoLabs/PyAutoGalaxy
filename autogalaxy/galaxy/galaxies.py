@@ -8,10 +8,9 @@ from autogalaxy.galaxy.galaxy import Galaxy
 from autogalaxy.profiles.basis import Basis
 from autogalaxy.profiles.light.linear import LightProfileLinear
 from autogalaxy.operate.image import OperateImageGalaxies
-from autogalaxy.operate.deflections import OperateDeflections
 
 
-class Galaxies(List, OperateImageGalaxies, OperateDeflections):
+class Galaxies(List, OperateImageGalaxies):
     def __init__(
         self,
         galaxies: List[Galaxy],

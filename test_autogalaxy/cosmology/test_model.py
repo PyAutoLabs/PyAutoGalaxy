@@ -115,6 +115,17 @@ def test__scaling_factor_between_redshifts_from():
     assert scaling_factor == pytest.approx(0.6739452581456, 1e-4)
 
 
+def test__luminosity_distance():
+
+    cosmology = ag.cosmology.Planck15()
+
+    # D_A(0, 0.1) = 392840 kpc = 392.840 Mpc (verified by test__angular_diameter_distances)
+    # D_L(0.1) = (1 + 0.1)^2 * 392.840 = 1.21 * 392.840 = 475.3364 Mpc
+    luminosity_distance = cosmology.luminosity_distance(z=0.1)
+
+    assert luminosity_distance == pytest.approx(475.336, 1e-4)
+
+
 def test__velocity_dispersion_from():
 
     cosmology = ag.cosmology.Planck15()

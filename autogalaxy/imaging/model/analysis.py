@@ -22,7 +22,6 @@ class AnalysisImaging(AnalysisDataset):
         adapt_images: Optional[AdaptImages] = None,
         cosmology: LensingCosmology = None,
         settings: aa.Settings = None,
-        preloads: aa.Preloads = None,
         title_prefix: str = None,
         use_jax: bool = True,
     ):
@@ -61,7 +60,6 @@ class AnalysisImaging(AnalysisDataset):
             adapt_images=adapt_images,
             cosmology=cosmology,
             settings=settings,
-            preloads=preloads,
             title_prefix=title_prefix,
             use_jax=use_jax,
         )
@@ -121,8 +119,6 @@ class AnalysisImaging(AnalysisDataset):
         instance
             An instance of the model that is being fitted to the data by this analysis (whose parameters have been set
             via a non-linear search).
-        preload_overwrite
-            If a `Preload` object is input this is used instead of the preloads stored as an attribute in the analysis.
 
         Returns
         -------
@@ -144,7 +140,6 @@ class AnalysisImaging(AnalysisDataset):
             dataset_model=dataset_model,
             adapt_images=adapt_images,
             settings=self.settings,
-            preloads=self.preloads,
             xp=self._xp,
         )
 

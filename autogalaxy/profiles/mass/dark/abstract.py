@@ -5,9 +5,7 @@ import autoarray as aa
 
 from autogalaxy.profiles.mass.abstract.abstract import MassProfile
 from autogalaxy.cosmology.model import LensingCosmology
-from autogalaxy.profiles.mass.abstract.mge_numpy import (
-    MassProfileMGE,
-)
+
 
 from autogalaxy import exc
 
@@ -16,7 +14,7 @@ class DarkProfile:
     pass
 
 
-class AbstractgNFW(MassProfile, DarkProfile, MassProfileMGE):
+class AbstractgNFW(MassProfile, DarkProfile):
     epsrel = 1.49e-5
 
     def __init__(
@@ -47,7 +45,6 @@ class AbstractgNFW(MassProfile, DarkProfile, MassProfileMGE):
         """
 
         super().__init__(centre=centre, ell_comps=ell_comps)
-        super(MassProfileMGE, self).__init__()
 
         self.kappa_s = kappa_s
         self.scale_radius = scale_radius
@@ -68,24 +65,7 @@ class AbstractgNFW(MassProfile, DarkProfile, MassProfileMGE):
 
         grid_eta = self.elliptical_radii_grid_from(grid=grid, xp=xp, **kwargs)
 
-        return self.convergence_func(grid_radius=grid_eta)
-
-    @aa.over_sample
-    @aa.grid_dec.to_array
-    @aa.grid_dec.transform
-    def convergence_2d_via_mge_from(self, grid: aa.type.Grid2DLike, xp=np, **kwargs):
-        """Calculate the projected convergence at a given set of arc-second gridded coordinates.
-
-        Parameters
-        ----------
-        grid
-            The grid of (y,x) arc-second coordinates the convergence is computed on.
-
-        """
-
-        elliptical_radii = self.elliptical_radii_grid_from(grid=grid, xp=xp, **kwargs)
-
-        return self._convergence_2d_via_mge_from(grid_radii=elliptical_radii)
+        return self.convergence_func(grid_radius=grid_eta, xp=xp)
 
     def tabulate_integral(self, grid, tabulate_bins, **kwargs):
         """Tabulate an integral over the convergence of deflection potential of a mass profile. This is used in \
@@ -107,27 +87,18 @@ class AbstractgNFW(MassProfile, DarkProfile, MassProfileMGE):
 
         return eta_min, eta_max, minimum_log_eta, maximum_log_eta, bin_size
 
-    def decompose_convergence_via_mge(self, **kwargs):
+    def density_3d_func(self, r, xp=np):
+        x = r.array / self.scale_radius
+
         rho_at_scale_radius = (
             self.kappa_s / self.scale_radius
         )  # density parameter of 3D gNFW
 
-        radii_min = self.scale_radius / 2000.0
-        radii_max = self.scale_radius * 30.0
-
-        def gnfw_3d(r):
-            x = r / self.scale_radius
-            return (
-                rho_at_scale_radius
-                * x ** (-self.inner_slope)
-                * (1.0 + x) ** (self.inner_slope - 3.0)
-            )
-
-        amplitude_list, sigma_list = self._decompose_convergence_via_mge(
-            func=gnfw_3d, radii_min=radii_min, radii_max=radii_max
+        return (
+            rho_at_scale_radius
+            * x ** (-self.inner_slope)
+            * (1.0 + x) ** (self.inner_slope - 3.0)
         )
-        amplitude_list *= np.sqrt(2.0 * np.pi) * sigma_list
-        return amplitude_list, sigma_list
 
     def coord_func_f(self, grid_radius: np.ndarray, xp=np) -> np.ndarray:
         """

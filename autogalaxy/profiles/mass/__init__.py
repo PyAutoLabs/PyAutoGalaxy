@@ -1,4 +1,5 @@
 from .abstract.abstract import MassProfile
+from .abstract.mge import MGEDecomposer
 from .point import PointMass, SMBH, SMBHBinary
 from .total import (
     dPIEMass,
@@ -36,8 +37,11 @@ from .dark import (
     NFWMCRLudlow,
     gNFWMCRLudlow,
     NFWVirialMassConcSph,
+    cNFW,
     cNFWSph,
+    cNFWMCRLudlow,
     cNFWMCRLudlowSph,
+    cNFWMCRScatterLudlow,
     cNFWMCRScatterLudlowSph,
 )
 from .stellar import (

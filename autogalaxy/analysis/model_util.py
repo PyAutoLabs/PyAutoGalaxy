@@ -129,6 +129,7 @@ def mge_model_from(
     )
 
 
+
 def mge_model_V2_from(
     mask_radius: float,
     total_gaussians: int = 30,
@@ -261,6 +262,106 @@ def mge_model_V2_from(
         Basis,
         profile_list=bulge_gaussian_list,
     )
+
+def mge_point_model_from(
+    pixel_scales: float,
+    total_gaussians: int = 10,
+    centre: Tuple[float, float] = (0.0, 0.0),
+) -> af.Model:
+    """
+    Construct a Multi-Gaussian Expansion (MGE) model for a compact or unresolved
+    point-like component (e.g. a nuclear starburst, AGN, or unresolved bulge).
+
+    The model is composed of ``total_gaussians`` linear Gaussians whose sigma values
+    are logarithmically spaced between 0.01 arcseconds and twice the pixel scale.
+    All Gaussians share the same centre and ellipticity components, keeping the
+    parameter count low while capturing a realistic PSF-convolved point source.
+
+    Parameters
+    ----------
+    pixel_scales
+        The pixel scale of the image in arcseconds per pixel.  The maximum Gaussian
+        width is set to ``2 * pixel_scales`` so that the model is compact relative to
+        the resolution of the data.
+    total_gaussians
+        Number of Gaussian components in the basis.
+    centre
+        (y, x) centre of the point source in arc-seconds.  A ±0.1 arcsecond uniform
+        prior is placed on each coordinate.
+
+    Returns
+    -------
+    af.Model
+        An ``autofit.Model`` wrapping a ``Basis`` of linear Gaussians.
+    """
+
+    from autogalaxy.profiles.light.linear import Gaussian
+    from autogalaxy.profiles.basis import Basis
+
+    if total_gaussians < 1:
+        raise ValueError(
+            f"mge_point_model_from requires total_gaussians >= 1, got {total_gaussians}."
+        )
+
+    if pixel_scales <= 0:
+        raise ValueError(
+            f"mge_point_model_from requires pixel_scales > 0, got {pixel_scales}."
+        )
+
+    # Sigma values are logarithmically spaced between 0.01 arcsec (10**-2)
+    # and twice the pixel scale, with a floor to avoid taking log10 of
+    # very small or non-positive values.
+    min_log10_sigma = -2.0  # corresponds to 0.01 arcsec
+    max_sigma = max(2.0 * pixel_scales, 10**min_log10_sigma)
+    max_log10_sigma = np.log10(max_sigma)
+
+    log10_sigma_list = np.linspace(min_log10_sigma, max_log10_sigma, total_gaussians)
+    centre_0 = af.UniformPrior(lower_limit=centre[0] - 0.1, upper_limit=centre[0] + 0.1)
+    centre_1 = af.UniformPrior(lower_limit=centre[1] - 0.1, upper_limit=centre[1] + 0.1)
+
+    gaussian_list = af.Collection(af.Model(Gaussian) for _ in range(total_gaussians))
+
+    for i, gaussian in enumerate(gaussian_list):
+        gaussian.centre.centre_0 = centre_0
+        gaussian.centre.centre_1 = centre_1
+        gaussian.ell_comps = gaussian_list[0].ell_comps
+        gaussian.sigma = 10 ** log10_sigma_list[i]
+
+    return af.Model(Basis, profile_list=gaussian_list)
+
+
+def hilbert_pixels_from_pixel_scale(pixel_scale: float) -> int:
+    """
+    Return the number of Hilbert-curve pixels appropriate for a given image pixel scale.
+
+    The Hilbert pixel count controls the resolution of the Hilbert-curve ordering used
+    in adaptive source-plane pixelizations. Finer pixel scales resolve smaller angular
+    features and therefore benefit from a higher Hilbert resolution.
+
+    Parameters
+    ----------
+    pixel_scale
+        The pixel scale of the image in arcseconds per pixel.
+
+    Returns
+    -------
+    int
+        The recommended number of Hilbert pixels.
+    """
+    if not np.isfinite(pixel_scale) or pixel_scale <= 0:
+        raise ValueError(
+            f"hilbert_pixels_from_pixel_scale requires pixel_scale to be finite and > 0, got {pixel_scale}."
+        )
+
+    if pixel_scale > 0.06:
+        return 1000
+    elif pixel_scale > 0.04:
+        return 1250
+    elif pixel_scale >= 0.03:
+        return 1500
+    else:
+        return 1750
+
 
 
 def simulator_start_here_model_from():

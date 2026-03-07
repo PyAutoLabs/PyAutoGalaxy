@@ -21,8 +21,6 @@ from autoarray.inversion.mesh.mesh.abstract import AbstractMesh
 from autoarray.inversion.regularization.abstract import AbstractRegularization
 from autoarray.inversion.pixelization import Pixelization  # noqa
 from autoarray.inversion.mesh.border_relocator import BorderRelocator
-from autoarray.preloads import Preloads
-from autoarray.preloads import mapper_indices_from
 from autoarray.mask.mask_1d import Mask1D  # noqa
 from autoarray.mask.mask_2d import Mask2D  # noqa
 from autoarray.mask.derive.zoom_2d import Zoom2D
@@ -71,7 +69,7 @@ from .ellipse.model.analysis import AnalysisEllipse
 from .operate.image import OperateImage
 from .operate.image import OperateImageList
 from .operate.image import OperateImageGalaxies
-from .operate.deflections import OperateDeflections
+from .operate.lens_calc import LensCalc
 from .gui.scribbler import Scribbler
 from .imaging.fit_imaging import FitImaging
 from .imaging.model.analysis import AnalysisImaging
@@ -121,4 +119,4 @@ from autoconf.fitsable import header_obj_from
 from autoconf.fitsable import output_to_fits
 from autoconf.fitsable import hdu_list_for_output_from
 
-__version__ = "2026.1.21.3"
+__version__ = "2026.2.26.4"
