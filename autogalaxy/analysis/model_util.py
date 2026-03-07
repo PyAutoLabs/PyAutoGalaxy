@@ -138,6 +138,7 @@ def mge_model_V2_from(
     centre: Tuple[float, float] = (0.0, 0.0),
     centre_fixed: Optional[Tuple[float, float]] = None,
     use_spherical: bool = False,
+    ell_comps_range: Optional[float] = None,
 ) -> af.Collection:
     """
     Construct a Multi-Gaussian Expansion (MGE) for the lens or source galaxy light
@@ -238,9 +239,16 @@ def mge_model_V2_from(
             gaussian.centre.centre_0 = centre_0  # All Gaussians have same y centre.
             gaussian.centre.centre_1 = centre_1  # All Gaussians have same x centre.
             if not use_spherical:
-                gaussian.ell_comps = gaussian_list[
-                    0
-                ].ell_comps  # All Gaussians have same elliptical components.
+                if ell_comps_range is not None:
+                    if i == 0:
+                        gaussian.ell_comps.ell_comps_0 = af.UniformPrior(
+                            lower_limit=-ell_comps_range, upper_limit=ell_comps_range
+                        )
+                        gaussian.ell_comps.ell_comps_1 = af.UniformPrior(
+                            lower_limit=-ell_comps_range, upper_limit=ell_comps_range
+                        )
+                    else:
+                        gaussian.ell_comps = gaussian_list[0].ell_comps  # All Gaussians have same elliptical components.
             gaussian.sigma = (
                 10 ** log10_sigma_list[i]
             )  # All Gaussian sigmas are fixed to values above.
