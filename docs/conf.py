@@ -74,7 +74,7 @@ todo_include_todos = True
 
 # -- Options for Markdown files ----------------------------------------------
 
-myst_enable_extensions = ["colon_fence", "deflist"]
+myst_enable_extensions = ["colon_fence", "deflist", "substitution"]
 myst_heading_anchors = 3
 
 autosummary_generate = True
