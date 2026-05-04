@@ -75,7 +75,7 @@ massively parallel model-fitting and an SQLite3 database that allows large suite
 queried and analysed. Accompanying `PyAutoGalaxy` is the [autogalaxy workspace](https://github.com/PyAutoLabs/autogalaxy_workspace),
 which includes example scripts and galaxy datasets covering every use case. The [`HowToGalaxy`](https://github.com/PyAutoLabs/HowToGalaxy)
 repository provides a separate Jupyter notebook lecture series which introduces non-experts to galaxy morphology studies using `PyAutoGalaxy`. Readers can try `PyAutoGalaxy` right now by going 
-to [the introduction Jupyter notebook on Colab](https://colab.research.google.com/github/PyAutoLabs/autogalaxy_workspace/blob/2026.4.13.6/start_here.ipynb) or 
+to [the introduction Jupyter notebook on Colab](https://colab.research.google.com/github/PyAutoLabs/autogalaxy_workspace/blob/2026.5.1.4/start_here.ipynb) or 
 checkout the [readthedocs](https://pyautogalaxy.readthedocs.io/en/latest/) for a complete overview of `PyAutoGalaxy`'s 
 features.
 
@@ -157,7 +157,7 @@ interferometer datasets before a `PyAutoGalaxy` analysis. The [`HowToGalaxy`](ht
 tutorials — a standalone repository separate from the workspace — are a four-chapter lecture series composed of over
 20 Jupyter notebooks aimed at non-experts, introducing them to galaxy morphology analysis, Bayesian inference and
 teaching them how to use `PyAutoGalaxy` for scientific study. The lectures are available on
-[Colab](https://colab.research.google.com/github/PyAutoLabs/HowToGalaxy/blob/2026.4.13.6/notebooks/chapter_1_introduction/tutorial_1_grids_and_galaxies.ipynb)
+[Colab](https://colab.research.google.com/github/PyAutoLabs/HowToGalaxy/blob/2026.5.1.4/notebooks/chapter_1_introduction/tutorial_1_grids_and_galaxies.ipynb)
 and may therefore be taken without a local `PyAutoGalaxy` installation.
 
 # Software Citations

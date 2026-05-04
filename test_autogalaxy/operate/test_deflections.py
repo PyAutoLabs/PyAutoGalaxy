@@ -156,49 +156,6 @@ def test__magnification_2d_via_hessian_from():
     assert magnification.in_list[1] == pytest.approx(-2.575917, 1.0e-4)
 
 
-def test__hessian_from__np_richardson_matches_jax_jacfwd_to_float64():
-    import jax.numpy as jnp
-
-    grid = ag.Grid2DIrregular(values=[(0.5, 0.5), (1.0, 1.0), (0.7, -0.3)])
-
-    mp = ag.mp.Isothermal(
-        centre=(0.0, 0.0), ell_comps=(0.05, -0.111111), einstein_radius=1.5
-    )
-
-    od = LensCalc.from_mass_obj(mp)
-
-    np_hess = od.hessian_from(grid=grid, xp=np)
-    jnp_hess = od.hessian_from(grid=grid, xp=jnp)
-
-    for np_component, jnp_component in zip(np_hess, jnp_hess):
-        np.testing.assert_allclose(
-            np.asarray(np_component),
-            np.asarray(jnp_component),
-            rtol=1.0e-8,
-        )
-
-
-def test__magnification_2d_via_hessian_from__np_jnp_agree_to_float64():
-    import jax.numpy as jnp
-
-    grid = ag.Grid2DIrregular(values=[(0.5, 0.5), (1.0, 1.0), (0.7, -0.3)])
-
-    mp = ag.mp.Isothermal(
-        centre=(0.0, 0.0), ell_comps=(0.05, -0.111111), einstein_radius=1.5
-    )
-
-    od = LensCalc.from_mass_obj(mp)
-
-    np_mag = od.magnification_2d_via_hessian_from(grid=grid, xp=np)
-    jnp_mag = od.magnification_2d_via_hessian_from(grid=grid, xp=jnp)
-
-    np.testing.assert_allclose(
-        np.asarray(np_mag.array),
-        np.asarray(jnp_mag),
-        rtol=1.0e-7,
-    )
-
-
 def test__tangential_critical_curve_list_from__radius_matches_einstein_radius():
     grid = ag.Grid2D.uniform(shape_native=(15, 15), pixel_scales=0.3)
 

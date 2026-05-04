@@ -24,11 +24,11 @@ environment with all the required dependencies already installed.
 This is a great way to get started quickly without needing to install **PyAutoGalaxy** on your own machine,
 so you can check it is the right software for you before going through the installation process:
 
-- [imaging/start_here.ipynb](https://colab.research.google.com/github/PyAutoLabs/autogalaxy_workspace/blob/2026.4.13.6/notebooks/imaging/start_here.ipynb):
+- [imaging/start_here.ipynb](https://colab.research.google.com/github/PyAutoLabs/autogalaxy_workspace/blob/2026.5.1.4/notebooks/imaging/start_here.ipynb):
   Galaxy modeling with CCD imaging (e.g. Hubble, James Webb, ground-based telescopes).
-- [interferometer/start_here.ipynb](https://colab.research.google.com/github/PyAutoLabs/autogalaxy_workspace/blob/2026.4.13.6/notebooks/interferometer/start_here.ipynb):
+- [interferometer/start_here.ipynb](https://colab.research.google.com/github/PyAutoLabs/autogalaxy_workspace/blob/2026.5.1.4/notebooks/interferometer/start_here.ipynb):
   Galaxy modeling with interferometer data (e.g. ALMA), fitting directly in the uv-plane.
-- [multi_band/start_here.ipynb](https://colab.research.google.com/github/PyAutoLabs/autogalaxy_workspace/blob/2026.4.13.6/notebooks/multi/start_here.ipynb):
+- [multi_band/start_here.ipynb](https://colab.research.google.com/github/PyAutoLabs/autogalaxy_workspace/blob/2026.5.1.4/notebooks/multi/start_here.ipynb):
   Multi-band galaxy modeling to study colour gradients and wavelength-dependent structure.
 
 ## Still Unsure?
