@@ -7,7 +7,7 @@ when you installed **PyAutoGalaxy**. If you didn't, checkout the
 [installation instructions](https://pyautogalaxy.readthedocs.io/en/latest/general/installation.html#installation-with-pip)
 for how to downloaded and configure the workspace.
 
-The `README.rst` files distributed throughout the workspace describe every folder and file, and specify if
+The `README.md` files distributed throughout the workspace describe every folder and file, and specify if
 examples are for beginner or advanced users.
 
 New users should begin by checking out the following parts of the workspace.
@@ -30,7 +30,7 @@ Here, you'll find the configuration files which customize:
 > - The behaviour of different (y,x) Cartesian grids used to perform lens calculations.
 > - The generaltrue config which customizes other aspects of **PyAutoGalaxy**.
 
-Descriptions of every configuration file and their input parameters are provided in the `README.rst` in
+Descriptions of every configuration file and their input parameters are provided in the `README.md` in
 the [config directory of the workspace](https://github.com/Jammy2211/autogalaxy_workspace/tree/release/config)
 
 ## Dataset
