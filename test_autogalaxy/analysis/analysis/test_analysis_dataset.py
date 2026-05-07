@@ -1,11 +1,11 @@
 import pytest
 import numpy as np
-from os import path
 
 import autofit as af
 import autogalaxy as ag
+from pathlib import Path
 
-directory = path.dirname(path.realpath(__file__))
+directory = Path(__file__).resolve().parent
 
 
 def test__instance_with_associated_adapt_images_from__galaxy_name_image_dict(

@@ -1,12 +1,12 @@
 import os
-from os import path
+from pathlib import Path
 
 from autoconf.dictable import from_json
 
 import autofit as af
 import autogalaxy as ag
 
-directory = path.dirname(path.realpath(__file__))
+directory = Path(__file__).resolve().parent
 
 
 def test__galaxies_via_instance(masked_imaging_7x7):

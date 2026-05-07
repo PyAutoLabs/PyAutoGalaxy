@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Optional
-from os import path
+from pathlib import Path
 
 from autoconf import conf
 from autoconf.dictable import from_json, output_to_json
@@ -267,11 +267,11 @@ def lp_chain_tracer_from(light_result, settings_search):
     else:
         unique_tag = ""
 
-    lp_chain_tracer_path = path.join(
-        conf.instance.output_path,
-        settings_search.path_prefix,
-        unique_tag,
-        "light_dark_lp_chain_tracer.json",
+    lp_chain_tracer_path = (
+        Path(conf.instance.output_path)
+        / settings_search.path_prefix
+        / unique_tag
+        / "light_dark_lp_chain_tracer.json"
     )
 
     try:

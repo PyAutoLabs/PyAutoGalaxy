@@ -1,11 +1,11 @@
-from os import path
+from pathlib import Path
 
 import autofit as af
 import autogalaxy as ag
 
 from autogalaxy.quantity.model.result import ResultQuantity
 
-directory = path.dirname(path.realpath(__file__))
+directory = Path(__file__).resolve().parent
 
 
 class TestAnalysisQuantity:

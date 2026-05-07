@@ -1,17 +1,17 @@
 import shutil
-from os import path
 import pytest
 
 import autogalaxy as ag
 
 from autogalaxy.quantity.model.plotter import PlotterQuantity
+from pathlib import Path
 
-directory = path.dirname(path.abspath(__file__))
+directory = Path(__file__).resolve().parent
 
 
 @pytest.fixture(name="plot_path")
 def make_plotter_plotter_setup():
-    return path.join("{}".format(directory), "files")
+    return directory / "files"
 
 
 def test__dataset(
@@ -19,7 +19,7 @@ def test__dataset(
     plot_path,
     plot_patch,
 ):
-    if path.exists(plot_path):
+    if Path(plot_path).exists():
         shutil.rmtree(plot_path)
 
     plotter = PlotterQuantity(image_path=plot_path)
@@ -27,7 +27,7 @@ def test__dataset(
     plotter.dataset_quantity(dataset=dataset_quantity_7x7_array_2d)
 
     image = ag.ndarray_via_fits_from(
-        file_path=path.join(plot_path, "dataset.fits"), hdu=1
+        file_path=Path(plot_path) / "dataset.fits", hdu=1
     )
 
     assert image.shape == (7, 7)
@@ -39,11 +39,11 @@ def test__fit_quantity(
     plot_path,
     plot_patch,
 ):
-    if path.exists(plot_path):
+    if Path(plot_path).exists():
         shutil.rmtree(plot_path)
 
     plotter = PlotterQuantity(image_path=plot_path)
 
     plotter.fit_quantity(fit=fit_quantity_7x7_array_2d)
 
-    assert path.join(plot_path, "fit.png") not in plot_patch.paths
+    assert str(Path(plot_path) / "fit.png") not in plot_patch.paths

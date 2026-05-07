@@ -1,11 +1,11 @@
 import os
-from os import path
 import shutil
 
 import numpy as np
 import pytest
 
 import autogalaxy as ag
+from pathlib import Path
 
 
 def test__perfect_fit__simulate_and_reload__chi_squared_zero():
@@ -35,34 +35,30 @@ def test__perfect_fit__simulate_and_reload__chi_squared_zero():
         shape_native=dataset.data.shape_native, pixel_scales=0.2
     )
 
-    file_path = path.join(
-        "{}".format(path.dirname(path.realpath(__file__))),
-        "data_temp",
-        "simulate_and_fit",
-    )
+    file_path = Path(Path(__file__).resolve().parent) / "data_temp" / "simulate_and_fit"
 
     try:
         shutil.rmtree(file_path)
     except FileNotFoundError:
         pass
 
-    if path.exists(file_path) is False:
+    if Path(file_path).exists() is False:
         os.makedirs(file_path)
 
     from autoarray.dataset.plot.imaging_plots import fits_imaging
 
     fits_imaging(
         dataset=dataset,
-        data_path=path.join(file_path, "data.fits"),
-        noise_map_path=path.join(file_path, "noise_map.fits"),
-        psf_path=path.join(file_path, "psf.fits"),
+        data_path=Path(file_path) / "data.fits",
+        noise_map_path=Path(file_path) / "noise_map.fits",
+        psf_path=Path(file_path) / "psf.fits",
         overwrite=True,
     )
 
     dataset = ag.Imaging.from_fits(
-        data_path=path.join(file_path, "data.fits"),
-        noise_map_path=path.join(file_path, "noise_map.fits"),
-        psf_path=path.join(file_path, "psf.fits"),
+        data_path=Path(file_path) / "data.fits",
+        noise_map_path=Path(file_path) / "noise_map.fits",
+        psf_path=Path(file_path) / "psf.fits",
         pixel_scales=0.2,
         over_sample_size_lp=1,
     )
@@ -79,11 +75,9 @@ def test__perfect_fit__simulate_and_reload__chi_squared_zero():
 
     assert fit.chi_squared == pytest.approx(0.0, 1e-4)
 
-    file_path = path.join(
-        "{}".format(path.dirname(path.realpath(__file__))), "data_temp"
-    )
+    file_path = Path(Path(__file__).resolve().parent) / "data_temp"
 
-    if path.exists(file_path) is True:
+    if Path(file_path).exists() is True:
         shutil.rmtree(file_path)
 
 

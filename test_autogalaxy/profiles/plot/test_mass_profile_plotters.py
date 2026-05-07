@@ -1,18 +1,16 @@
-from os import path
+from pathlib import Path
 
 import autoarray as aa
 import autogalaxy.plot as aplt
 import pytest
 from autogalaxy.operate.lens_calc import LensCalc
 
-directory = path.dirname(path.realpath(__file__))
+directory = Path(__file__).resolve().parent
 
 
 @pytest.fixture(name="plot_path")
 def make_mp_plotter_setup():
-    return path.join(
-        "{}".format(path.dirname(path.realpath(__file__))), "files", "plots", "profiles"
-    )
+    return Path(__file__).resolve().parent / "files" / "plots" / "profiles"
 
 
 def test__figures_2d__all_are_output(
@@ -58,8 +56,8 @@ def test__figures_2d__all_are_output(
         output_format="png",
     )
 
-    assert path.join(plot_path, "convergence_2d.png") in plot_patch.paths
-    assert path.join(plot_path, "potential_2d.png") in plot_patch.paths
-    assert path.join(plot_path, "deflections_y_2d.png") in plot_patch.paths
-    assert path.join(plot_path, "deflections_x_2d.png") in plot_patch.paths
-    assert path.join(plot_path, "magnification_2d.png") in plot_patch.paths
+    assert str(plot_path / "convergence_2d.png") in plot_patch.paths
+    assert str(plot_path / "potential_2d.png") in plot_patch.paths
+    assert str(plot_path / "deflections_y_2d.png") in plot_patch.paths
+    assert str(plot_path / "deflections_x_2d.png") in plot_patch.paths
+    assert str(plot_path / "magnification_2d.png") in plot_patch.paths

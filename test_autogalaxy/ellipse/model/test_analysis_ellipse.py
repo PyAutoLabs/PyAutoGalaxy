@@ -1,11 +1,11 @@
-from os import path
+from pathlib import Path
 
 import autofit as af
 import autogalaxy as ag
 
 from autogalaxy.ellipse.model.result import ResultEllipse
 
-directory = path.dirname(path.realpath(__file__))
+directory = Path(__file__).resolve().parent
 
 
 def test__make_result__result_imaging_is_returned(masked_imaging_7x7):

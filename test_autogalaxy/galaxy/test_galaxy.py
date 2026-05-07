@@ -1,5 +1,5 @@
 import numpy as np
-from os import path
+from pathlib import Path
 import pytest
 
 from autoconf.dictable import from_json, output_to_json
@@ -734,9 +734,7 @@ def test__decorator__oversample_uniform__profile_offset_from_centre__correct_num
 
 
 def test__output_to_and_load_from_json():
-    json_file = path.join(
-        "{}".format(path.dirname(path.realpath(__file__))), "files", "galaxy.json"
-    )
+    json_file = Path(__file__).resolve().parent / "files" / "galaxy.json"
 
     g0 = ag.Galaxy(
         redshift=1.0,
