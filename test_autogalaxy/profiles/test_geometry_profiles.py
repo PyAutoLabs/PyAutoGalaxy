@@ -1,6 +1,6 @@
 from __future__ import division, print_function
 
-from os import path
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -8,7 +8,7 @@ import pytest
 import autogalaxy as ag
 from autogalaxy.profiles import geometry_profiles
 
-directory = path.dirname(path.realpath(__file__))
+directory = Path(__file__).resolve().parent
 
 
 def test__cos_and_sin_from_x__zero_ell_comps__cos_1_sin_0():

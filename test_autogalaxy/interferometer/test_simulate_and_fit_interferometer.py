@@ -1,11 +1,11 @@
 import os
-from os import path
 import shutil
 
 import numpy as np
 import pytest
 
 import autogalaxy as ag
+from pathlib import Path
 
 
 def test__perfect_fit__chi_squared_0():
@@ -33,27 +33,23 @@ def test__perfect_fit__chi_squared_0():
 
     dataset = simulator.via_galaxies_from(galaxies=[galaxy_0, galaxy_1], grid=grid)
 
-    file_path = path.join(
-        "{}".format(path.dirname(path.realpath(__file__))),
-        "data_temp",
-        "simulate_and_fit",
-    )
+    file_path = Path(Path(__file__).resolve().parent) / "data_temp" / "simulate_and_fit"
 
     try:
         shutil.rmtree(file_path)
     except FileNotFoundError:
         pass
 
-    if path.exists(file_path) is False:
+    if Path(file_path).exists() is False:
         os.makedirs(file_path)
 
     from autoarray.dataset.plot.interferometer_plots import fits_interferometer
 
     fits_interferometer(
         dataset=dataset,
-        data_path=path.join(file_path, "data.fits"),
-        noise_map_path=path.join(file_path, "noise_map.fits"),
-        uv_wavelengths_path=path.join(file_path, "uv_wavelengths.fits"),
+        data_path=Path(file_path) / "data.fits",
+        noise_map_path=Path(file_path) / "noise_map.fits",
+        uv_wavelengths_path=Path(file_path) / "uv_wavelengths.fits",
         overwrite=True,
     )
 
@@ -63,9 +59,9 @@ def test__perfect_fit__chi_squared_0():
     )
 
     dataset = ag.Interferometer.from_fits(
-        data_path=path.join(file_path, "data.fits"),
-        noise_map_path=path.join(file_path, "noise_map.fits"),
-        uv_wavelengths_path=path.join(file_path, "uv_wavelengths.fits"),
+        data_path=Path(file_path) / "data.fits",
+        noise_map_path=Path(file_path) / "noise_map.fits",
+        uv_wavelengths_path=Path(file_path) / "uv_wavelengths.fits",
         real_space_mask=real_space_mask,
         transformer_class=ag.TransformerDFT,
     )
@@ -94,9 +90,7 @@ def test__perfect_fit__chi_squared_0():
     )
     assert abs(fit.chi_squared) < 1.0e-4
 
-    file_path = path.join(
-        "{}".format(path.dirname(path.realpath(__file__))), "data_temp"
-    )
+    file_path = Path(Path(__file__).resolve().parent) / "data_temp"
 
     shutil.rmtree(file_path, ignore_errors=True)
 

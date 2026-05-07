@@ -1,16 +1,14 @@
-from os import path
+from pathlib import Path
 import pytest
 
 from autogalaxy.operate.lens_calc import LensCalc
 
-directory = path.dirname(path.realpath(__file__))
+directory = Path(__file__).resolve().parent
 
 
 @pytest.fixture(name="plot_path")
 def make_profile_plotter_setup():
-    return path.join(
-        "{}".format(path.dirname(path.realpath(__file__))), "files", "plots", "profiles"
-    )
+    return Path(__file__).resolve().parent / "files" / "plots" / "profiles"
 
 
 def test__1d__half_light_radius_from_light_profile(lp_0):

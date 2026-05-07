@@ -1,16 +1,14 @@
-from os import path
+from pathlib import Path
 
 import autogalaxy.plot as aplt
 import pytest
 
-directory = path.dirname(path.realpath(__file__))
+directory = Path(__file__).resolve().parent
 
 
 @pytest.fixture(name="plot_path")
 def make_galaxy_plotter_setup():
-    return path.join(
-        "{}".format(path.dirname(path.realpath(__file__))), "files", "plots", "galaxy"
-    )
+    return Path(__file__).resolve().parent / "files" / "plots" / "galaxy"
 
 
 def test__subplots_galaxy_quantities__all_are_output(
@@ -26,7 +24,7 @@ def test__subplots_galaxy_quantities__all_are_output(
         output_format="png",
     )
 
-    assert path.join(plot_path, "image.png") in plot_patch.paths
+    assert str(plot_path / "image.png") in plot_patch.paths
 
     aplt.subplot_galaxy_mass_profiles(
         galaxy=gal_x1_lp_x1_mp,
@@ -39,7 +37,7 @@ def test__subplots_galaxy_quantities__all_are_output(
         output_format="png",
     )
 
-    assert path.join(plot_path, "convergence.png") in plot_patch.paths
-    assert path.join(plot_path, "potential.png") in plot_patch.paths
-    assert path.join(plot_path, "deflections_y.png") in plot_patch.paths
-    assert path.join(plot_path, "deflections_x.png") in plot_patch.paths
+    assert str(plot_path / "convergence.png") in plot_patch.paths
+    assert str(plot_path / "potential.png") in plot_patch.paths
+    assert str(plot_path / "deflections_y.png") in plot_patch.paths
+    assert str(plot_path / "deflections_x.png") in plot_patch.paths

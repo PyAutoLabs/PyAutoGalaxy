@@ -1,12 +1,12 @@
-from os import path
 
 import autofit as af
 import autogalaxy as ag
 
 from autogalaxy.interferometer.model.result import ResultInterferometer
+from pathlib import Path
 
 
-directory = path.dirname(path.realpath(__file__))
+directory = Path(__file__).resolve().parent
 
 
 def test__make_result__result_interferometer_is_returned(interferometer_7):

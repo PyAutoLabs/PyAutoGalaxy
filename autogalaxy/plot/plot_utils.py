@@ -1,5 +1,6 @@
 import logging
 import os
+from pathlib import Path
 import numpy as np
 
 logger = logging.getLogger(__name__)
@@ -88,7 +89,7 @@ def _save_subplot(fig, output_path, output_filename, output_format=None,
         plt.show()
     else:
         os.makedirs(str(output_path), exist_ok=True)
-        fpath = os.path.join(str(output_path), f"{output_filename}.{fmt}")
+        fpath = Path(output_path) / f"{output_filename}.{fmt}"
         fig.savefig(fpath, dpi=dpi, bbox_inches="tight", pad_inches=0.1)
     plt.close(fig)
 

@@ -1,4 +1,4 @@
-from os import path
+from pathlib import Path
 
 import autogalaxy.plot as aplt
 import pytest
@@ -6,12 +6,7 @@ import pytest
 
 @pytest.fixture(name="plot_path")
 def make_adapt_plotter_setup():
-    return path.join(
-        "{}".format(path.dirname(path.realpath(__file__))),
-        "files",
-        "plots",
-        "adapt",
-    )
+    return Path(__file__).resolve().parent / "files" / "plots" / "adapt"
 
 
 def test__plot_adapt_adapt_images(
@@ -22,4 +17,4 @@ def test__plot_adapt_adapt_images(
         output_path=plot_path,
         output_format="png",
     )
-    assert path.join(plot_path, "adapt_images.png") in plot_patch.paths
+    assert str(plot_path / "adapt_images.png") in plot_patch.paths

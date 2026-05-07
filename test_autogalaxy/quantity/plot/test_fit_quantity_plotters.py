@@ -1,20 +1,15 @@
-from os import path
+from pathlib import Path
 
 import pytest
 
 import autogalaxy.plot as aplt
 
-directory = path.dirname(path.realpath(__file__))
+directory = Path(__file__).resolve().parent
 
 
 @pytest.fixture(name="plot_path")
 def make_galaxy_fit_plotter_setup():
-    return path.join(
-        "{}".format(path.dirname(path.realpath(__file__))),
-        "files",
-        "plots",
-        "galaxy_fitting",
-    )
+    return Path(__file__).resolve().parent / "files" / "plots" / "galaxy_fitting"
 
 
 def test__fit_sub_plot__all_types_of_fit(
@@ -28,4 +23,4 @@ def test__fit_sub_plot__all_types_of_fit(
         output_path=plot_path,
         output_format="png",
     )
-    assert path.join(plot_path, "fit.png") in plot_patch.paths
+    assert str(plot_path / "fit.png") in plot_patch.paths

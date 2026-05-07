@@ -1,17 +1,15 @@
-from os import path
 
 import pytest
 
 import autogalaxy.plot as aplt
+from pathlib import Path
 
-directory = path.dirname(path.realpath(__file__))
+directory = Path(__file__).resolve().parent
 
 
 @pytest.fixture(name="plot_path")
 def make_fit_imaging_plotter_setup():
-    return path.join(
-        "{}".format(path.dirname(path.realpath(__file__))), "files", "plots", "fit"
-    )
+    return Path(Path(__file__).resolve().parent) / "files" / "plots" / "fit"
 
 
 def test__subplot_of_galaxy(fit_imaging_x2_galaxy_7x7, plot_path, plot_patch):
@@ -27,8 +25,8 @@ def test__subplot_of_galaxy(fit_imaging_x2_galaxy_7x7, plot_path, plot_patch):
         output_path=plot_path,
         output_format="png",
     )
-    assert path.join(plot_path, "of_galaxy_0.png") in plot_patch.paths
-    assert path.join(plot_path, "of_galaxy_1.png") in plot_patch.paths
+    assert str(Path(plot_path) / "of_galaxy_0.png") in plot_patch.paths
+    assert str(Path(plot_path) / "of_galaxy_1.png") in plot_patch.paths
 
     plot_patch.paths = []
 
@@ -39,5 +37,5 @@ def test__subplot_of_galaxy(fit_imaging_x2_galaxy_7x7, plot_path, plot_patch):
         output_format="png",
     )
 
-    assert path.join(plot_path, "of_galaxy_0.png") in plot_patch.paths
-    assert path.join(plot_path, "of_galaxy_1.png") not in plot_patch.paths
+    assert str(Path(plot_path) / "of_galaxy_0.png") in plot_patch.paths
+    assert str(Path(plot_path) / "of_galaxy_1.png") not in plot_patch.paths

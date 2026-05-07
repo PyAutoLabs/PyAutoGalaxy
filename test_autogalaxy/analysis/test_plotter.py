@@ -1,23 +1,23 @@
 import csv
 import shutil
 import numpy as np
-from os import path
+from pathlib import Path
 import pytest
 
 import autogalaxy as ag
 
 from autogalaxy.analysis.plotter import Plotter
 
-directory = path.dirname(path.abspath(__file__))
+directory = Path(__file__).resolve().parent
 
 
 @pytest.fixture(name="plot_path")
 def make_plotter_plotter_setup():
-    return path.join("{}".format(directory), "files")
+    return directory / "files"
 
 
 def test__galaxies(masked_imaging_7x7, galaxies_7x7, plot_path, plot_patch):
-    if path.exists(plot_path):
+    if plot_path.exists():
         shutil.rmtree(plot_path)
 
     plotter = Plotter(image_path=plot_path)
@@ -27,11 +27,11 @@ def test__galaxies(masked_imaging_7x7, galaxies_7x7, plot_path, plot_patch):
         grid=masked_imaging_7x7.grids.lp,
     )
 
-    assert path.join(plot_path, "galaxies.png") in plot_patch.paths
-    assert path.join(plot_path, "galaxy_images.png") in plot_patch.paths
+    assert str(plot_path / "galaxies.png") in plot_patch.paths
+    assert str(plot_path / "galaxy_images.png") in plot_patch.paths
 
     image = ag.ndarray_via_fits_from(
-        file_path=path.join(plot_path, "galaxy_images.fits"), hdu=1
+        file_path=plot_path / "galaxy_images.fits", hdu=1
     )
 
     assert image.shape == (5, 5)
@@ -42,7 +42,7 @@ def test__inversion(
     plot_path,
     plot_patch,
 ):
-    if path.exists(plot_path):
+    if plot_path.exists():
         shutil.rmtree(plot_path)
 
     plotter = Plotter(image_path=plot_path)
@@ -51,10 +51,10 @@ def test__inversion(
         inversion=rectangular_inversion_7x7_3x3,
     )
 
-    assert path.join(plot_path, "inversion_0_0.png") in plot_patch.paths
+    assert str(plot_path / "inversion_0_0.png") in plot_patch.paths
 
     with open(
-        path.join(plot_path, "source_plane_reconstruction_0.csv"), mode="r"
+        plot_path / "source_plane_reconstruction_0.csv", mode="r"
     ) as file:
         reader = csv.reader(file)
         header_list = next(reader)  # ['y', 'x', 'reconstruction', 'noise_map']
@@ -90,12 +90,10 @@ def test__adapt_images(
         adapt_images=adapt_images,
     )
 
-    plot_path = path.join(plot_path)
-
-    assert path.join(plot_path, "adapt_images.png") in plot_patch.paths
+    assert str(plot_path / "adapt_images.png") in plot_patch.paths
 
     image = ag.ndarray_via_fits_from(
-        file_path=path.join(plot_path, "adapt_images.fits"), hdu=1
+        file_path=plot_path / "adapt_images.fits", hdu=1
     )
 
     assert image.shape == (5, 5)

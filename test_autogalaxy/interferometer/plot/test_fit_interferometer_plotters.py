@@ -1,4 +1,4 @@
-from os import path
+from pathlib import Path
 
 import autogalaxy.plot as aplt
 import pytest
@@ -6,9 +6,7 @@ import pytest
 
 @pytest.fixture(name="plot_path")
 def make_fit_dataset_plotter_setup():
-    return path.join(
-        "{}".format(path.dirname(path.realpath(__file__))), "files", "plots", "fit"
-    )
+    return Path(__file__).resolve().parent / "files" / "plots" / "fit"
 
 
 def test__fit_sub_plot_real_space(
@@ -23,7 +21,7 @@ def test__fit_sub_plot_real_space(
         output_format="png",
     )
 
-    assert path.join(plot_path, "fit_real_space.png") in plot_patch.paths
+    assert str(plot_path / "fit_real_space.png") in plot_patch.paths
 
     plot_patch.paths = []
 
@@ -33,4 +31,4 @@ def test__fit_sub_plot_real_space(
         output_format="png",
     )
 
-    assert path.join(plot_path, "fit_real_space.png") in plot_patch.paths
+    assert str(plot_path / "fit_real_space.png") in plot_patch.paths

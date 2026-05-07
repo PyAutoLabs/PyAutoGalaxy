@@ -1,10 +1,10 @@
 import numpy as np
 import os
-from os import path
 import pytest
 import shutil
 
 import autogalaxy as ag
+from pathlib import Path
 
 
 def test__via_signal_to_noise_map__array_2d_data__correct_noise_map(
@@ -134,14 +134,9 @@ def test__vector_data__y_x():
 
 @pytest.fixture(name="test_data_path")
 def make_test_data_path():
-    test_data_path = path.join(
-        "{}".format(os.path.dirname(os.path.realpath(__file__))),
-        "files",
-        "array",
-        "output_test",
-    )
+    test_data_path = Path(__file__).resolve().parent / "files" / "array" / "output_test"
 
-    if os.path.exists(test_data_path):
+    if test_data_path.exists():
         shutil.rmtree(test_data_path)
 
     os.makedirs(test_data_path)
@@ -156,22 +151,22 @@ def test__output_to_fits__array_2d_data__data_and_noise_map_written_correctly(
 
     output_to_fits(
         values=dataset_quantity_7x7_array_2d.data.native.array.astype("float"),
-        file_path=path.join(test_data_path, "data.fits"),
+        file_path=Path(test_data_path) / "data.fits",
         overwrite=True,
         header_dict=dataset_quantity_7x7_array_2d.data.mask.header_dict,
     )
     output_to_fits(
         values=dataset_quantity_7x7_array_2d.noise_map.native.array.astype("float"),
-        file_path=path.join(test_data_path, "noise_map.fits"),
+        file_path=Path(test_data_path) / "noise_map.fits",
         overwrite=True,
         header_dict=dataset_quantity_7x7_array_2d.noise_map.mask.header_dict,
     )
 
     data = ag.Array2D.from_fits(
-        file_path=path.join(test_data_path, "data.fits"), hdu=0, pixel_scales=1.0
+        file_path=Path(test_data_path) / "data.fits", hdu=0, pixel_scales=1.0
     )
     noise_map = ag.Array2D.from_fits(
-        file_path=path.join(test_data_path, "noise_map.fits"), hdu=0, pixel_scales=1.0
+        file_path=Path(test_data_path) / "noise_map.fits", hdu=0, pixel_scales=1.0
     )
 
     assert (data.native == np.ones((7, 7))).all()
@@ -197,19 +192,19 @@ def test__output_to_fits__vector_yx_2d_data__first_pixel_written_correctly(
 
     output_to_fits(
         values=dataset_quantity.data.native.array.astype("float"),
-        file_path=path.join(test_data_path, "data.fits"),
+        file_path=Path(test_data_path) / "data.fits",
         overwrite=True,
         header_dict=dataset_quantity.data.mask.header_dict,
     )
     output_to_fits(
         values=dataset_quantity.noise_map.native.array.astype("float"),
-        file_path=path.join(test_data_path, "noise_map.fits"),
+        file_path=Path(test_data_path) / "noise_map.fits",
         overwrite=True,
         header_dict=dataset_quantity.noise_map.mask.header_dict,
     )
 
     data = ag.Array2D.from_fits(
-        file_path=path.join(test_data_path, "data.fits"), hdu=0, pixel_scales=1.0
+        file_path=Path(test_data_path) / "data.fits", hdu=0, pixel_scales=1.0
     )
 
     assert data[0, 0] == pytest.approx([1.0, 5.0], 1.0e-4)
