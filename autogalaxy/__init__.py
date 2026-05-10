@@ -83,6 +83,9 @@ from .quantity.model.analysis import AnalysisQuantity
 from .quantity.dataset_quantity import DatasetQuantity
 from .galaxy.galaxy import Galaxy
 from .galaxy.galaxies import Galaxies
+from .galaxy.galaxy_table import GalaxyTable
+from .galaxy.galaxy_table import galaxy_table_from_csv
+from .galaxy.galaxy_table import galaxy_table_to_csv
 from .galaxy.redshift import Redshift
 from .galaxy.to_inversion import AbstractToInversion
 from .galaxy.to_inversion import GalaxiesToInversion
