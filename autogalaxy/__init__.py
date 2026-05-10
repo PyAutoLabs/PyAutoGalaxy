@@ -26,6 +26,7 @@ from autoarray.mask.mask_2d import Mask2D  # noqa
 from autoarray.mask.derive.zoom_2d import Zoom2D
 from autoarray.operators.transformer import TransformerDFT  # noqa
 from autoarray.operators.transformer import TransformerNUFFT  # noqa
+from autoarray.operators.transformer import TransformerNUFFTPyNUFFT  # noqa
 from autoarray.layout.layout import Layout2D  # noqa
 from autoarray.structures.arrays.uniform_1d import Array1D  # noqa
 from autoarray.structures.arrays.uniform_2d import Array2D  # noqa
