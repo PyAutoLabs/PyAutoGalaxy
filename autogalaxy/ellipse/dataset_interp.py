@@ -43,45 +43,79 @@ class DatasetInterp:
 
         return (x, y)
 
-    @cached_property
-    def mask_interp(self) -> "interpolate.RegularGridInterpolator":
+    def mask_interp(self, points, xp=np):
         """
         Returns a 2D interpolation of the mask, which is used to determine whether inteprolated values use a masked
         pixel for the interpolation and thus should not be included in a fit.
-        """
-        from scipy import interpolate
 
-        return interpolate.RegularGridInterpolator(
-            points=self.points_interp,
-            values=np.float64(self.dataset.data.mask),
-            bounds_error=False,
+        Backwards-compatibility note: this used to be a cached property that
+        returned a scipy ``RegularGridInterpolator`` instance, also callable on
+        ``(N, 2)`` points. Existing call sites in ``fit_ellipse.py`` that read
+        ``self.interp.mask_interp(points)`` continue to work; the sentinel
+        check ``self.interp.mask_interp is not None`` also continues to pass
+        (a bound method is never None).
+
+        Parameters
+        ----------
+        points
+            An ``(N, 2)`` array of query coordinates. Out-of-bounds queries
+            return 0.0 (treat outside-the-grid as unmasked).
+        xp
+            Array namespace (``numpy`` or ``jax.numpy``). Defaults to
+            ``numpy``.
+        """
+        x_axis, y_axis = self.points_interp
+        return aa.numerics.interp_2d(
+            points,
+            x_axis,
+            y_axis,
+            np.float64(self.dataset.data.mask),
             fill_value=0.0,
+            xp=xp,
         )
 
-    @cached_property
-    def data_interp(self) -> "interpolate.RegularGridInterpolator":
+    def data_interp(self, points, xp=np):
         """
         Returns a 2D interpolation of the data, which is used to evaluate the data at any point in 2D space.
-        """
-        from scipy import interpolate
 
-        return interpolate.RegularGridInterpolator(
-            points=self.points_interp,
-            values=np.float64(self.dataset.data.native),
-            bounds_error=False,
+        Parameters
+        ----------
+        points
+            An ``(N, 2)`` array of query coordinates. Out-of-bounds queries
+            return 0.0.
+        xp
+            Array namespace (``numpy`` or ``jax.numpy``). Defaults to
+            ``numpy``.
+        """
+        x_axis, y_axis = self.points_interp
+        return aa.numerics.interp_2d(
+            points,
+            x_axis,
+            y_axis,
+            np.float64(self.dataset.data.native),
             fill_value=0.0,
+            xp=xp,
         )
 
-    @cached_property
-    def noise_map_interp(self) -> "interpolate.RegularGridInterpolator":
+    def noise_map_interp(self, points, xp=np):
         """
         Returns a 2D interpolation of the noise-map, which is used to evaluate the noise-map at any point in 2D space.
-        """
-        from scipy import interpolate
 
-        return interpolate.RegularGridInterpolator(
-            points=self.points_interp,
-            values=np.float64(self.dataset.noise_map.native),
-            bounds_error=False,
+        Parameters
+        ----------
+        points
+            An ``(N, 2)`` array of query coordinates. Out-of-bounds queries
+            return 0.0.
+        xp
+            Array namespace (``numpy`` or ``jax.numpy``). Defaults to
+            ``numpy``.
+        """
+        x_axis, y_axis = self.points_interp
+        return aa.numerics.interp_2d(
+            points,
+            x_axis,
+            y_axis,
+            np.float64(self.dataset.noise_map.native),
             fill_value=0.0,
+            xp=xp,
         )
