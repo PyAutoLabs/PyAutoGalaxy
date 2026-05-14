@@ -143,6 +143,19 @@ class AnalysisQuantity(Analysis):
             dataset=self.dataset, light_mass_obj=galaxies, func_str=self.func_str
         )
 
+    def fit_from(self, instance: af.ModelInstance) -> FitQuantity:
+        """
+        Standard-name alias for :meth:`fit_quantity_for_instance`.
+
+        Exposing ``fit_from`` lets the autofit base ``Analysis.fit_for_visualization``
+        helper dispatch through the same JIT-cached wrapper as imaging /
+        interferometer (it calls ``self.fit_from`` unconditionally). Without
+        this method, ``use_jax_for_visualization=True`` on ``AnalysisQuantity``
+        would be a silent no-op — see the Phase 0c shipped notes in
+        ``PyAutoPrompt/complete.md``.
+        """
+        return self.fit_quantity_for_instance(instance=instance)
+
     def save_attributes(self, paths: af.DirectoryPaths):
         """
         Before the non-linear search begins, this routine saves attributes of the `Analysis` object to the `files`
