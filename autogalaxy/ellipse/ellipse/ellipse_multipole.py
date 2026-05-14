@@ -41,6 +41,7 @@ class EllipseMultipole:
     def get_shape_angle(
         self,
         ellipse: Ellipse,
+        xp=np,
     ) -> float:
         """
         The shape angle is the offset between the angle of the ellipse and the angle of the multipole,
@@ -53,25 +54,24 @@ class EllipseMultipole:
         ----------
         ellipse
             The base ellipse profile that is perturbed by the multipole.
+        xp
+            The array module to use (default: numpy).
 
         Returns
         -------
         The angle between the ellipse and the multipole, in degrees between +- 180/m.
+        The boundary case `angle == period/2.0` exactly maps to `-period/2.0` after wrap.
         """
 
         angle = (
             ellipse.angle()
             - multipole_k_m_and_phi_m_from(self.multipole_comps, self.m)[1]
         )
-        while angle < -180 / self.m:
-            angle += 360 / self.m
-        while angle > 180 / self.m:
-            angle -= 360 / self.m
-
-        return angle
+        period = 360.0 / self.m
+        return xp.mod(angle + period / 2.0, period) - period / 2.0
 
     def points_perturbed_from(
-        self, pixel_scale, points, ellipse: Ellipse, n_i: int = 0
+        self, pixel_scale, points, ellipse: Ellipse, n_i: int = 0, xp=np
     ) -> np.ndarray:
         """
         Returns the (y,x) coordinates of the input points, which are perturbed by the multipole of the ellipse.
@@ -84,6 +84,8 @@ class EllipseMultipole:
             The (y,x) coordinates of the ellipse that are perturbed by the multipole.
         ellipse
             The ellipse that is perturbed by the multipole, which is used to compute the angles of the ellipse.
+        xp
+            The array module to use (default: numpy).
 
         Returns
         -------
@@ -100,19 +102,19 @@ class EllipseMultipole:
         )
 
         # 1) compute cartesian (polar) angle
-        theta = np.arctan2(points[:, 0], points[:, 1])  # <- true polar angle
+        theta = xp.arctan2(points[:, 0], points[:, 1])  # <- true polar angle
 
         # 2) multipole in that same frame
         delta_theta = self.m * (theta - ellipse.angle_radians())
-        radial = comps_adjusted[1] * np.cos(delta_theta) + comps_adjusted[0] * np.sin(
+        radial = comps_adjusted[1] * xp.cos(delta_theta) + comps_adjusted[0] * xp.sin(
             delta_theta
         )
 
         # 3) perturb along the true radial direction
-        x = points[:, 1] + radial * np.cos(theta)
-        y = points[:, 0] + radial * np.sin(theta)
+        x = points[:, 1] + radial * xp.cos(theta)
+        y = points[:, 0] + radial * xp.sin(theta)
 
-        return np.stack((y, x), axis=-1)
+        return xp.stack((y, x), axis=-1)
 
 
 class EllipseMultipoleScaled(EllipseMultipole):
@@ -165,7 +167,7 @@ class EllipseMultipoleScaled(EllipseMultipole):
         self.m = m
 
     def points_perturbed_from(
-        self, pixel_scale, points, ellipse: Ellipse, n_i: int = 0
+        self, pixel_scale, points, ellipse: Ellipse, n_i: int = 0, xp=np
     ) -> np.ndarray:
         """
         Returns the (y,x) coordinates of the input points, which are perturbed by the multipole of the ellipse.
@@ -178,6 +180,8 @@ class EllipseMultipoleScaled(EllipseMultipole):
             The (y,x) coordinates of the ellipse that are perturbed by the multipole.
         ellipse
             The ellipse that is perturbed by the multipole, which is used to compute the angles of the ellipse.
+        xp
+            The array module to use (default: numpy).
 
         Returns
         -------
@@ -194,11 +198,11 @@ class EllipseMultipoleScaled(EllipseMultipole):
         )
 
         # 1) compute cartesian (polar) angle
-        theta = np.arctan2(points[:, 0], points[:, 1])  # <- true polar angle
+        theta = xp.arctan2(points[:, 0], points[:, 1])  # <- true polar angle
 
         # 2) multipole in that same frame
         delta_theta = self.m * (theta - ellipse.angle_radians())
-        radial = comps_adjusted[1] * np.cos(delta_theta) + comps_adjusted[0] * np.sin(
+        radial = comps_adjusted[1] * xp.cos(delta_theta) + comps_adjusted[0] * xp.sin(
             delta_theta
         )
 
@@ -212,7 +216,7 @@ class EllipseMultipoleScaled(EllipseMultipole):
         #         )
 
         # 3) perturb along the true radial direction
-        x = points[:, 1] + radial * np.cos(theta)
-        y = points[:, 0] + radial * np.sin(theta)
+        x = points[:, 1] + radial * xp.cos(theta)
+        y = points[:, 0] + radial * xp.sin(theta)
 
-        return np.stack(arrays=(y, x), axis=-1)
+        return xp.stack(arrays=(y, x), axis=-1)
