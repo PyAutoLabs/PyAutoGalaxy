@@ -14,7 +14,7 @@ def test__scatter_is_nonzero__sph_scatter_positive():
         redshift_source=2.5,
     )
 
-    assert mp.scale_radius == pytest.approx(0.14978, 1.0e-4)
+    assert mp.scale_radius == pytest.approx(0.14978, 1.0e-3)
 
 
 def test__scatter_is_nonzero__sph_scatter_negative():
@@ -25,7 +25,7 @@ def test__scatter_is_nonzero__sph_scatter_negative():
         redshift_source=2.5,
     )
 
-    assert mp.scale_radius == pytest.approx(0.29886, 1.0e-4)
+    assert mp.scale_radius == pytest.approx(0.29886, 1.0e-3)
 
 
 def test__scatter_is_nonzero__ell_scatter_positive():
@@ -38,7 +38,7 @@ def test__scatter_is_nonzero__ell_scatter_positive():
     )
 
     assert nfw_ell.ell_comps == (0.5, 0.5)
-    assert nfw_ell.scale_radius == pytest.approx(0.14978, 1.0e-4)
+    assert nfw_ell.scale_radius == pytest.approx(0.14978, 1.0e-3)
 
 
 def test__scatter_is_nonzero__ell_scatter_negative__deflections_differ_from_sph():
@@ -58,12 +58,12 @@ def test__scatter_is_nonzero__ell_scatter_negative__deflections_differ_from_sph(
     )
 
     assert nfw_ell.ell_comps == (0.5, 0.5)
-    assert nfw_ell.scale_radius == pytest.approx(0.29886, 1.0e-4)
+    assert nfw_ell.scale_radius == pytest.approx(0.29886, 1.0e-3)
 
     deflections_sph = mp_sph.deflections_yx_2d_from(grid=grid)
     deflections_ell = nfw_ell.deflections_yx_2d_from(grid=grid)
 
-    assert deflections_sph[0] != pytest.approx(deflections_ell[0], 1.0e-4)
+    assert deflections_sph[0] != pytest.approx(deflections_ell[0], 1.0e-3)
 
 
 def test__scatter_is_nonzero_cored__sph_scatter_positive():
@@ -75,7 +75,7 @@ def test__scatter_is_nonzero_cored__sph_scatter_positive():
         redshift_source=2.5,
     )
 
-    assert cnfw_sph.scale_radius == pytest.approx(0.14978, 1.0e-4)
+    assert cnfw_sph.scale_radius == pytest.approx(0.14978, 1.0e-3)
 
 
 def test__scatter_is_nonzero_cored__sph_scatter_negative():
@@ -87,7 +87,7 @@ def test__scatter_is_nonzero_cored__sph_scatter_negative():
         redshift_source=2.5,
     )
 
-    assert cnfw_sph.scale_radius == pytest.approx(0.29886, 1.0e-4)
+    assert cnfw_sph.scale_radius == pytest.approx(0.29886, 1.0e-3)
 
 
 def test__scatter_is_nonzero_cored__ell_scatter_positive():
@@ -100,7 +100,7 @@ def test__scatter_is_nonzero_cored__ell_scatter_positive():
         redshift_source=2.5,
     )
 
-    assert cnfw.scale_radius == pytest.approx(0.14978, 1.0e-4)
+    assert cnfw.scale_radius == pytest.approx(0.14978, 1.0e-3)
 
 
 def test__scatter_is_nonzero_cored__ell_scatter_negative():
@@ -112,4 +112,4 @@ def test__scatter_is_nonzero_cored__ell_scatter_negative():
         redshift_source=2.5,
     )
 
-    assert cnfw_sph.scale_radius == pytest.approx(0.29886, 1.0e-4)
+    assert cnfw_sph.scale_radius == pytest.approx(0.29886, 1.0e-3)

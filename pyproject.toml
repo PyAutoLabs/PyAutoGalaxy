@@ -28,7 +28,6 @@ keywords = ["cli"]
 dependencies = [
     "autofit",
     "autoarray",
-    "colossus==1.3.1",
     "astropy>=5.0,<=7.2.0",
     "nautilus-sampler==1.0.5"
 ]
@@ -68,8 +67,8 @@ docs=[
     "sphinx_inline_tabs",
     "sphinx_autodoc_typehints"
 ]
-test = ["pytest"]
-dev = ["pytest", "black"]
+test = ["pytest", "colossus==1.3.1"]
+dev = ["pytest", "black", "colossus==1.3.1"]
 
 [tool.setuptools.package-data]
 "autogalaxy.config" = ["*"]

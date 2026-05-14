@@ -1,5 +1,4 @@
 import numpy as np
-import warnings
 
 
 def kappa_s_and_scale_radius_for_duffy(mass_at_200, redshift_object, redshift_source):
@@ -54,86 +53,62 @@ def kappa_s_and_scale_radius_for_duffy(mass_at_200, redshift_object, redshift_so
     return kappa_s, scale_radius, radius_at_200
 
 
-def _ludlow16_cosmology_callback(
-    mass_at_200,
-    redshift_object,
-    redshift_source,
-):
+def ludlow16_cosmology(mass_at_200, redshift_object, redshift_source, xp=np):
     """
-    Pure NumPy / Python function.
-    Must NEVER see JAX tracers.
-    """
+    Ludlow et al. 2016 concentration plus the three cosmological quantities
+    needed to convert it into AutoGalaxy NFW parameters
+    (``kappa_s``, ``scale_radius``).
 
-    import numpy as np
-    from colossus.cosmology import cosmology as col_cosmology
-    from colossus.halo.concentration import concentration as col_concentration
+    The concentration is computed via ``ludlow16.ludlow16_concentration``
+    (a JAX-native port of ``colossus.halo.concentration.modelLudlow16``).
+    The cosmology quantities flow through the autogalaxy ``Planck15``
+    cosmology, which already supports both numpy and JAX via its own
+    ``xp`` parameter.
+
+    Mass is in Msun (physical) — colossus internally works in Msun/h, so
+    the conversion is applied here.
+
+    Returns
+    -------
+    concentration : scalar xp array
+    cosmic_average_density : scalar xp array
+        Critical density at ``redshift_object``, in Msun / kpc^3.
+    critical_surface_density : scalar xp array
+        Sigma_crit between the lens and source planes, in Msun / kpc^2.
+    kpc_per_arcsec : scalar xp array
+        Angular-diameter scale at ``redshift_object``, in kpc / arcsec.
+    """
     from autogalaxy.cosmology.model import Planck15
-
-    # -----------------------
-    # Colossus cosmology
-    # -----------------------
-    col_cosmo = col_cosmology.setCosmology("planck15")
-
-    m_input = mass_at_200 * col_cosmo.h
-    concentration = col_concentration(
-        m_input,
-        "200c",
-        redshift_object,
-        model="ludlow16",
+    from autogalaxy.profiles.mass.dark.ludlow16 import (
+        ludlow16_concentration,
+        PLANCK15_COSMOLOGY,
     )
 
-    # -----------------------
-    # AutoGalaxy cosmology (no astropy.units)
-    # -----------------------
     cosmology = Planck15()
+    h = PLANCK15_COSMOLOGY["h"]
 
-    # Msun / kpc^3 (your xp drop-in should return this directly)
-    cosmic_average_density = cosmology.critical_density(redshift_object, xp=np)
+    concentration = ludlow16_concentration(
+        mass_at_200 * h,
+        redshift_object,
+        xp=xp,
+        **PLANCK15_COSMOLOGY,
+    )
 
-    # Msun / kpc^2
+    cosmic_average_density = cosmology.critical_density(redshift_object, xp=xp)
     critical_surface_density = (
         cosmology.critical_surface_density_between_redshifts_solar_mass_per_kpc2_from(
             redshift_0=redshift_object,
             redshift_1=redshift_source,
-            xp=np,
+            xp=xp,
         )
     )
-
-    # kpc / arcsec
-    kpc_per_arcsec = cosmology.kpc_per_arcsec_from(redshift=redshift_object, xp=np)
+    kpc_per_arcsec = cosmology.kpc_per_arcsec_from(redshift=redshift_object, xp=xp)
 
     return (
-        np.float64(concentration),
-        np.float64(cosmic_average_density),
-        np.float64(critical_surface_density),
-        np.float64(kpc_per_arcsec),
-    )
-
-
-def ludlow16_cosmology_jax(
-    mass_at_200,
-    redshift_object,
-    redshift_source,
-):
-    """
-    JAX-safe wrapper around Colossus + Astropy cosmology.
-    """
-    import jax
-    import jax.numpy as jnp
-    from jax import ShapeDtypeStruct
-
-    return jax.pure_callback(
-        _ludlow16_cosmology_callback,
-        (
-            ShapeDtypeStruct((), jnp.float64),  # concentration
-            ShapeDtypeStruct((), jnp.float64),  # rho_crit(z)
-            ShapeDtypeStruct((), jnp.float64),  # Sigma_crit
-            ShapeDtypeStruct((), jnp.float64),  # kpc/arcsec
-        ),
-        mass_at_200,
-        redshift_object,
-        redshift_source,
-        vmap_method="sequential",
+        concentration,
+        cosmic_average_density,
+        critical_surface_density,
+        kpc_per_arcsec,
     )
 
 
@@ -151,39 +126,21 @@ def kappa_s_and_scale_radius_for_ludlow(
 
         xp = jnp
 
-    # ------------------------------------
-    # Cosmology + concentration (callback)
-    # ------------------------------------
-
-    if xp is np:
-        (
-            concentration,
-            cosmic_average_density,
-            critical_surface_density,
-            kpc_per_arcsec,
-        ) = _ludlow16_cosmology_callback(
-            mass_at_200,
-            redshift_object,
-            redshift_source,
-        )
-    else:
-        (
-            concentration,
-            cosmic_average_density,
-            critical_surface_density,
-            kpc_per_arcsec,
-        ) = ludlow16_cosmology_jax(
-            mass_at_200,
-            redshift_object,
-            redshift_source,
-        )
+    (
+        concentration,
+        cosmic_average_density,
+        critical_surface_density,
+        kpc_per_arcsec,
+    ) = ludlow16_cosmology(
+        mass_at_200,
+        redshift_object,
+        redshift_source,
+        xp=xp,
+    )
 
     # Apply scatter (JAX-safe)
     concentration = 10.0 ** (xp.log10(concentration) + scatter_sigma * 0.15)
 
-    # ------------------------------------
-    # JAX-native algebra
-    # ------------------------------------
     radius_at_200 = (
         mass_at_200 / (200.0 * cosmic_average_density * (4.0 * xp.pi / 3.0))
     ) ** (1.0 / 3.0)
@@ -224,39 +181,21 @@ def kappa_s_scale_radius_and_core_radius_for_ludlow(
 
         xp = jnp
 
-        # ------------------------------------
-        # Cosmology + concentration (callback)
-        # ------------------------------------
-
-    if xp is np:
-        (
-            concentration,
-            cosmic_average_density,
-            critical_surface_density,
-            kpc_per_arcsec,
-        ) = _ludlow16_cosmology_callback(
-            mass_at_200,
-            redshift_object,
-            redshift_source,
-        )
-    else:
-        (
-            concentration,
-            cosmic_average_density,
-            critical_surface_density,
-            kpc_per_arcsec,
-        ) = ludlow16_cosmology_jax(
-            mass_at_200,
-            redshift_object,
-            redshift_source,
-        )
+    (
+        concentration,
+        cosmic_average_density,
+        critical_surface_density,
+        kpc_per_arcsec,
+    ) = ludlow16_cosmology(
+        mass_at_200,
+        redshift_object,
+        redshift_source,
+        xp=xp,
+    )
 
     # Apply scatter (JAX-safe)
     concentration = 10.0 ** (xp.log10(concentration) + scatter_sigma * 0.15)
 
-    # ------------------------------------
-    # JAX-native algebra
-    # ------------------------------------
     radius_at_200 = (
         mass_at_200 / (200.0 * cosmic_average_density * (4.0 * xp.pi / 3.0))
     ) ** (
