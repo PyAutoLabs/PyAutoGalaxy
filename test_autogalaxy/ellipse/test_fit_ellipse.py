@@ -90,7 +90,10 @@ def test__data_interp(imaging_lh, imaging_lh_masked):
 
     fit = ag.FitEllipse(dataset=imaging_lh_masked, ellipse=ellipse_0)
 
-    assert fit.data_interp[0] == pytest.approx(1.8378134567395, 1.0e-4)
+    # New algorithm: shape fixed at (N, 2) with NaN rows for masked positions.
+    # Indices 0, 1, 4 are NaN (masked); index 2 is the first non-NaN point.
+    assert np.isnan(fit.data_interp[0])
+    assert fit.data_interp[2] == pytest.approx(2.4276272487476, 1.0e-4)
 
 
 def test__noise_map_interp(imaging_lh, imaging_lh_masked):
@@ -102,7 +105,9 @@ def test__noise_map_interp(imaging_lh, imaging_lh_masked):
 
     fit = ag.FitEllipse(dataset=imaging_lh_masked, ellipse=ellipse_0)
 
-    assert fit.noise_map_interp[0] == pytest.approx(2.0, 1.0e-4)
+    # New algorithm: NaN rows propagate through interpolation; index 2 is first non-NaN.
+    assert np.isnan(fit.noise_map_interp[0])
+    assert fit.noise_map_interp[2] == pytest.approx(2.0, 1.0e-4)
 
 
 def test__signal_to_noise_map_interp(imaging_lh, imaging_lh_masked):
@@ -116,7 +121,9 @@ def test__signal_to_noise_map_interp(imaging_lh, imaging_lh_masked):
 
     fit = ag.FitEllipse(dataset=imaging_lh_masked, ellipse=ellipse_0)
 
-    assert fit.signal_to_noise_map_interp[0] == pytest.approx(0.91890672836, 1.0e-4)
+    # New algorithm: NaN rows propagate through division; index 2 is first non-NaN.
+    assert np.isnan(fit.signal_to_noise_map_interp[0])
+    assert fit.signal_to_noise_map_interp[2] == pytest.approx(1.21381362437, 1.0e-4)
 
 
 def test__residual_map(imaging_lh, imaging_lh_masked):
@@ -130,7 +137,10 @@ def test__residual_map(imaging_lh, imaging_lh_masked):
 
     fit = ag.FitEllipse(dataset=imaging_lh_masked, ellipse=ellipse_0)
 
-    assert fit.residual_map[0] == pytest.approx(-2.514972947, 1.0e-4)
+    # New algorithm: NaN rows propagate; index 2 is first non-NaN point.
+    # nanmean is computed over the 2 non-NaN values only.
+    assert np.isnan(fit.residual_map[0])
+    assert fit.residual_map[2] == pytest.approx(-1.7633557568774, 1.0e-4)
 
 
 def test__normalized_residual_map(imaging_lh, imaging_lh_masked):
@@ -144,7 +154,9 @@ def test__normalized_residual_map(imaging_lh, imaging_lh_masked):
 
     fit = ag.FitEllipse(dataset=imaging_lh_masked, ellipse=ellipse_0)
 
-    assert fit.normalized_residual_map[0] == pytest.approx(-1.25748647, 1.0e-4)
+    # New algorithm: NaN rows propagate; index 2 is first non-NaN point.
+    assert np.isnan(fit.normalized_residual_map[0])
+    assert fit.normalized_residual_map[2] == pytest.approx(-0.8816778784387, 1.0e-4)
 
 
 def test__chi_squared_map(imaging_lh, imaging_lh_masked):
@@ -158,7 +170,9 @@ def test__chi_squared_map(imaging_lh, imaging_lh_masked):
 
     fit = ag.FitEllipse(dataset=imaging_lh_masked, ellipse=ellipse_0)
 
-    assert fit.chi_squared_map[0] == pytest.approx(1.58127223199, 1.0e-4)
+    # New algorithm: NaN rows propagate; index 2 is first non-NaN point.
+    assert np.isnan(fit.chi_squared_map[0])
+    assert fit.chi_squared_map[2] == pytest.approx(0.7773558813282, 1.0e-4)
 
 
 def test__chi_squared(imaging_lh, imaging_lh_masked):
@@ -172,7 +186,8 @@ def test__chi_squared(imaging_lh, imaging_lh_masked):
 
     fit = ag.FitEllipse(dataset=imaging_lh_masked, ellipse=ellipse_0)
 
-    assert fit.chi_squared == pytest.approx(5.72639320225, 1.0e-4)
+    # New algorithm: nansum over 2 non-NaN chi_squared values only.
+    assert fit.chi_squared == pytest.approx(1.5547117626564, 1.0e-4)
 
 
 def test__noise_normalization(imaging_lh, imaging_lh_masked):
@@ -184,7 +199,8 @@ def test__noise_normalization(imaging_lh, imaging_lh_masked):
 
     fit = ag.FitEllipse(dataset=imaging_lh_masked, ellipse=ellipse_0)
 
-    assert fit.noise_normalization == pytest.approx(16.120857137646, 1.0e-4)
+    # New algorithm: nansum over 2 non-NaN noise values only (= 2 * log(2*pi*4)).
+    assert fit.noise_normalization == pytest.approx(6.4483428550585, 1.0e-4)
 
 
 def test__log_likelihood(imaging_lh, imaging_lh_masked):
@@ -196,10 +212,11 @@ def test__log_likelihood(imaging_lh, imaging_lh_masked):
 
     fit = ag.FitEllipse(dataset=imaging_lh_masked, ellipse=ellipse_0)
 
-    assert fit.log_likelihood == pytest.approx(-0.169821080058, 1.0e-4)
+    # New algorithm: -0.5 * chi_squared over 2 non-NaN perimeter samples only.
+    assert fit.log_likelihood == pytest.approx(-0.0736366768059, 1.0e-4)
 
 
-# ── mask-rejection loop tests (pinned for JAX-rewrite regression) ──────────
+# ── unified NaN-marking algorithm tests (prompt-3 regression pins) ──────────
 
 
 @pytest.fixture(name="imaging_30x30")
@@ -211,9 +228,10 @@ def make_imaging_30x30():
 
 
 def test__points_from_major_axis__zero_masked(imaging_30x30):
-    # Mask has one corner pixel True so interp.mask_interp is constructed and the loop
-    # fires, but the masked pixel is far from the ellipse perimeter.  The equals-branch
-    # fires every iteration and the returned points must be identical to the unmasked fit.
+    # Mask has one corner pixel True (far from the ellipse perimeter).
+    # The new algorithm: shape is (N, 2) = (total_points_from - 1, 2), all rows finite,
+    # and the result matches the fully-unmasked fit row-for-row because the bilinear
+    # mask interpolator returns 0 for every perimeter sample far from the masked pixel.
     ellipse = ag.Ellipse(centre=(0.0, 0.0), ell_comps=(0.3, 0.2), major_axis=5.0)
 
     mask_array = np.full((30, 30), False)
@@ -225,9 +243,9 @@ def test__points_from_major_axis__zero_masked(imaging_30x30):
         dataset=imaging_30x30.apply_mask(mask=mask), ellipse=ellipse
     )
 
-    assert fit_masked._points_from_major_axis.shape[0] == ellipse.total_points_from(
-        pixel_scale=1.0
-    ) - 1
+    N = ellipse.total_points_from(pixel_scale=1.0)
+    assert fit_masked._points_from_major_axis.shape == (N - 1, 2)
+    assert np.all(np.isfinite(fit_masked._points_from_major_axis))
 
     np.testing.assert_allclose(
         fit_masked._points_from_major_axis,
@@ -237,9 +255,9 @@ def test__points_from_major_axis__zero_masked(imaging_30x30):
 
 
 def test__points_from_major_axis__under_masked_trim(imaging_30x30):
-    # mask[13, 15] causes: at i=1 the extra-points branch regenerates to n_i=1 (31 pts);
-    # at i=2 the 31-point set has 0 masked points (unmasked=31 > required=30) so the
-    # trim branch fires and removes 1 extra point; subsequent iterations hit equals-branch.
+    # mask[13, 15] catches one perimeter sample.
+    # New algorithm: shape is fixed at (N, 2); exactly one row is [nan, nan] at index 8;
+    # all other rows match the initial perimeter generation (no regeneration step).
     ellipse = ag.Ellipse(centre=(0.0, 0.0), ell_comps=(0.3, 0.2), major_axis=5.0)
 
     mask_array = np.full((30, 30), False)
@@ -250,53 +268,53 @@ def test__points_from_major_axis__under_masked_trim(imaging_30x30):
         dataset=imaging_30x30.apply_mask(mask=mask), ellipse=ellipse
     )
 
-    assert fit._points_from_major_axis.shape[0] == ellipse.total_points_from(
-        pixel_scale=1.0
-    ) - 1
+    N = ellipse.total_points_from(pixel_scale=1.0)
+    points = fit._points_from_major_axis
+    assert points.shape == (N - 1, 2)
+    assert np.sum(np.isnan(points[:, 0])) == 1
 
     expected = np.array(
         [
-            [-0.8875687769622342, 4.318959680242291],
-            [-1.9465967000974331, 4.536106717915154],
-            [-2.7904545348693404, 4.00915543006672],
-            [-3.121759540619221, 2.9674537201425717],
-            [-3.0971817353867803, 1.9304881368053626],
-            [-2.9362004594598003, 1.0874492395351023],
-            [-2.7382783396152313, 0.4194888120858164],
-            [-2.533386213036308, -0.12847880766605385],
-            [-2.325860264652024, -0.6022069457624895],
-            [-2.110815651174979, -1.0354045082443406],
-            [-1.8786866984151742, -1.4542117489414634],
-            [-1.6151780479744147, -1.881457224557489],
-            [-1.2986189827210775, -2.3396631393811322],
-            [-0.894688693486922, -2.8515790329629698],
-            [-0.34900318176777473, -3.4320284500721225],
-            [0.41165293239048256, -4.048113740292],
-            [1.4128512563813995, -4.503082523252524],
-            [2.4255072367965793, -4.3699267851023045],
-            [3.0174521816485678, -3.5149110737600795],
-            [3.137367386840201, -2.428503123238989],
-            [3.0251208310290503, -1.4838926102749905],
-            [2.83904957529029, -0.7350808643096405],
-            [2.6361114386419064, -0.13368844148940043],
-            [2.430126819911951, 0.3722817356273538],
-            [2.2197796316635774, 0.8221161006262405],
-            [1.9976499645857964, 1.2451447437071157],
-            [1.7519886861942746, 1.6653894308155623],
-            [1.4652965048117415, 2.105248935438702],
-            [1.1104174658849209, 2.5875786835756953],
-            [0.6439087789280391, 3.1332964003786445],
+            [-0.00000000e+00,  3.74206807e+00],
+            [-9.21350849e-01,  4.33461495e+00],
+            [-2.01511259e+00,  4.52601698e+00],
+            [-2.84687547e+00,  3.91838793e+00],
+            [-3.13310933e+00,  2.82106431e+00],
+            [-3.07580015e+00,  1.77581404e+00],
+            [-2.89800061e+00,  9.41617477e-01],
+            [-2.69069903e+00,  2.82803864e-01],
+            [            np.nan,             np.nan],
+            [-2.26249250e+00, -7.35128377e-01],
+            [-2.03593096e+00, -1.17544529e+00],
+            [-1.78665636e+00, -1.60871261e+00],
+            [-1.49648449e+00, -2.05973419e+00],
+            [-1.13695582e+00, -2.55364458e+00],
+            [-6.61892435e-01, -3.11395908e+00],
+            [-4.58271169e-16, -3.74206807e+00],
+            [ 9.21350849e-01, -4.33461495e+00],
+            [ 2.01511259e+00, -4.52601698e+00],
+            [ 2.84687547e+00, -3.91838793e+00],
+            [ 3.13310933e+00, -2.82106431e+00],
+            [ 3.07580015e+00, -1.77581404e+00],
+            [ 2.89800061e+00, -9.41617477e-01],
+            [ 2.69069903e+00, -2.82803864e-01],
+            [ 2.47840199e+00,  2.60490545e-01],
+            [ 2.26249250e+00,  7.35128377e-01],
+            [ 2.03593096e+00,  1.17544529e+00],
+            [ 1.78665636e+00,  1.60871261e+00],
+            [ 1.49648449e+00,  2.05973419e+00],
+            [ 1.13695582e+00,  2.55364458e+00],
+            [ 6.61892435e-01,  3.11395908e+00],
         ]
     )
 
-    np.testing.assert_allclose(fit._points_from_major_axis, expected, rtol=1e-12)
+    np.testing.assert_allclose(points, expected, equal_nan=True, rtol=1e-6)
 
 
 def test__points_from_major_axis__over_masked_extra_points(imaging_30x30):
-    # A 3x3 block at rows 16-18, cols 18-20 causes 2 points to be masked on the initial
-    # 30-point set (unmasked=28 < required=30).  The extra-points branch fires at i=1
-    # (n_i=1, 31 pts, still 2 masked -> unmasked=29 < 30) and again at i=2 (n_i=2,
-    # 32 pts, still 2 masked -> unmasked=30 == 30).  From i=3 the equals-branch fires.
+    # A 3x3 block at rows 16-18, cols 18-20 catches 2 perimeter samples.
+    # New algorithm: shape is fixed at (N, 2); exactly 2 NaN rows at indices 28 and 29;
+    # all other rows match the initial perimeter generation (no regeneration step).
     ellipse = ag.Ellipse(centre=(0.0, 0.0), ell_comps=(0.3, 0.2), major_axis=5.0)
 
     mask_array = np.full((30, 30), False)
@@ -307,27 +325,56 @@ def test__points_from_major_axis__over_masked_extra_points(imaging_30x30):
         dataset=imaging_30x30.apply_mask(mask=mask), ellipse=ellipse
     )
 
-    assert fit._points_from_major_axis.shape[0] == ellipse.total_points_from(
-        pixel_scale=1.0
-    ) - 1
+    N = ellipse.total_points_from(pixel_scale=1.0)
+    points = fit._points_from_major_axis
+    assert points.shape == (N - 1, 2)
+    assert np.sum(np.isnan(points[:, 0])) >= 2
 
-    # Spot-check first and last points with full-precision reference values.
-    np.testing.assert_allclose(
-        fit._points_from_major_axis[0],
-        np.array([-0.0, 3.7420680720326427]),
-        rtol=1e-12,
+    expected = np.array(
+        [
+            [-0.00000000e+00,  3.74206807e+00],
+            [-9.21350849e-01,  4.33461495e+00],
+            [-2.01511259e+00,  4.52601698e+00],
+            [-2.84687547e+00,  3.91838793e+00],
+            [-3.13310933e+00,  2.82106431e+00],
+            [-3.07580015e+00,  1.77581404e+00],
+            [-2.89800061e+00,  9.41617477e-01],
+            [-2.69069903e+00,  2.82803864e-01],
+            [-2.47840199e+00, -2.60490545e-01],
+            [-2.26249250e+00, -7.35128377e-01],
+            [-2.03593096e+00, -1.17544529e+00],
+            [-1.78665636e+00, -1.60871261e+00],
+            [-1.49648449e+00, -2.05973419e+00],
+            [-1.13695582e+00, -2.55364458e+00],
+            [-6.61892435e-01, -3.11395908e+00],
+            [-4.58271169e-16, -3.74206807e+00],
+            [ 9.21350849e-01, -4.33461495e+00],
+            [ 2.01511259e+00, -4.52601698e+00],
+            [ 2.84687547e+00, -3.91838793e+00],
+            [ 3.13310933e+00, -2.82106431e+00],
+            [ 3.07580015e+00, -1.77581404e+00],
+            [ 2.89800061e+00, -9.41617477e-01],
+            [ 2.69069903e+00, -2.82803864e-01],
+            [ 2.47840199e+00,  2.60490545e-01],
+            [ 2.26249250e+00,  7.35128377e-01],
+            [ 2.03593096e+00,  1.17544529e+00],
+            [ 1.78665636e+00,  1.60871261e+00],
+            [ 1.49648449e+00,  2.05973419e+00],
+            [             np.nan,              np.nan],
+            [             np.nan,              np.nan],
+        ]
     )
-    np.testing.assert_allclose(
-        fit._points_from_major_axis[-1],
-        np.array([1.4354511411249111, 2.1483044498322945]),
-        rtol=1e-12,
-    )
+
+    np.testing.assert_allclose(points, expected, equal_nan=True, rtol=1e-6)
 
 
-def test__points_from_major_axis__unreachable_raises(imaging_30x30):
-    # Masking all pixels except a tiny top-left 5x5 region means the ellipse (major_axis=5,
-    # centred at origin) cannot accumulate the required number of unmasked points regardless
-    # of how many extra angles are added.  The loop must reach i=300 and raise.
+def test__points_from_major_axis__unreachable_returns_all_nan(imaging_30x30):
+    # Masking all pixels except a tiny top-left 5x5 region means every perimeter sample
+    # of the ellipse (major_axis=5, centred at origin) is masked.
+    # New algorithm: returns all-NaN instead of raising ValueError.
+    # Downstream: chi_squared will be NaN; the non-linear search treats NaN likelihood
+    # as -inf (model rejection), so this is a loud failure at the search level rather
+    # than a Python exception here.
     ellipse = ag.Ellipse(centre=(0.0, 0.0), ell_comps=(0.3, 0.2), major_axis=5.0)
 
     mask_array = np.full((30, 30), True)
@@ -338,15 +385,18 @@ def test__points_from_major_axis__unreachable_raises(imaging_30x30):
         dataset=imaging_30x30.apply_mask(mask=mask), ellipse=ellipse
     )
 
-    with pytest.raises(ValueError, match="attempted to add over 300 extra points"):
-        _ = fit._points_from_major_axis
+    N = ellipse.total_points_from(pixel_scale=1.0)
+    points = fit._points_from_major_axis
+    assert points.shape == (N - 1, 2)
+    assert np.all(np.isnan(points))
 
 
 def test__points_from_major_axis__with_multipole_under_masked(imaging_30x30):
-    # Same geometry as test__points_from_major_axis__under_masked_trim (mask[13,15],
-    # EXTRA->TRIM->EQUAL path) but with a m=4 multipole that perturbs the points inside
-    # the inner loop block (fit_ellipse.py lines 112-120).  The output must differ from
-    # the no-multipole case, confirming that multipole perturbation was applied.
+    # Same geometry as test__points_from_major_axis__under_masked_trim (mask[13, 15])
+    # but with a m=4 multipole (multipole_comps=(0.05, 0.0)).
+    # New algorithm: shape (N, 2), one NaN row at index 8 (same position as no-multipole
+    # case since NaN-marking is based on the perturbed coordinates hitting the mask),
+    # and all non-NaN rows differ from the no-multipole case confirming multipole applied.
     ellipse = ag.Ellipse(centre=(0.0, 0.0), ell_comps=(0.3, 0.2), major_axis=5.0)
     multipole = ag.EllipseMultipole(m=4, multipole_comps=(0.05, 0.0))
 
@@ -360,43 +410,44 @@ def test__points_from_major_axis__with_multipole_under_masked(imaging_30x30):
         multipole_list=[multipole],
     )
 
-    assert fit._points_from_major_axis.shape[0] == ellipse.total_points_from(
-        pixel_scale=1.0
-    ) - 1
+    N = ellipse.total_points_from(pixel_scale=1.0)
+    points = fit._points_from_major_axis
+    assert points.shape == (N - 1, 2)
+    assert np.sum(np.isnan(points[:, 0])) == 1
 
     expected = np.array(
         [
-            [-0.8948637627342421, 4.35445749205703],
-            [-1.9662891852074944, 4.5819956347080995],
-            [-2.8090599546476698, 4.0358865660880605],
-            [-3.118093237115593, 2.963968638787185],
-            [-3.0636273709808624, 1.9095735415513715],
-            [-2.8898535455248733, 1.0702842274696087],
-            [-2.7100443128493983, 0.4151635182772758],
-            [-2.54343822078039, -0.12898858780260153],
-            [-2.366937919038917, -0.6128426873688835],
-            [-2.154272852773611, -1.0567212833146127],
-            [-1.8978749492680655, -1.4690645606718333],
-            [-1.605428202942083, -1.8701000144979532],
-            [-1.2768336674699277, -2.300413521324486],
-            [-0.8806522731441982, -2.806841726860251],
-            [-0.34700836576138805, -3.4124118229345113],
-            [0.4136477483968692, -4.067730367429611],
-            [1.4268876767241232, -4.547819829355243],
-            [2.447292552047729, -4.409176403158951],
-            [3.0272020266808997, -3.5262682838196153],
-            [3.11817913598731, -2.413650311508619],
-            [2.981663629430418, -1.4625758352047185],
-            [2.797971920903396, -0.7244451227032465],
-            [2.626059430897824, -0.13317866135285275],
-            [2.4583608466777838, 0.3766070294358943],
-            [2.2661265455985045, 0.839281112691734],
-            [2.031204328991714, 1.266059338961107],
-            [1.7556549896979028, 1.6688745121709494],
-            [1.446691085033412, 2.0785177994173614],
-            [1.0907249807748596, 2.5416897667827496],
-            [0.6366137931560313, 3.0977985885639057],
+            [ 0.00000000e+00,  3.74206807e+00],
+            [-9.29076274e-01,  4.37096021e+00],
+            [-2.03533802e+00,  4.57144403e+00],
+            [-2.86415004e+00,  3.94216434e+00],
+            [-3.12538390e+00,  2.81410831e+00],
+            [-3.03830015e+00,  1.75416341e+00],
+            [-2.85277518e+00,  9.26922846e-01],
+            [-2.67047361e+00,  2.80678086e-01],
+            [             np.nan,              np.nan],
+            [-2.30771793e+00, -7.49823009e-01],
+            [-2.07343096e+00, -1.19709592e+00],
+            [-1.79438178e+00, -1.61566861e+00],
+            [-1.47920991e+00, -2.03595778e+00],
+            [-1.11673040e+00, -2.50821753e+00],
+            [-6.54167010e-01, -3.07761381e+00],
+            [-4.58271169e-16, -3.74206807e+00],
+            [ 9.29076274e-01, -4.37096021e+00],
+            [ 2.03533802e+00, -4.57144403e+00],
+            [ 2.86415004e+00, -3.94216434e+00],
+            [ 3.12538390e+00, -2.81410831e+00],
+            [ 3.03830015e+00, -1.75416341e+00],
+            [ 2.85277518e+00, -9.26922846e-01],
+            [ 2.67047361e+00, -2.80678086e-01],
+            [ 2.49862741e+00,  2.62616323e-01],
+            [ 2.30771793e+00,  7.49823009e-01],
+            [ 2.07343096e+00,  1.19709592e+00],
+            [ 1.79438178e+00,  1.61566861e+00],
+            [ 1.47920991e+00,  2.03595778e+00],
+            [ 1.11673040e+00,  2.50821753e+00],
+            [ 6.54167010e-01,  3.07761381e+00],
         ]
     )
 
-    np.testing.assert_allclose(fit._points_from_major_axis, expected, rtol=1e-12)
+    np.testing.assert_allclose(points, expected, equal_nan=True, rtol=1e-6)
