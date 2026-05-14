@@ -65,7 +65,7 @@ class DatasetInterp:
             ``numpy``.
         """
         x_axis, y_axis = self.points_interp
-        return aa.numerics.interp_2d(
+        return aa.interp_2d(
             points,
             x_axis,
             y_axis,
@@ -88,7 +88,7 @@ class DatasetInterp:
             ``numpy``.
         """
         x_axis, y_axis = self.points_interp
-        return aa.numerics.interp_2d(
+        return aa.interp_2d(
             points,
             x_axis,
             y_axis,
@@ -111,7 +111,7 @@ class DatasetInterp:
             ``numpy``.
         """
         x_axis, y_axis = self.points_interp
-        return aa.numerics.interp_2d(
+        return aa.interp_2d(
             points,
             x_axis,
             y_axis,
