@@ -30,6 +30,7 @@ class FitEllipse(aa.FitDataset):
         dataset: aa.Imaging,
         ellipse: Ellipse,
         multipole_list: Optional[List[EllipseMultipole]] = None,
+        use_jax: bool = False,
     ):
         """
         A fit to a `DatasetInterp` dataset, using a model image to represent the observed data and noise-map.
@@ -38,12 +39,30 @@ class FitEllipse(aa.FitDataset):
         ----------
         dataset
             The dataset containing the signal and noise-map that is fitted.
+        ellipse
+            The ellipse profile used to fit the dataset.
+        multipole_list
+            Optional list of multipole perturbations applied to the ellipse points.
+        use_jax
+            If True, internal arrays are computed with JAX and downstream
+            reductions return raw JAX arrays. The algorithm is identical to
+            the NumPy path — both use a single perimeter-sampling pass with
+            NaN-marking for masked positions.
 
         """
         super().__init__(dataset=dataset)
 
         self.ellipse = ellipse
         self.multipole_list = multipole_list
+        self.use_jax = use_jax
+
+    @property
+    def _xp(self):
+        """``jax.numpy`` if ``self.use_jax`` else ``numpy``."""
+        if self.use_jax:
+            import jax.numpy as jnp
+            return jnp
+        return np
 
     @cached_property
     def interp(self) -> DatasetInterp:
@@ -53,87 +72,52 @@ class FitEllipse(aa.FitDataset):
         """
         return DatasetInterp(dataset=self.dataset)
 
-    def points_from_major_axis_from(self) -> np.ndarray:
+    def points_from_major_axis_from(self) -> "np.ndarray | jax.Array":
         """
-        Returns the (y,x) coordinates on the ellipse that are used to interpolate the data and noise-map values.
+        Return the ``(N, 2)`` (y, x) coordinates on the ellipse perimeter where
+        interpolation occurs.
 
-        These points are computed by overlaying the ellipse over the 2D data and noise-map and computing the (y,x)
-        coordinates on the ellipse that are closest to the data points.
+        Sampling proceeds in one shot:
 
-        If multipole components are used, the points are also perturbed by the multipole components.
+        1. ``N = Ellipse.total_points_from(pixel_scale)`` perimeter angles are
+           generated.
+        2. Multipole perturbations (if any) are applied in-place.
+        3. The mask interpolator is evaluated at every point; positions that
+           sit on (or partly on) masked pixels are marked as NaN via
+           ``xp.where(keep, points, nan)``.
+
+        The output shape is fixed at ``(N, 2)`` regardless of mask geometry —
+        masked rows are NaN, unmasked rows hold their (y, x) coordinates.
+        Downstream reductions (``residual_map``, ``chi_squared``,
+        ``noise_normalization``) use ``nanmean`` / ``nansum`` and skip NaN
+        positions correctly.
+
+        The algorithm is identical for ``self.use_jax`` ``False`` and ``True``;
+        only the numerics backend (``np`` vs ``jax.numpy``) differs.
 
         Returns
         -------
-        The (y,x) coordinates on the ellipse where the interpolation occurs.
+        The ``(N, 2)`` (y, x) coordinates with NaN at masked positions.
         """
+        xp = self._xp
+        pixel_scale = self.dataset.pixel_scales[0]
+
         points = self.ellipse.points_from_major_axis_from(
-            pixel_scale=self.dataset.pixel_scales[0],
+            pixel_scale=pixel_scale, xp=xp
         )
 
         if self.multipole_list is not None:
             for multipole in self.multipole_list:
                 points = multipole.points_perturbed_from(
-                    pixel_scale=self.dataset.pixel_scales[0],
+                    pixel_scale=pixel_scale,
                     points=points,
                     ellipse=self.ellipse,
+                    xp=xp,
                 )
 
-        if self.interp.mask_interp is not None:
-
-            i_total = 300
-
-            total_points_required = points.shape[0]
-
-            for i in range(1, i_total + 1):
-
-                total_points = points.shape[0]
-                total_points_masked = np.sum(self.interp.mask_interp(points) > 0)
-
-                if total_points_required == total_points - total_points_masked:
-                    continue
-
-                if total_points_required < total_points - total_points_masked:
-
-                    number_of_extra_points = (
-                        total_points - total_points_masked - total_points_required
-                    )
-
-                    unmasked_indices = np.where(self.interp.mask_interp(points) == 0)[0]
-                    unmasked_indices = unmasked_indices[number_of_extra_points:]
-
-                    points = points[unmasked_indices]
-
-                    continue
-
-                points = self.ellipse.points_from_major_axis_from(
-                    pixel_scale=self.dataset.pixel_scales[0], n_i=i
-                )
-
-                if self.multipole_list is not None:
-                    for multipole in self.multipole_list:
-
-                        points = multipole.points_perturbed_from(
-                            pixel_scale=self.dataset.pixel_scales[0],
-                            points=points,
-                            ellipse=self.ellipse,
-                            n_i=i,
-                        )
-
-                if i == i_total:
-
-                    raise ValueError(
-                        """
-                        The code has attempted to add over 300 extra points to the ellipse and still not found a set of points that
-                        do not hit the mask with the expected number of points. 
-        
-                        This is likely due to the mask being too large or a strange geometry, and the code is unable to find a
-                        set of points that do not hit the mask.
-                        """
-                    )
-
-            points = points[self.interp.mask_interp(points) == 0]
-
-        return points
+        mask_values = self.interp.mask_interp(points, xp=xp)
+        keep = mask_values == 0
+        return xp.where(keep[:, None], points, xp.nan)
 
     @cached_property
     def _points_from_major_axis(self) -> np.ndarray:
@@ -164,9 +148,12 @@ class FitEllipse(aa.FitDataset):
         The data values of the ellipse fits, computed via a 2D interpolation of where the ellipse
         overlaps the data.
         """
-        data = self.interp.data_interp(self._points_from_major_axis)
+        xp = self._xp
+        data = self.interp.data_interp(self._points_from_major_axis, xp=xp)
 
-        return aa.ArrayIrregular(values=data)
+        if xp is np:
+            return aa.ArrayIrregular(values=data)
+        return data
 
     @property
     def noise_map_interp(self) -> aa.ArrayIrregular:
@@ -186,9 +173,12 @@ class FitEllipse(aa.FitDataset):
         The noise-map values of the ellipse fits, computed via a 2D interpolation of where the ellipse
         overlaps the noise-map.
         """
-        noise_map = self.interp.noise_map_interp(self._points_from_major_axis)
+        xp = self._xp
+        noise_map = self.interp.noise_map_interp(self._points_from_major_axis, xp=xp)
 
-        return aa.ArrayIrregular(values=noise_map)
+        if xp is np:
+            return aa.ArrayIrregular(values=noise_map)
+        return noise_map
 
     @property
     def signal_to_noise_map_interp(self) -> aa.ArrayIrregular:
@@ -201,7 +191,14 @@ class FitEllipse(aa.FitDataset):
         The signal-to-noise-map values of the ellipse fits, computed via a 2D interpolation of where
         the ellipse overlaps the data and noise-map.
         """
-        return aa.ArrayIrregular(values=self.data_interp / self.noise_map_interp)
+        xp = self._xp
+        data = self.interp.data_interp(self._points_from_major_axis, xp=xp)
+        noise_map = self.interp.noise_map_interp(self._points_from_major_axis, xp=xp)
+        values = data / noise_map
+
+        if xp is np:
+            return aa.ArrayIrregular(values=values)
+        return values
 
     @property
     def model_data(self) -> aa.ArrayIrregular:
@@ -233,11 +230,17 @@ class FitEllipse(aa.FitDataset):
         -------
         The residual-map of the fit, which is the data minus the model data and therefore the same as the model data.
         """
+        xp = self._xp
 
-        if not self.model_data:
-            return aa.ArrayIrregular(values=np.zeros(self.model_data.shape))
+        if xp is np:
+            if not self.model_data:
+                return aa.ArrayIrregular(values=xp.zeros(self.model_data.shape))
 
-        return aa.ArrayIrregular(values=self.model_data - np.nanmean(self.model_data))
+        values = self.model_data - xp.nanmean(self.model_data)
+
+        if xp is np:
+            return aa.ArrayIrregular(values=values)
+        return values
 
     @property
     def normalized_residual_map(self) -> aa.ArrayIrregular:
@@ -252,7 +255,12 @@ class FitEllipse(aa.FitDataset):
         -------
         The normalized residual-map of the fit, which is the residual-map divided by the noise-map.
         """
-        return aa.ArrayIrregular(values=self.residual_map / self.noise_map_interp)
+        xp = self._xp
+        values = self.residual_map / self.noise_map_interp
+
+        if xp is np:
+            return aa.ArrayIrregular(values=values)
+        return values
 
     @property
     def chi_squared_map(self) -> aa.ArrayIrregular:
@@ -267,7 +275,12 @@ class FitEllipse(aa.FitDataset):
         -------
         The chi-squared-map of the fit, which is the normalized residual-map squared.
         """
-        return aa.ArrayIrregular(values=self.normalized_residual_map**2.0)
+        xp = self._xp
+        values = self.normalized_residual_map**2.0
+
+        if xp is np:
+            return aa.ArrayIrregular(values=values)
+        return values
 
     @property
     def chi_squared(self) -> float:
@@ -282,7 +295,8 @@ class FitEllipse(aa.FitDataset):
         -------
         The chi-squared of the fit.
         """
-        return float(np.nansum(self.chi_squared_map))
+        xp = self._xp
+        return xp.nansum(self.chi_squared_map)
 
     @property
     def noise_normalization(self):
@@ -293,7 +307,9 @@ class FitEllipse(aa.FitDataset):
         -------
         The noise normalization term of the log likelihood.
         """
-        return np.nansum(np.log(2 * np.pi * self.noise_map_interp**2.0))
+        xp = self._xp
+        noise_map = self.interp.noise_map_interp(self._points_from_major_axis, xp=xp)
+        return xp.nansum(xp.log(2 * xp.pi * noise_map**2.0))
 
     @property
     def log_likelihood(self):
