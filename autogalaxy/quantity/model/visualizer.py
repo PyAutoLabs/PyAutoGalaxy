@@ -69,7 +69,7 @@ class VisualizerQuantity(af.Visualizer):
         if skip_visualization():
             return
 
-        fit = analysis.fit_quantity_for_instance(instance=instance)
+        fit = analysis.fit_for_visualization(instance=instance)
 
         plotter = PlotterQuantity(
             image_path=paths.image_path, title_prefix=analysis.title_prefix
