@@ -78,12 +78,14 @@ class AnalysisQuantity(Analysis):
         carry the traced model arrays and ride as pytree children.
         """
         from autoarray.abstract_ndarray import register_instance_pytree
+        from autoarray.dataset.dataset_model import DatasetModel
         from autogalaxy.analysis.jax_pytrees import register_galaxies_pytree
 
         register_instance_pytree(
             FitQuantity,
             no_flatten=("dataset", "func_str", "use_mask_in_fit"),
         )
+        register_instance_pytree(DatasetModel)
         register_galaxies_pytree()
 
     def log_likelihood_function(self, instance: af.ModelInstance) -> float:
