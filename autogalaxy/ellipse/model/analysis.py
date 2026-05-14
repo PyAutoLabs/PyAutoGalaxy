@@ -33,7 +33,11 @@ class AnalysisEllipse(af.Analysis):
     Visualizer = VisualizerEllipse
 
     def __init__(
-        self, dataset: aa.Imaging, title_prefix: str = None, use_jax: bool = False
+        self,
+        dataset: aa.Imaging,
+        title_prefix: str = None,
+        use_jax: bool = False,
+        **kwargs,
     ):
         """
         Fits a model made of ellipses to an imaging dataset via a non-linear search.
@@ -57,7 +61,30 @@ class AnalysisEllipse(af.Analysis):
         self.dataset = dataset
         self.title_prefix = title_prefix
 
-        super().__init__(use_jax=use_jax)
+        super().__init__(use_jax=use_jax, **kwargs)
+
+        if use_jax:
+            self._register_fit_ellipse_pytrees()
+
+    @staticmethod
+    def _register_fit_ellipse_pytrees() -> None:
+        """Register every type reachable from a ``FitEllipse`` return value so
+        ``jax.jit`` can flatten its output.
+
+        ``dataset`` is per-analysis-constant — ride as aux so JAX does not
+        recurse into it. ``ellipse`` and ``multipole_list`` carry the
+        traced model parameters (``centre``, ``ell_comps``, ``major_axis``,
+        ``multipole_comps``).
+        """
+        from autoarray.abstract_ndarray import register_instance_pytree
+        from autogalaxy.ellipse.ellipse.ellipse import Ellipse
+        from autogalaxy.ellipse.ellipse.ellipse_multipole import EllipseMultipole
+
+        register_instance_pytree(Ellipse)
+        # ``m`` is the multipole order (integer discriminator like 4, 6 — not
+        # fittable). The traced parameters live in ``multipole_comps``.
+        register_instance_pytree(EllipseMultipole, no_flatten=("m",))
+        register_instance_pytree(FitEllipse, no_flatten=("dataset",))
 
     def log_likelihood_function(self, instance: af.ModelInstance) -> float:
         """

@@ -23,6 +23,7 @@ class AnalysisQuantity(Analysis):
         cosmology: LensingCosmology = None,
         title_prefix: str = None,
         use_jax: bool = True,
+        **kwargs,
     ):
         """
         Fits a galaxy model to a quantity dataset via a non-linear search.
@@ -57,11 +58,33 @@ class AnalysisQuantity(Analysis):
             A string that is added before the title of all figures output by visualization, for example to
             put the name of the dataset and galaxy in the title.
         """
-        super().__init__(cosmology=cosmology, use_jax=use_jax)
+        super().__init__(cosmology=cosmology, use_jax=use_jax, **kwargs)
 
         self.dataset = dataset
         self.func_str = func_str
         self.title_prefix = title_prefix
+
+        if use_jax:
+            self._register_fit_quantity_pytrees()
+
+    @staticmethod
+    def _register_fit_quantity_pytrees() -> None:
+        """Register every type reachable from a ``FitQuantity`` return value
+        so ``jax.jit`` can flatten its output.
+
+        ``dataset``, ``func_str``, ``use_mask_in_fit`` are per-analysis-
+        constant — ride as aux so JAX does not recurse into them.
+        ``light_mass_obj`` (a ``Galaxies``) and ``model_data_manual``
+        carry the traced model arrays and ride as pytree children.
+        """
+        from autoarray.abstract_ndarray import register_instance_pytree
+        from autogalaxy.analysis.jax_pytrees import register_galaxies_pytree
+
+        register_instance_pytree(
+            FitQuantity,
+            no_flatten=("dataset", "func_str", "use_mask_in_fit"),
+        )
+        register_galaxies_pytree()
 
     def log_likelihood_function(self, instance: af.ModelInstance) -> float:
         """
