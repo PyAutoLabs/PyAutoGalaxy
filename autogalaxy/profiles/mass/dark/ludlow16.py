@@ -55,6 +55,19 @@ def _erfc(arg, xp):
     return erfc(arg)
 
 
+def _trapezoid_last_axis(y, x, xp):
+    """Trapezoidal-rule integration along the last axis of ``y``.
+
+    Equivalent to ``xp.trapezoid(y, x, axis=-1)`` but works on numpy
+    versions before 1.26 (which only have the now-deprecated ``trapz``).
+    Broadcasting follows the same rule: ``x`` may be 1-D (shared across
+    the leading axes of ``y``) or fully-shaped to match ``y``.
+    """
+    dx = x[..., 1:] - x[..., :-1]
+    y_avg = 0.5 * (y[..., :-1] + y[..., 1:])
+    return xp.sum(y_avg * dx, axis=-1)
+
+
 # ---------------------------------------------------------------------------
 # Eisenstein & Hu 1998 transfer function — direct port of
 # colossus.cosmology.power_spectrum.modelEisenstein98.
@@ -186,7 +199,7 @@ def _sigma2_unnormalised(
     integrand = k[None, :] ** 3 * Pk_unnorm[None, :] * W ** 2
     integrand = integrand / (2.0 * xp.pi ** 2)
 
-    sigma2 = xp.trapezoid(integrand, ln_k, axis=-1)
+    sigma2 = _trapezoid_last_axis(integrand, ln_k, xp=xp)
     if sigma2.shape == (1,):
         return sigma2[0]
     return sigma2
@@ -233,7 +246,7 @@ def _growth_unnormalised(z, Om0, Ode0, xp=np, nz=256, z_max=1.0e4):
     zp = xp.exp(u_grid) - 1.0
     Ep = _E_lcdm(zp, Om0, Ode0, xp=xp)
     integrand = (1.0 + zp) ** 2 / Ep ** 3
-    integral = xp.trapezoid(integrand, u_grid, axis=-1)
+    integral = _trapezoid_last_axis(integrand, u_grid, xp=xp)
 
     D = _E_lcdm(z_arr, Om0, Ode0, xp=xp) * integral
     if z_arr.shape == ():
