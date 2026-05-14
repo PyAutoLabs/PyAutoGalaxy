@@ -152,3 +152,24 @@ def test__points_from_major_axis():
     assert ellipse.points_from_major_axis_from(pixel_scale=1.0)[1][0] == pytest.approx(
         -0.2123224755, 1.0e-4
     )
+
+
+def test__multipole__get_shape_angle__boundary_returns_neg_half_period():
+    # The xp.mod rewrite maps boundary case `period/2.0` to `-period/2.0`
+    # (closed-open interval), unlike the old while-loop which returned `period/2.0`
+    # (open-closed). This test pins the new convention.
+    multipole = ag.EllipseMultipole(m=4, multipole_comps=(0.0, 0.0))
+    # period = 360 / 4 = 90; choose ellipse.angle() such that the unnormalised
+    # offset equals exactly +period/2 = 45.0 degrees.
+    # multipole_k_m_and_phi_m_from((0.0, 0.0), m=4) returns phi_m = 0, k = 0.
+    # So angle_offset = ellipse.angle() - phi_m = ellipse.angle().
+    # We want that to be exactly +45.0 so that after wrap it lands at -45.0.
+    # ellipse.angle() depends on ell_comps. Easiest: derive ell_comps via
+    # ag.convert.ell_comps_from(axis_ratio=..., angle=45.0).
+    ellipse = ag.Ellipse(
+        centre=(0.0, 0.0),
+        ell_comps=ag.convert.ell_comps_from(axis_ratio=0.5, angle=45.0),
+        major_axis=1.0,
+    )
+    result = multipole.get_shape_angle(ellipse=ellipse)
+    assert result == pytest.approx(-45.0, abs=1e-9)
