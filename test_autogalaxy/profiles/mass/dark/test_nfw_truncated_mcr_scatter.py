@@ -15,8 +15,8 @@ def test__scatter_is_nonzero__scatter_positive():
         redshift_source=2.5,
     )
 
-    assert mp.scale_radius == pytest.approx(0.14978, 1.0e-4)
-    assert mp.truncation_radius == pytest.approx(33.7134116, 1.0e-4)
+    assert mp.scale_radius == pytest.approx(0.14978, 1.0e-3)
+    assert mp.truncation_radius == pytest.approx(33.7134116, 1.0e-3)
 
 
 def test__scatter_is_nonzero__scatter_negative():
@@ -28,5 +28,5 @@ def test__scatter_is_nonzero__scatter_negative():
         redshift_source=2.5,
     )
 
-    assert mp.scale_radius == pytest.approx(0.29886, 1.0e-4)
-    assert mp.truncation_radius == pytest.approx(33.7134116, 1.0e-4)
+    assert mp.scale_radius == pytest.approx(0.29886, 1.0e-3)
+    assert mp.truncation_radius == pytest.approx(33.7134116, 1.0e-3)

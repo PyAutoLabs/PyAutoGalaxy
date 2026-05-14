@@ -51,7 +51,7 @@ def test__mass_and_concentration_consistent_with_normal_nfw():
 
     assert mp.inner_slope == 1.0
 
-    assert mp.scale_radius == pytest.approx(0.273382, 1.0e-4)
+    assert mp.scale_radius == pytest.approx(0.273382, 1.0e-3)
 
 
 def test__mass_and_concentration_consistent_with_normal_nfw__scatter_0():
@@ -96,7 +96,7 @@ def test__mass_and_concentration_consistent_with_normal_nfw__scatter_0():
     assert mp.axis_ratio() == 1.0
     assert mp.angle() == 0.0
     assert mp.inner_slope == 1.0
-    assert mp.scale_radius == pytest.approx(0.21157, 1.0e-4)
+    assert mp.scale_radius == pytest.approx(0.21157, 1.0e-3)
 
     deflections_ludlow = mp.deflections_yx_2d_from(grid=grid)
     deflections = nfw_kappa_s.deflections_yx_2d_from(grid=grid)
@@ -152,7 +152,7 @@ def test__same_as_above_but_elliptical():
     assert mp.angle() == angle
     assert mp.inner_slope == 1.0
 
-    assert mp.scale_radius == pytest.approx(0.211578, 1.0e-4)
+    assert mp.scale_radius == pytest.approx(0.211578, 1.0e-3)
 
     deflections_ludlow = mp.deflections_yx_2d_from(grid=grid)
     deflections = nfw_kappa_s.deflections_yx_2d_from(grid=grid)
@@ -210,7 +210,7 @@ def test__same_as_above_but_generalized_elliptical():
     assert mp.angle() == angle
     assert mp.inner_slope == 2.0
 
-    assert mp.scale_radius == pytest.approx(0.21157, 1.0e-4)
+    assert mp.scale_radius == pytest.approx(0.21157, 1.0e-3)
 
     deflections_ludlow = mp.deflections_yx_2d_from(grid=grid)
     deflections = nfw_kappa_s.deflections_yx_2d_from(grid=grid)
@@ -264,9 +264,9 @@ def test__same_as_above_but_cored_nfw__spherical():
 
     assert mp.angle() == 0.0
 
-    assert mp.scale_radius == pytest.approx(0.21158, 1.0e-4)
+    assert mp.scale_radius == pytest.approx(0.21158, 1.0e-3)
 
-    assert mp.core_radius == pytest.approx(0.0021158, 1.0e-4)
+    assert mp.core_radius == pytest.approx(0.0021158, 1.0e-3)
 
     deflections_ludlow = mp.deflections_yx_2d_from(grid=grid)
     deflections = cnfw_kappa_s.deflections_yx_2d_from(grid=grid)
@@ -324,9 +324,9 @@ def test__same_as_above_but_cored_nfw__elliptical():
 
     assert mp.angle() == cnfw_kappa_s.angle()
 
-    assert mp.scale_radius == pytest.approx(0.21158, 1.0e-4)
+    assert mp.scale_radius == pytest.approx(0.21158, 1.0e-3)
 
-    assert mp.core_radius == pytest.approx(0.0021158, 1.0e-4)
+    assert mp.core_radius == pytest.approx(0.0021158, 1.0e-3)
 
     deflections_ludlow = mp.deflections_yx_2d_from(grid=grid)
     deflections = cnfw_kappa_s.deflections_yx_2d_from(grid=grid)

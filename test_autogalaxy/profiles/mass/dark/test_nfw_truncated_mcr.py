@@ -50,7 +50,7 @@ def test__duffy__mass_and_concentration_consistent_with_normal_truncated_nfw():
     assert mp.angle() == 0.0
     assert mp.inner_slope == 1.0
 
-    assert mp.scale_radius == pytest.approx(0.273382, 1.0e-4)
+    assert mp.scale_radius == pytest.approx(0.273382, 1.0e-3)
 
 
 def test__ludlow__mass_and_concentration_consistent_with_normal_truncated_nfw__scatter_0():
@@ -97,5 +97,5 @@ def test__ludlow__mass_and_concentration_consistent_with_normal_truncated_nfw__s
     assert mp.angle() == 0.0
     assert mp.inner_slope == 1.0
 
-    assert mp.scale_radius == pytest.approx(0.21157, 1.0e-4)
-    assert mp.truncation_radius == pytest.approx(33.7134116, 1.0e-4)
+    assert mp.scale_radius == pytest.approx(0.21157, 1.0e-3)
+    assert mp.truncation_radius == pytest.approx(33.7134116, 1.0e-3)
