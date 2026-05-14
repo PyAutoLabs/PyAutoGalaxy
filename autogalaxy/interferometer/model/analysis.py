@@ -42,6 +42,7 @@ class AnalysisInterferometer(AnalysisDataset):
         settings: aa.Settings = None,
         title_prefix: str = None,
         use_jax: bool = True,
+        **kwargs,
     ):
         """
         Fits a galaxy model to an interferometer dataset via a non-linear search.
@@ -80,6 +81,7 @@ class AnalysisInterferometer(AnalysisDataset):
             settings=settings,
             title_prefix=title_prefix,
             use_jax=use_jax,
+            **kwargs,
         )
 
     @property
