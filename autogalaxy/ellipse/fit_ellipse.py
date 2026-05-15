@@ -123,10 +123,10 @@ class FitEllipse(aa.FitDataset):
         keep = mask_values == 0
         return xp.where(keep[:, None], points, xp.nan)
 
-    @cached_property
+    @property
     def _points_from_major_axis(self) -> np.ndarray:
         """
-        Returns cached (y,x) coordinates on the ellipse that are used to interpolate the data and noise-map values.
+        Returns (y,x) coordinates on the ellipse that are used to interpolate the data and noise-map values.
 
         Returns
         -------

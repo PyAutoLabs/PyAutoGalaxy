@@ -62,7 +62,7 @@ def axis_ratio_and_angle_from(
     """
     angle = 0.5 * xp.arctan2(
         ell_comps[0],
-        xp.where((ell_comps[0] == 0) & (ell_comps[1] == 0), 1.0, ell_comps[1]),
+        xp.where(xp.logical_and(ell_comps[0] == 0, ell_comps[1] == 0), 1.0, ell_comps[1]),
     )
     angle *= 180.0 / xp.pi
 
@@ -202,7 +202,7 @@ def shear_magnitude_and_angle_from(
     """
     angle = (
         0.5
-        * xp.arctan2(gamma_2, xp.where((gamma_1 == 0) & (gamma_2 == 0), 1.0, gamma_1))
+        * xp.arctan2(gamma_2, xp.where(xp.logical_and(gamma_1 == 0, gamma_2 == 0), 1.0, gamma_1))
         * 180.0
         / xp.pi
     )
@@ -210,7 +210,7 @@ def shear_magnitude_and_angle_from(
 
     angle = xp.where(angle < 0, angle + 180.0, angle)
     angle = xp.where(
-        (xp.abs(angle - 90.0) > 45.0) & (angle > 90.0), angle - 180.0, angle
+        xp.logical_and(xp.abs(angle - 90.0) > 45.0, angle > 90.0), angle - 180.0, angle
     )
 
     return magnitude, angle
@@ -309,7 +309,7 @@ def multipole_k_m_and_phi_m_from(
         xp.arctan2(
             multipole_comps[0],
             xp.where(
-                (multipole_comps[0] == 0) & (multipole_comps[1] == 0),
+                xp.logical_and(multipole_comps[0] == 0, multipole_comps[1] == 0),
                 1.0,
                 multipole_comps[1],
             ),
