@@ -11,6 +11,10 @@ dataset.  Rather than convolving a model image with a PSF, the fit works by:
 This is the classical isophote-fitting approach used in tools such as IRAF/ELLIPSE and galfit, and is
 appropriate for measuring galaxy morphology, position angles, axis ratios, and multipole perturbations
 directly from imaging data without fitting a parametric light profile model.
+
+`FitEllipseSummed` aggregates multiple `FitEllipse` objects (one per ellipse in a model) and exposes
+sum-over-list versions of `figure_of_merit`, `log_likelihood`, and `chi_squared`. This is the return
+type of `AnalysisEllipse.fit_from`, mirroring the single-object return of `AnalysisImaging.fit_from`.
 """
 import numpy as np
 from typing import List, Optional
@@ -119,10 +123,10 @@ class FitEllipse(aa.FitDataset):
         keep = mask_values == 0
         return xp.where(keep[:, None], points, xp.nan)
 
-    @cached_property
+    @property
     def _points_from_major_axis(self) -> np.ndarray:
         """
-        Returns cached (y,x) coordinates on the ellipse that are used to interpolate the data and noise-map values.
+        Returns (y,x) coordinates on the ellipse that are used to interpolate the data and noise-map values.
 
         Returns
         -------
@@ -333,3 +337,54 @@ class FitEllipse(aa.FitDataset):
         The figure of merit of the fit.
         """
         return -0.5 * (self.chi_squared + self.noise_normalization)
+
+
+class FitEllipseSummed:
+    """
+    Aggregate of one or more :class:`FitEllipse` objects whose
+    ``figure_of_merit`` / ``log_likelihood`` / ``chi_squared`` properties
+    sum over the contained fits.
+
+    Used by :class:`AnalysisEllipse.fit_from` so the return type is a
+    single object (matching :class:`AnalysisImaging.fit_from`'s pattern)
+    even when a model contains multiple ellipses. Each contained
+    :class:`FitEllipse` carries the same shared ``dataset``; this class
+    exposes that dataset for JAX pytree-registration purposes
+    (``no_flatten=("dataset",)``).
+    """
+
+    def __init__(self, fit_list: List[FitEllipse]):
+        self.fit_list = fit_list
+
+    @property
+    def dataset(self):
+        """
+        All fits in the list share the same dataset; expose the first
+        for pytree no_flatten purposes.
+        """
+        return self.fit_list[0].dataset
+
+    @property
+    def figure_of_merit(self):
+        """
+        The sum of the ``figure_of_merit`` values of every contained
+        :class:`FitEllipse`, used by the non-linear search as the
+        overall objective.
+        """
+        return sum(f.figure_of_merit for f in self.fit_list)
+
+    @property
+    def log_likelihood(self):
+        """
+        The sum of the ``log_likelihood`` values of every contained
+        :class:`FitEllipse`.
+        """
+        return sum(f.log_likelihood for f in self.fit_list)
+
+    @property
+    def chi_squared(self):
+        """
+        The sum of the ``chi_squared`` values of every contained
+        :class:`FitEllipse`.
+        """
+        return sum(f.chi_squared for f in self.fit_list)

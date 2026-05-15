@@ -161,16 +161,27 @@ class Ellipse(EllProfile):
         The ellipse radii from the major-axis of the ellipse.
         """
 
+        if xp is np:
+            minor_axis = self.minor_axis  # numpy property — fine
+        else:
+            # JAX-safe inline computation of minor_axis. Cannot call self.minor_axis
+            # because it's a @property that hardcodes np.sqrt; under vmap with
+            # ell_comps as tracers, np.sqrt fails.
+            from autogalaxy.convert import axis_ratio_from
+            axis_ratio = axis_ratio_from(ell_comps=self.ell_comps, xp=xp)
+            ellipticity = xp.sqrt(1.0 - axis_ratio ** 2.0)
+            minor_axis = self.major_axis * xp.sqrt(1.0 - ellipticity ** 2.0)
+
         angles_from_x0 = self.angles_from_x0_from(pixel_scale=pixel_scale, n_i=n_i, xp=xp)
 
         return xp.divide(
-            self.major_axis * self.minor_axis,
+            self.major_axis * minor_axis,
             xp.sqrt(
                 xp.add(
                     self.major_axis**2.0
-                    * xp.sin(angles_from_x0 - self.angle_radians()) ** 2.0,
-                    self.minor_axis**2.0
-                    * xp.cos(angles_from_x0 - self.angle_radians()) ** 2.0,
+                    * xp.sin(angles_from_x0 - self.angle_radians(xp=xp)) ** 2.0,
+                    minor_axis**2.0
+                    * xp.cos(angles_from_x0 - self.angle_radians(xp=xp)) ** 2.0,
                 )
             ),
         )

@@ -4,11 +4,16 @@
 This module provides `AnalysisEllipse`, which implements `log_likelihood_function` by:
 
 1. Extracting the ellipse (and optional multipoles) from the model instance.
-2. Constructing a `FitEllipse` object.
-3. Returning the `figure_of_merit` of the fit.
+2. Constructing a `FitEllipseSummed` object via `fit_from`.
+3. Returning the `figure_of_merit` of the summed fit.
 
 Unlike `AnalysisImaging`, this class does not use PSF convolution or linear inversions. It directly fits
 the isophotal structure of the image via interpolation along the ellipse perimeter.
+
+The `fit_from` method returns a `FitEllipseSummed` — a single object aggregating one `FitEllipse` per
+ellipse in the model. This mirrors `AnalysisImaging.fit_from`'s single-object return and allows
+``jax.jit(analysis.fit_from)(instance)`` to cross the JIT boundary cleanly once ellipse/fit pytrees
+are registered.
 """
 import logging
 import numpy as np
@@ -17,7 +22,7 @@ from typing import List, Optional
 import autofit as af
 import autoarray as aa
 
-from autogalaxy.ellipse.fit_ellipse import FitEllipse
+from autogalaxy.ellipse.fit_ellipse import FitEllipse, FitEllipseSummed
 from autogalaxy.ellipse.model.result import ResultEllipse
 from autogalaxy.ellipse.model.visualizer import VisualizerEllipse
 
@@ -26,6 +31,8 @@ from autogalaxy import exc
 logger = logging.getLogger(__name__)
 
 logger.setLevel(level="INFO")
+
+_FIT_ELLIPSE_PYTREES_REGISTERED = False
 
 
 class AnalysisEllipse(af.Analysis):
@@ -36,7 +43,7 @@ class AnalysisEllipse(af.Analysis):
         self,
         dataset: aa.Imaging,
         title_prefix: str = None,
-        use_jax: bool = False,
+        use_jax: bool = True,
         **kwargs,
     ):
         """
@@ -57,34 +64,14 @@ class AnalysisEllipse(af.Analysis):
         title_prefix
             A string that is added before the title of all figures output by visualization, for example to
             put the name of the dataset and galaxy in the title.
+        use_jax
+            If True, the JAX-traceable fit path is enabled. Fit-related pytrees are registered on the
+            first :meth:`fit_from` call. Default ``True`` mirrors :class:`AnalysisImaging`.
         """
         self.dataset = dataset
         self.title_prefix = title_prefix
 
         super().__init__(use_jax=use_jax, **kwargs)
-
-        if use_jax:
-            self._register_fit_ellipse_pytrees()
-
-    @staticmethod
-    def _register_fit_ellipse_pytrees() -> None:
-        """Register every type reachable from a ``FitEllipse`` return value so
-        ``jax.jit`` can flatten its output.
-
-        ``dataset`` is per-analysis-constant — ride as aux so JAX does not
-        recurse into it. ``ellipse`` and ``multipole_list`` carry the
-        traced model parameters (``centre``, ``ell_comps``, ``major_axis``,
-        ``multipole_comps``).
-        """
-        from autoarray.abstract_ndarray import register_instance_pytree
-        from autogalaxy.ellipse.ellipse.ellipse import Ellipse
-        from autogalaxy.ellipse.ellipse.ellipse_multipole import EllipseMultipole
-
-        register_instance_pytree(Ellipse)
-        # ``m`` is the multipole order (integer discriminator like 4, 6 — not
-        # fittable). The traced parameters live in ``multipole_comps``.
-        register_instance_pytree(EllipseMultipole, no_flatten=("m",))
-        register_instance_pytree(FitEllipse, no_flatten=("dataset",))
 
     def log_likelihood_function(self, instance: af.ModelInstance) -> float:
         """
@@ -116,24 +103,58 @@ class AnalysisEllipse(af.Analysis):
         float
             The log likelihood indicating how well this model instance fitted the imaging data.
         """
-        fit_list = self.fit_list_from(instance=instance)
-        return sum(fit.log_likelihood for fit in fit_list)
+        return self.fit_from(instance=instance).figure_of_merit
 
-    def fit_list_from(self, instance: af.ModelInstance) -> List[FitEllipse]:
+    def fit_from(self, instance: af.ModelInstance) -> FitEllipseSummed:
         """
-        Given a model instance create a list of `FitEllipse` objects.
+        Given a model instance create a :class:`FitEllipseSummed` aggregating one :class:`FitEllipse`
+        per ellipse in the instance.
 
-        This function unpacks the `instance`, specifically the `ellipses` and (in input) the `multipoles` and uses
-        them to create a list of `FitEllipse` objects that are used to fit the model to the imaging data.
+        This function is used in `log_likelihood_function` to fit the model containing ellipses to the imaging
+        data and compute the figure of merit. It registers ellipse/multipole/fit pytrees on the first call
+        when ``use_jax`` is True so the return value can cross the ``jax.jit`` boundary.
 
-        This function is used in the `log_likelihood_function` to fit the model containing ellipses to the imaging data
-        and compute the log likelihood.
+        Mirrors :meth:`AnalysisImaging.fit_from`.
 
         Parameters
         ----------
         instance
             An instance of the model that is being fitted to the data by this analysis (whose parameters have been set
             via a non-linear search).
+
+        Returns
+        -------
+        FitEllipseSummed
+            The aggregated fit of all ellipses to the imaging dataset.
+        """
+        if self._use_jax:
+            self._register_fit_ellipse_pytrees()
+
+        fit_list = self.fit_list_from(instance=instance, use_jax=self._use_jax)
+        return FitEllipseSummed(fit_list=fit_list)
+
+    def fit_list_from(
+        self, instance: af.ModelInstance, use_jax: bool = False
+    ) -> List[FitEllipse]:
+        """
+        Given a model instance create a list of `FitEllipse` objects.
+
+        This function unpacks the `instance`, specifically the `ellipses` and (in input) the `multipoles` and uses
+        them to create a list of `FitEllipse` objects that are used to fit the model to the imaging data.
+
+        This function is used in the `fit_from` to fit the model containing ellipses to the imaging data
+        and compute the log likelihood. It is also called by `VisualizerEllipse.visualize`, which passes
+        the default `use_jax=False` to get numpy-backed arrays suitable for matplotlib.
+
+        Parameters
+        ----------
+        instance
+            An instance of the model that is being fitted to the data by this analysis (whose parameters have been set
+            via a non-linear search).
+        use_jax
+            If True, each `FitEllipse` is constructed with `use_jax=True` so that all internal
+            array operations use ``jax.numpy`` and results are JAX arrays. Default ``False`` preserves
+            the numpy path for visualization and other non-JIT callers.
 
         Returns
         -------
@@ -150,12 +171,74 @@ class AnalysisEllipse(af.Analysis):
                 multipole_list = None
 
             fit = FitEllipse(
-                dataset=self.dataset, ellipse=ellipse, multipole_list=multipole_list
+                dataset=self.dataset,
+                ellipse=ellipse,
+                multipole_list=multipole_list,
+                use_jax=use_jax,
             )
 
             fit_list.append(fit)
 
         return fit_list
+
+    @staticmethod
+    def _register_fit_ellipse_pytrees() -> None:
+        """Register every type reachable from a :class:`FitEllipseSummed` return value
+        so ``jax.jit(fit_from)`` can flatten its output.
+
+        ``dataset`` is per-analysis-constant — rides as aux (``no_flatten``) so JAX does not
+        recurse into it. ``ellipse``, ``multipole_list`` and their contained parameters
+        (``centre``, ``ell_comps``, ``major_axis``, ``multipole_comps``) are dynamic per fit.
+
+        Idempotent — guarded by the module-level ``_FIT_ELLIPSE_PYTREES_REGISTERED`` flag so
+        repeated calls from each ``fit_from`` invocation are cheap.
+
+        Note: no shim in ``autogalaxy/analysis/jax_pytrees.py`` is needed — unlike ``Galaxies``
+        (a ``list`` subclass requiring custom flatten/unflatten), ``Ellipse`` and
+        ``EllipseMultipole`` are plain classes handled correctly by the generic
+        ``register_instance_pytree``.
+
+        Note: ``Ellipse``, ``EllipseMultipole``, and ``EllipseMultipoleScaled`` may already have
+        been registered by ``autofit.jax.pytrees.register_model`` (which uses its own
+        ``_REGISTERED_INSTANCE_CLASSES`` set, independent of autoarray's
+        ``_pytree_registered_classes``). The ``_safe_register`` helper checks both tracking sets
+        before calling JAX's ``register_pytree_node``, avoiding the duplicate-registration
+        ``ValueError``.
+        """
+        global _FIT_ELLIPSE_PYTREES_REGISTERED
+        if _FIT_ELLIPSE_PYTREES_REGISTERED:
+            return
+
+        from autoarray.abstract_ndarray import register_instance_pytree, _pytree_registered_classes
+        from autoarray.dataset.dataset_model import DatasetModel
+        from autogalaxy.ellipse.ellipse.ellipse import Ellipse
+        from autogalaxy.ellipse.ellipse.ellipse_multipole import (
+            EllipseMultipole,
+            EllipseMultipoleScaled,
+        )
+
+        # autofit.jax.pytrees.register_model may have already registered Ellipse /
+        # EllipseMultipole / EllipseMultipoleScaled in its own _REGISTERED_INSTANCE_CLASSES
+        # set, which is independent from autoarray's _pytree_registered_classes. Populate
+        # autoarray's set to make register_instance_pytree's idempotency guard work for
+        # those classes, then call register_instance_pytree normally for the rest.
+        try:
+            from autofit.jax.pytrees import _REGISTERED_INSTANCE_CLASSES as _af_registered
+        except ImportError:
+            _af_registered = set()
+
+        for cls in (Ellipse, EllipseMultipole, EllipseMultipoleScaled):
+            if cls in _af_registered:
+                _pytree_registered_classes.add(cls)
+
+        register_instance_pytree(FitEllipse, no_flatten=("dataset",))
+        register_instance_pytree(FitEllipseSummed, no_flatten=("dataset",))
+        register_instance_pytree(DatasetModel)
+        register_instance_pytree(Ellipse)
+        register_instance_pytree(EllipseMultipole, no_flatten=("m",))
+        register_instance_pytree(EllipseMultipoleScaled, no_flatten=("m",))
+
+        _FIT_ELLIPSE_PYTREES_REGISTERED = True
 
     def make_result(
         self,
