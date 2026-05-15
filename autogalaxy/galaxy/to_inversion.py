@@ -404,6 +404,8 @@ class GalaxiesToInversion(AbstractToInversion):
 
         image_plane_mesh_grid_list = []
 
+        #print(self.adapt_images)
+
         for galaxy in self.galaxies.galaxies_with_cls_list_from(cls=aa.Pixelization):
             try:
                 image_plane_mesh_grid = (

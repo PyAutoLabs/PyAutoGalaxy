@@ -104,3 +104,94 @@ PowerLawSph:
     limits:
       lower: 1.0
       upper: 3.0
+PowerLawMultiBand:
+  centre_0:
+    type: Gaussian
+    mean: 0.0
+    sigma: 0.1
+    width_modifier:
+      type: Absolute
+      value: 0.05
+    limits:
+      lower: -inf
+      upper: inf
+  centre_1:
+    type: Gaussian
+    mean: 0.0
+    sigma: 0.1
+    width_modifier:
+      type: Absolute
+      value: 0.05
+    limits:
+      lower: -inf
+      upper: inf
+  einstein_radius:
+    type: Uniform
+    lower_limit: 0.0
+    upper_limit: 8.0
+    width_modifier:
+      type: Relative
+      value: 0.25
+    limits:
+      lower: 0.0
+      upper: inf
+  axis_ratio:
+    type: Uniform
+    lower_limit: 0.2
+    upper_limit: 0.9999
+    width_modifier:
+      type: Absolute
+      value: 0.1
+    limits:
+      lower: 0.2
+      upper: 0.9999
+  position_angle:
+    type: Uniform
+    lower_limit: -180.0
+    upper_limit: 180.0
+    width_modifier:
+      type: Absolute
+      value: 15.0
+    limits:
+      lower: -180.0
+      upper: 180.0
+  slope:
+    type: Uniform
+    lower_limit: 1.5
+    upper_limit: 3.0
+    width_modifier:
+      type: Absolute
+      value: 0.2
+    limits:
+      lower: 1.0
+      upper: 3.0
+  shift_centre_0:
+    type: Gaussian
+    mean: 0.0
+    sigma: 0.1
+    width_modifier:
+      type: Absolute
+      value: 0.05
+    limits:
+      lower: -inf
+      upper: inf
+  shift_centre_1:
+    type: Gaussian
+    mean: 0.0
+    sigma: 0.1
+    width_modifier:
+      type: Absolute
+      value: 0.05
+    limits:
+      lower: -inf
+      upper: inf
+  shift_angle:
+    type: Gaussian
+    mean: 0.0
+    sigma: 20.0
+    width_modifier:
+      type: Absolute
+      value: 5.0
+    limits:
+      lower: -inf
+      upper: inf

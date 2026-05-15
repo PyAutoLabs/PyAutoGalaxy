@@ -19,3 +19,74 @@ ExternalShear:
     limits:
       lower: -inf
       upper: inf
+ExternalShearMultiBand:
+  centre_0:
+    type: Gaussian
+    mean: 0.0
+    sigma: 0.1
+    width_modifier:
+      type: Absolute
+      value: 0.05
+    limits:
+      lower: -inf
+      upper: inf
+  centre_1:
+    type: Gaussian
+    mean: 0.0
+    sigma: 0.1
+    width_modifier:
+      type: Absolute
+      value: 0.05
+    limits:
+      lower: -inf
+      upper: inf
+  magnitude:
+    type: Uniform
+    lower_limit: 0.0
+    upper_limit: 1.0
+    width_modifier:
+      type: Absolute
+      value: 0.025
+    limits:
+      lower: 0.0
+      upper: 2.0
+  position_angle:
+    type: Uniform
+    lower_limit: -180.0
+    upper_limit: 180.0
+    width_modifier:
+      type: Absolute
+      value: 15.0
+    limits:
+      lower: -180.0
+      upper: 180.0
+  shift_centre_0:
+    type: Gaussian
+    mean: 0.0
+    sigma: 0.1
+    width_modifier:
+      type: Absolute
+      value: 0.05
+    limits:
+      lower: -inf
+      upper: inf
+  shift_centre_1:
+    type: Gaussian
+    mean: 0.0
+    sigma: 0.1
+    width_modifier:
+      type: Absolute
+      value: 0.05
+    limits:
+      lower: -inf
+      upper: inf
+  shift_angle:
+    type: Gaussian
+    mean: 0.0
+    sigma: 20.0
+    width_modifier:
+      type: Absolute
+      value: 5.0
+    limits:
+      lower: -inf
+      upper: inf

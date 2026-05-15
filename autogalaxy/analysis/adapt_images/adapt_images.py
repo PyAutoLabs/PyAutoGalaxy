@@ -6,6 +6,7 @@ from autoconf import conf
 from autoconf import cached_property
 
 import autoarray as aa
+import numpy as np
 
 if TYPE_CHECKING:
     from autogalaxy.galaxy.galaxy import Galaxy
@@ -147,7 +148,7 @@ class AdaptImages:
 
         return adapt_model_image
 
-    def updated_via_instance_from(self, instance, mask=None) -> "AdaptImages":
+    def updated_via_instance_from(self, instance, dataset_model, xp=np, mask=None) -> "AdaptImages":
         """
         Returns adapt-images which have been updated to map galaxy instances instead of galaxy names.
 
@@ -202,10 +203,60 @@ class AdaptImages:
             for galaxy_name, galaxy in instance.path_instance_tuples_for_class(Galaxy):
                 galaxy_name = str(galaxy_name)
 
+                #print('grid_offset:', dataset_model.grid_offset)
+                #print('grid_rotation:', dataset_model.grid_rotation)
+
                 if galaxy_name in self.galaxy_name_image_plane_mesh_grid_dict:
-                    galaxy_image_plane_mesh_grid_dict[galaxy] = (
-                        self.galaxy_name_image_plane_mesh_grid_dict[galaxy_name]
-                    )
+
+                    # print('AdaptImage Here')
+
+                    # image_plane_mesh_grid = self.galaxy_name_image_plane_mesh_grid_dict[galaxy_name]
+                    # #print('image_plane_mesh_grid:', image_plane_mesh_grid)
+
+                    # moved_image_plane_mesh_grid = image_plane_mesh_grid.subtracted_and_rotated_from(
+                    #     offset=dataset_model.grid_offset,
+                    #     angle=dataset_model.grid_rotation,
+                    #     xp=xp
+                    # )
+
+                    # print('moved_image_plane_mesh_grid:', moved_image_plane_mesh_grid)
+
+                    #galaxy_image_plane_mesh_grid_dict[galaxy] = moved_image_plane_mesh_grid
+                    # print('What is this?')
+                    # print(self.galaxy_name_image_plane_mesh_grid_dict[galaxy_name])
+
+                    if dataset_model is not None:
+                        galaxy_image_plane_mesh_grid_dict[galaxy] = (
+                            self.galaxy_name_image_plane_mesh_grid_dict[galaxy_name].subtracted_and_rotated_from(
+                                offset=dataset_model.grid_offset,
+                                angle=dataset_model.grid_rotation_angle,
+                                xp=xp
+                            )
+                        )
+                    else:
+                        galaxy_image_plane_mesh_grid_dict[galaxy] = (
+                            self.galaxy_name_image_plane_mesh_grid_dict[galaxy_name]
+                        )
+
+                    # if self.galaxy_name_image_plane_mesh_grid_dict[galaxy_name] is not None:
+                    #     print('Ever here?')
+                    #     image_plane_mesh_grid = self.galaxy_name_image_plane_mesh_grid_dict[galaxy_name]
+                    #     print('Ever here 1.5?')
+                    #     moved_image_plane_mesh_grid = image_plane_mesh_grid.subtracted_and_rotated_from(
+                    #         offset=dataset_model.grid_offset,
+                    #         angle=dataset_model.grid_rotation_angle,
+                    #         xp=xp
+                    #     )
+                    #     print('Ever here2?')
+                    #     print("What is moved_image_plane_mesh_grid?")
+                    #     print(moved_image_plane_mesh_grid)
+                    #     print("==========")
+                    #     galaxy_image_plane_mesh_grid_dict[galaxy] = (moved_image_plane_mesh_grid)
+
+                    # else:
+                    #     galaxy_image_plane_mesh_grid_dict[galaxy] = (
+                    #         self.galaxy_name_image_plane_mesh_grid_dict[galaxy_name]
+                    #     )
 
         return AdaptImages(
             galaxy_image_dict=galaxy_image_dict,

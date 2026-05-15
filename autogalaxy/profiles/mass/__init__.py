@@ -12,9 +12,11 @@ from .total import (
     PowerLawBroken,
     PowerLawBrokenSph,
     PowerLawMultipole,
+    PowerLawMultipoleMultiBand,
     IsothermalCore,
     IsothermalCoreSph,
     PowerLaw,
+    PowerLawMultiBand,
     PowerLawSph,
     Isothermal,
     IsothermalSph,
@@ -34,6 +36,7 @@ from .dark import (
     NFWMCRLudlowSph,
     NFWMCRScatterLudlow,
     NFWMCRScatterLudlowSph,
+    NFWMCRScatterLudlowSphMultiBand,
     NFWMCRLudlow,
     gNFWMCRLudlow,
     NFWVirialMassConcSph,
@@ -60,4 +63,4 @@ from .stellar import (
     Chameleon,
     ChameleonSph,
 )
-from .sheets import ExternalShear, MassSheet
+from .sheets import ExternalShear, MassSheet, ExternalShearMultiBand

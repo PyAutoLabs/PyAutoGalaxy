@@ -4,7 +4,7 @@ from .gnfw_virial_mass_conc import gNFWVirialMassConcSph
 from .gnfw_virial_mass_gnfw_conc import gNFWVirialMassgNFWConcSph
 from .nfw import NFW, NFWSph
 from .nfw_mcr import NFWMCRLudlowSph, NFWMCRDuffySph, NFWMCRLudlow
-from .nfw_mcr_scatter import NFWMCRScatterLudlow, NFWMCRScatterLudlowSph
+from .nfw_mcr_scatter import NFWMCRScatterLudlow, NFWMCRScatterLudlowSph, NFWMCRScatterLudlowSphMultiBand
 from .nfw_truncated import NFWTruncatedSph
 from .nfw_truncated_mcr import NFWTruncatedMCRLudlowSph, NFWTruncatedMCRDuffySph
 from .nfw_truncated_mcr_scatter import NFWTruncatedMCRScatterLudlowSph

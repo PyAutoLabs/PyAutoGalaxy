@@ -58,6 +58,9 @@ class AnalysisDataset(Analysis):
         )
 
         self.dataset = dataset
+
+        #print(dir(adapt_images))
+
         self.adapt_images = adapt_images
 
         self.settings = settings or aa.Settings()
@@ -169,8 +172,8 @@ class AnalysisDataset(Analysis):
         except AttributeError:
             pass
 
-    def adapt_images_via_instance_from(self, instance: af.ModelInstance) -> AdaptImages:
+    def adapt_images_via_instance_from(self, instance: af.ModelInstance, dataset_model: aa.DatasetModel, xp=np) -> AdaptImages:
         try:
-            return self.adapt_images.updated_via_instance_from(instance=instance)
+            return self.adapt_images.updated_via_instance_from(instance=instance, dataset_model=dataset_model, xp=xp)
         except AttributeError:
             pass

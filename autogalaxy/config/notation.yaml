@@ -67,6 +67,13 @@ label:
     weight_power: W_{\rm p}
     zeroth_coefficient: \lambda_{\rm 0}
     zeroth_signal_scale: V
+    shift_centre_0: shift_{c0}
+    shift_centre_1: shift_{c1}
+    shift_angle: shift_{\theta}
+    rot_ref_centre_0: rot_ref_{c0}
+    rot_ref_centre_1: rot_ref_{c1}
+    magnitude: mag
+    position_angle: \theta_{\rm pos}
   superscript:
     ExternalShear: ext
     Mesh: mesh
@@ -144,3 +151,8 @@ label_format:
     virial_overdens: '{:.4f}'
     weight_floor: '{:.4f}'
     weight_power: '{:.4f}'
+    shift_centre_0: '{:.4f}'
+    shift_centre_1: '{:.4f}'
+    shift_angle: '{:.4f}'
+    magnitude: '{:.4f}'
+    position_angle: '{:.4f}'

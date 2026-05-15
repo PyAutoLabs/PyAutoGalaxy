@@ -359,3 +359,30 @@ def multipole_comps_from(
     multipole_comp_1 = k_m * xp.cos(angle)
 
     return multipole_comp_0, multipole_comp_1
+
+
+def rotate_centre(centre_0, centre_1, ref_centre_0, ref_centre_1, angle, xp=np):
+    """
+    Rotate a centre around a reference centre by an angle in degrees.
+
+    Coordinates are in (y, x) order: `centre_0` is y and `centre_1` is x.
+    A positive angle rotates counter-clockwise.
+    """
+    angle_radians = angle * xp.pi / 180.0
+
+    y_shift = centre_0 - ref_centre_0
+    x_shift = centre_1 - ref_centre_1
+
+    centre_0_rotated = (
+        ref_centre_0
+        + x_shift * xp.sin(angle_radians)
+        + y_shift * xp.cos(angle_radians)
+    )
+    centre_1_rotated = (
+        ref_centre_1
+        + x_shift * xp.cos(angle_radians)
+        - y_shift * xp.sin(angle_radians)
+    )
+
+    return centre_0_rotated, centre_1_rotated
+
