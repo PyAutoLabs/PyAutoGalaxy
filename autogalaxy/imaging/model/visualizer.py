@@ -146,6 +146,7 @@ class VisualizerImaging(af.Visualizer):
         paths: af.AbstractPaths,
         instance: af.ModelInstance,
         during_analysis: bool,
+        quick_update: bool = False,
     ):
         """
         Performs visualization during the non-linear search of information which is shared across all analyses on a
