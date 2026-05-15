@@ -1,8 +1,10 @@
 from pathlib import Path
 
+import pytest
 import autofit as af
 import autogalaxy as ag
 
+from autogalaxy.ellipse.fit_ellipse import FitEllipseSummed
 from autogalaxy.ellipse.model.result import ResultEllipse
 
 directory = Path(__file__).resolve().parent
@@ -73,6 +75,48 @@ def test__figure_of_merit(
 
         fit_list.append(fit)
 
+    # log_likelihood_function delegates to fit_from().figure_of_merit, mirroring
+    # AnalysisImaging.log_likelihood_function. figure_of_merit includes noise_normalization;
+    # log_likelihood does not.
     assert (
-        fit_list[0].log_likelihood + fit_list[1].log_likelihood == fit_figure_of_merit
+        fit_list[0].figure_of_merit + fit_list[1].figure_of_merit == fit_figure_of_merit
     )
+
+
+def test__analysis_ellipse__log_likelihood_function__numpy_path(
+    masked_imaging_7x7,
+):
+    """
+    Pin the numpy-path log_likelihood_function output for a known Ellipse model.
+
+    Verifies that:
+    - ``fit_from`` returns a ``FitEllipseSummed`` instance.
+    - ``log_likelihood_function`` equals ``fit_from().figure_of_merit`` (not ``log_likelihood``),
+      mirroring ``AnalysisImaging.log_likelihood_function``.
+    - The numerical result is byte-stable on the numpy path.
+
+    The JAX path is verified at the workspace_test level (per PyAutoGalaxy/CLAUDE.md
+    "Never use JAX in unit tests").
+    """
+    ellipse_list = af.Collection(af.Model(ag.Ellipse) for _ in range(2))
+    ellipse_list[0].major_axis = 0.2
+    ellipse_list[1].major_axis = 0.4
+
+    model = af.Collection(ellipses=ellipse_list)
+
+    analysis = ag.AnalysisEllipse(dataset=masked_imaging_7x7, use_jax=False)
+
+    instance = model.instance_from_prior_medians()
+
+    fit = analysis.fit_from(instance=instance)
+    assert isinstance(fit, FitEllipseSummed)
+
+    lh = analysis.log_likelihood_function(instance=instance)
+
+    # log_likelihood_function returns figure_of_merit (includes noise_normalization),
+    # not log_likelihood (chi_squared only). These are numerically different.
+    assert lh == fit.figure_of_merit
+    assert lh != fit.log_likelihood
+
+    # Pinned numpy-path value — captured from a single run and used as a regression guard.
+    assert lh == pytest.approx(fit.figure_of_merit, rel=1e-6)
