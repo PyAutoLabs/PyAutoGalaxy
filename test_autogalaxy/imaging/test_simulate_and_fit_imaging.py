@@ -81,6 +81,130 @@ def test__perfect_fit__simulate_and_reload__chi_squared_zero():
         shutil.rmtree(file_path)
 
 
+def _perfect_fit_dataset(galaxies, grid):
+    """Helper: simulate noiseless imaging and zero out the noise map for chi^2 tests."""
+    psf = ag.Convolver.from_gaussian(
+        shape_native=(3, 3), pixel_scales=grid.pixel_scales[0], sigma=0.05, normalize=True
+    )
+    simulator = ag.SimulatorImaging(
+        exposure_time=300.0, psf=psf, add_poisson_noise_to_data=False
+    )
+    dataset = simulator.via_galaxies_from(galaxies=galaxies, grid=grid)
+    dataset.noise_map = ag.Array2D.ones(
+        shape_native=dataset.data.shape_native, pixel_scales=grid.pixel_scales
+    )
+    return dataset
+
+
+def test__perfect_fit__sim_offset_centre__fit_with_dataset_model_grid_offset__chi_squared_zero():
+    """Sim a profile with offset centre; fit with origin profile + DatasetModel.grid_offset."""
+    grid = ag.Grid2D.uniform(shape_native=(31, 31), pixel_scales=0.2, over_sample_size=1)
+    centre = (0.3, 0.2)
+
+    sim_galaxy = ag.Galaxy(
+        redshift=0.5,
+        light=ag.lp.Sersic(centre=centre, intensity=0.5, effective_radius=0.5),
+    )
+    dataset = _perfect_fit_dataset([sim_galaxy], grid)
+    mask = ag.Mask2D.circular(
+        shape_native=dataset.data.shape_native, pixel_scales=0.2, radius=2.5
+    )
+    masked = dataset.apply_mask(mask=mask)
+
+    fit_galaxy = ag.Galaxy(
+        redshift=0.5,
+        light=ag.lp.Sersic(centre=(0.0, 0.0), intensity=0.5, effective_radius=0.5),
+    )
+    dataset_model = ag.DatasetModel(grid_offset=centre)
+    fit = ag.FitImaging(
+        dataset=masked, galaxies=[fit_galaxy], dataset_model=dataset_model
+    )
+
+    assert fit.chi_squared == pytest.approx(0.0, abs=1e-4)
+
+
+def test__perfect_fit__sim_rotated_ellipse__fit_with_dataset_model_grid_rotation__chi_squared_zero():
+    """Sim a rotated ellipse; fit with axis-aligned profile + DatasetModel.grid_rotation_angle.
+
+    Convention: profile with ell-angle theta is equivalent to grid rotated by -theta,
+    so fit with grid_rotation_angle=-theta to recover chi^2 = 0.
+    """
+    grid = ag.Grid2D.uniform(shape_native=(31, 31), pixel_scales=0.2, over_sample_size=1)
+    theta = 15.0
+
+    sim_galaxy = ag.Galaxy(
+        redshift=0.5,
+        light=ag.lp.Sersic(
+            centre=(0.0, 0.0),
+            ell_comps=ag.convert.ell_comps_from(axis_ratio=0.6, angle=theta),
+            intensity=0.5,
+            effective_radius=0.5,
+        ),
+    )
+    dataset = _perfect_fit_dataset([sim_galaxy], grid)
+    mask = ag.Mask2D.circular(
+        shape_native=dataset.data.shape_native, pixel_scales=0.2, radius=2.5
+    )
+    masked = dataset.apply_mask(mask=mask)
+
+    fit_galaxy = ag.Galaxy(
+        redshift=0.5,
+        light=ag.lp.Sersic(
+            centre=(0.0, 0.0),
+            ell_comps=ag.convert.ell_comps_from(axis_ratio=0.6, angle=0.0),
+            intensity=0.5,
+            effective_radius=0.5,
+        ),
+    )
+    dataset_model = ag.DatasetModel(grid_rotation_angle=-theta)
+    fit = ag.FitImaging(
+        dataset=masked, galaxies=[fit_galaxy], dataset_model=dataset_model
+    )
+
+    assert fit.chi_squared == pytest.approx(0.0, abs=1e-4)
+
+
+def test__perfect_fit__sim_offset_and_rotated__fit_with_dataset_model_offset_and_rotation__chi_squared_zero():
+    """Combined: sim with offset centre AND rotated ellipse, fit with identity profile +
+    DatasetModel(grid_offset, grid_rotation_angle)."""
+    grid = ag.Grid2D.uniform(shape_native=(31, 31), pixel_scales=0.2, over_sample_size=1)
+    centre = (0.3, 0.2)
+    theta = 12.0
+
+    sim_galaxy = ag.Galaxy(
+        redshift=0.5,
+        light=ag.lp.Sersic(
+            centre=centre,
+            ell_comps=ag.convert.ell_comps_from(axis_ratio=0.6, angle=theta),
+            intensity=0.5,
+            effective_radius=0.5,
+        ),
+    )
+    dataset = _perfect_fit_dataset([sim_galaxy], grid)
+    mask = ag.Mask2D.circular(
+        shape_native=dataset.data.shape_native, pixel_scales=0.2, radius=2.5
+    )
+    masked = dataset.apply_mask(mask=mask)
+
+    fit_galaxy = ag.Galaxy(
+        redshift=0.5,
+        light=ag.lp.Sersic(
+            centre=(0.0, 0.0),
+            ell_comps=ag.convert.ell_comps_from(axis_ratio=0.6, angle=0.0),
+            intensity=0.5,
+            effective_radius=0.5,
+        ),
+    )
+    dataset_model = ag.DatasetModel(
+        grid_offset=centre, grid_rotation_angle=-theta
+    )
+    fit = ag.FitImaging(
+        dataset=masked, galaxies=[fit_galaxy], dataset_model=dataset_model
+    )
+
+    assert fit.chi_squared == pytest.approx(0.0, abs=1e-4)
+
+
 def test__simulate_imaging_data_and_fit__standard_galaxies__known_figure_of_merit():
     grid = ag.Grid2D.uniform(shape_native=(31, 31), pixel_scales=0.2)
 
