@@ -64,7 +64,7 @@ class EllipseMultipole:
         """
 
         angle = (
-            ellipse.angle()
+            ellipse.angle(xp=xp)
             - multipole_k_m_and_phi_m_from(self.multipole_comps, self.m)[1]
         )
         period = 360.0 / self.m
@@ -97,7 +97,7 @@ class EllipseMultipole:
             k_orig,
             symmetry
             - 2 * phi_orig
-            + (symmetry - (ellipse.angle() - phi_orig)),  # Re-align light to match mass
+            + (symmetry - (ellipse.angle(xp=xp) - phi_orig)),  # Re-align light to match mass
             self.m,
         )
 
@@ -105,7 +105,7 @@ class EllipseMultipole:
         theta = xp.arctan2(points[:, 0], points[:, 1])  # <- true polar angle
 
         # 2) multipole in that same frame
-        delta_theta = self.m * (theta - ellipse.angle_radians())
+        delta_theta = self.m * (theta - ellipse.angle_radians(xp=xp))
         radial = comps_adjusted[1] * xp.cos(delta_theta) + comps_adjusted[0] * xp.sin(
             delta_theta
         )
@@ -193,7 +193,7 @@ class EllipseMultipoleScaled(EllipseMultipole):
         )
         comps_adjusted = multipole_comps_from(
             k_orig,
-            symmetry - 2 * phi_orig + (symmetry - (ellipse.angle() - phi_orig)),
+            symmetry - 2 * phi_orig + (symmetry - (ellipse.angle(xp=xp) - phi_orig)),
             self.m,
         )
 
@@ -201,7 +201,7 @@ class EllipseMultipoleScaled(EllipseMultipole):
         theta = xp.arctan2(points[:, 0], points[:, 1])  # <- true polar angle
 
         # 2) multipole in that same frame
-        delta_theta = self.m * (theta - ellipse.angle_radians())
+        delta_theta = self.m * (theta - ellipse.angle_radians(xp=xp))
         radial = comps_adjusted[1] * xp.cos(delta_theta) + comps_adjusted[0] * xp.sin(
             delta_theta
         )
