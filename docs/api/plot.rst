@@ -5,12 +5,12 @@ Plotting
 **PyAutoGalaxy** custom visualization library.
 
 Step-by-step Juypter notebook guides illustrating all objects listed on this page are
-provided on the `autogalaxy_workspace: plot tutorials <https://github.com/Jammy2211/autogalaxy_workspace/tree/release/notebooks/plot>`_ and
+provided on the `autogalaxy_workspace: plot tutorials <https://github.com/PyAutoLabs/autogalaxy_workspace/tree/main/notebooks/guides/plot>`_ and
 it is strongly recommended you use those to learn plot customization.
 
 **Examples / Tutorials:**
 
-- `autogalaxy_workspace: plot tutorials <https://github.com/Jammy2211/autogalaxy_workspace/tree/release/notebooks/plot>`_
+- `autogalaxy_workspace: plot tutorials <https://github.com/PyAutoLabs/autogalaxy_workspace/tree/main/notebooks/guides/plot>`_
 
 Plotters [aplt]
 ---------------

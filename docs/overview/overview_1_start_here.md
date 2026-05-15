@@ -4,7 +4,7 @@
 
 **PyAutoGalaxy** is software for analysing the morphologies and structures of galaxies:
 
-```{image} https://raw.githubusercontent.com/Jammy2211/PyAutoGalaxy/main/paper/hstcombined.png
+```{image} https://raw.githubusercontent.com/PyAutoLabs/PyAutoGalaxy/main/paper/hstcombined.png
 :alt: Alternative text
 :width: 400
 ```
@@ -51,7 +51,7 @@ aplt.plot_grid(grid=grid, title="Uniform Grid")
 
 The `Grid2D` looks like this:
 
-```{image} https://raw.githubusercontent.com/Jammy2211/PyAutoGalaxy/main/docs/overview/images/overview_1/0_grid.png
+```{image} https://raw.githubusercontent.com/PyAutoLabs/PyAutoGalaxy/main/docs/overview/images/overview_1/0_grid.png
 :alt: Alternative text
 :width: 600
 ```
@@ -102,7 +102,7 @@ aplt.plot_array(array=sersic_light_profile.image_2d_from(grid=grid), title="Sers
 
 The light profile appears as follows:
 
-```{image} https://raw.githubusercontent.com/Jammy2211/PyAutoGalaxy/main/docs/overview/images/overview_1/1_image_2d.png
+```{image} https://raw.githubusercontent.com/PyAutoLabs/PyAutoGalaxy/main/docs/overview/images/overview_1/1_image_2d.png
 :alt: Alternative text
 :width: 600
 ```
@@ -134,7 +134,7 @@ aplt.plot_array(array=galaxy.image_2d_from(grid=grid), title="Galaxy Image")
 
 The galaxy, with both a bulge and disk, appears as follows:
 
-```{image} https://raw.githubusercontent.com/Jammy2211/PyAutoGalaxy/main/docs/overview/images/overview_1/2_image_2d.png
+```{image} https://raw.githubusercontent.com/PyAutoLabs/PyAutoGalaxy/main/docs/overview/images/overview_1/2_image_2d.png
 :alt: Alternative text
 :width: 600
 ```
@@ -147,7 +147,7 @@ aplt.subplot_galaxy_light_profiles(galaxy=galaxy, grid=grid)
 
 The light profiles appear as follows:
 
-```{image} https://raw.githubusercontent.com/Jammy2211/PyAutoGalaxy/main/docs/overview/images/overview_1/3_subplot_image.png
+```{image} https://raw.githubusercontent.com/PyAutoLabs/PyAutoGalaxy/main/docs/overview/images/overview_1/3_subplot_image.png
 :alt: Alternative text
 :width: 600
 ```
@@ -176,7 +176,7 @@ galaxies = ag.Galaxies(
 aplt.plot_array(array=galaxies.image_2d_from(grid=grid), title="Galaxies Image")
 ```
 
-```{image} https://raw.githubusercontent.com/Jammy2211/PyAutoGalaxy/main/docs/overview/images/overview_1/4_image_2d.png
+```{image} https://raw.githubusercontent.com/PyAutoLabs/PyAutoGalaxy/main/docs/overview/images/overview_1/4_image_2d.png
 :alt: Alternative text
 :width: 600
 ```
@@ -242,7 +242,7 @@ aplt.plot_array(array=galaxies.image_2d_from(grid=grid), title="Galaxies Image")
 
 The image of the merging galaxy system appears as follows:
 
-```{image} https://raw.githubusercontent.com/Jammy2211/PyAutoGalaxy/main/docs/overview/images/overview_1/5_image_2d.png
+```{image} https://raw.githubusercontent.com/PyAutoLabs/PyAutoGalaxy/main/docs/overview/images/overview_1/5_image_2d.png
 :alt: Alternative text
 :width: 600
 ```

@@ -27,7 +27,7 @@ links to the relevant workspace examples.
 
 Modeling interferometer data from submillimeter (e.g. ALMA) and radio (e.g. LOFAR) observatories:
 
-```{image} https://raw.githubusercontent.com/Jammy2211/PyAutoGalaxy/main/paper/almacombined.png
+```{image} https://raw.githubusercontent.com/PyAutoLabs/PyAutoGalaxy/main/paper/almacombined.png
 :alt: Alternative text
 :width: 600
 ```
@@ -43,12 +43,12 @@ Checkout the `autogalaxy_workspace/*/interferometer` package to get started.
 Modeling imaging datasets observed at different wavelengths (e.g. HST F814W and F150W) simultaneously or simultaneously
 analysing imaging and interferometer data:
 
-```{image} https://raw.githubusercontent.com/Jammy2211/PyAutoGalaxy/main/docs/overview/images/overview_3/g_image.png
+```{image} https://raw.githubusercontent.com/PyAutoLabs/PyAutoGalaxy/main/docs/overview/images/overview_3/g_image.png
 :alt: Alternative text
 :width: 400
 ```
 
-```{image} https://raw.githubusercontent.com/Jammy2211/PyAutoGalaxy/main/docs/overview/images/overview_3/r_image.png
+```{image} https://raw.githubusercontent.com/PyAutoLabs/PyAutoGalaxy/main/docs/overview/images/overview_3/r_image.png
 :alt: Alternative text
 :width: 400
 ```
@@ -65,7 +65,7 @@ feature and it is recommended you first get to grips with the core API.
 Ellipse fitting is a technique which fits many ellipses to a galaxy's emission to determine its ellipticity, position
 angle and centre, without assuming a parametric form for its light (e.g. a Sersic profile):
 
-```{image} https://raw.githubusercontent.com/Jammy2211/PyAutoGalaxy/main/docs/overview/images/overview_3/ellipse.png
+```{image} https://raw.githubusercontent.com/PyAutoLabs/PyAutoGalaxy/main/docs/overview/images/overview_3/ellipse.png
 :alt: Alternative text
 :width: 600
 ```
@@ -84,7 +84,7 @@ Checkout `autogalaxy_workspace/notebooks/features/ellipse_fitting.ipynb` to lear
 
 An MGE decomposes the light of a galaxy into tens or hundreds of two dimensional Gaussians:
 
-```{image} https://raw.githubusercontent.com/Jammy2211/PyAutoGalaxy/main/docs/overview/images/overview_3/mge.png
+```{image} https://raw.githubusercontent.com/PyAutoLabs/PyAutoGalaxy/main/docs/overview/images/overview_3/mge.png
 :alt: Alternative text
 :width: 600
 ```
@@ -102,7 +102,7 @@ Checkout `autogalaxy_workspace/notebooks/features/multi_gaussian_expansion.ipynb
 
 Shapelets are a set of orthogonal basis functions that can be combined the represent galaxy structures:
 
-```{image} https://raw.githubusercontent.com/Jammy2211/PyAutoLens/main/docs/overview/images/overview_3/shapelets.png
+```{image} https://raw.githubusercontent.com/PyAutoLabs/PyAutoLens/main/docs/overview/images/overview_3/shapelets.png
 :alt: Alternative text
 :width: 600
 ```
@@ -145,7 +145,7 @@ The image below shows a non parametric of a galaxy observed in the Hubble Ultra 
 fitted accurately using light profiles, whereas its asymmetric and irregular spiral arm features are accurately
 captured using a rectangular mesh:
 
-```{image} https://raw.githubusercontent.com/Jammy2211/PyAutoGalaxy/main/paper/hstcombined.png
+```{image} https://raw.githubusercontent.com/PyAutoLabs/PyAutoGalaxy/main/paper/hstcombined.png
 :alt: Alternative text
 :width: 600
 ```

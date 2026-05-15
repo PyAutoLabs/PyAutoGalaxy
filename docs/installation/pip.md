@@ -41,7 +41,7 @@ the `autogalaxy_workspace`, reducing the download size):
 
 ```bash
 cd /path/on/your/computer/you/want/to/put/the/autogalaxy_workspace
-git clone https://github.com/Jammy2211/autogalaxy_workspace --depth 1
+git clone https://github.com/PyAutoLabs/autogalaxy_workspace --depth 1
 cd autogalaxy_workspace
 ```
 
