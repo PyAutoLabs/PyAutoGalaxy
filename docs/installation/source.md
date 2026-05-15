@@ -8,9 +8,9 @@ contribute the development **PyAutoGalaxy** or experiment with yourself!
 
 A large amount of **PyAutoGalaxy** functionality is contained in its parent projects:
 
-**PyAutoFit** <https://github.com/rhayes777/PyAutoFit>
+**PyAutoFit** <https://github.com/PyAutoLabs/PyAutoFit>
 
-**PyAutoArray** <https://github.com/Jammy2211/PyAutoArray>
+**PyAutoArray** <https://github.com/PyAutoLabs/PyAutoArray>
 
 If you wish to build from source all code you may need to build from source these 3 additional
 projects. We include below instructions for building just **PyAutoGalaxy** from source or building all projects.
@@ -26,7 +26,7 @@ pip install --upgrade pip
 First, clone (or fork) the **PyAutoGalaxy** GitHub repository:
 
 ```bash
-git clone https://github.com/Jammy2211/PyAutoGalaxy
+git clone https://github.com/PyAutoLabs/PyAutoGalaxy
 ```
 
 Next, install the **PyAuto** parent projects via pip:
@@ -88,9 +88,9 @@ pip install --upgrade pip
 First, clone (or fork) all 4 GitHub repositories:
 
 ```bash
-git clone https://github.com/rhayes777/PyAutoFit
-git clone https://github.com/Jammy2211/PyAutoArray
-git clone https://github.com/Jammy2211/PyAutoGalaxy
+git clone https://github.com/PyAutoLabs/PyAutoFit
+git clone https://github.com/PyAutoLabs/PyAutoArray
+git clone https://github.com/PyAutoLabs/PyAutoGalaxy
 ```
 
 Next, install **PyAutoConf** via pip:

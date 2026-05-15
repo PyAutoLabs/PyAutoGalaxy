@@ -56,7 +56,7 @@ affiliations:
     index: 4
 
 date: 12 May 2022
-codeRepository: https://github.com/Jammy2211/PyAutoGalaxy
+codeRepository: https://github.com/PyAutoLabs/PyAutoGalaxy
 license: MIT
 bibliography: paper.bib
 ---
@@ -75,7 +75,7 @@ massively parallel model-fitting and an SQLite3 database that allows large suite
 queried and analysed. Accompanying `PyAutoGalaxy` is the [autogalaxy workspace](https://github.com/PyAutoLabs/autogalaxy_workspace),
 which includes example scripts and galaxy datasets covering every use case. The [`HowToGalaxy`](https://github.com/PyAutoLabs/HowToGalaxy)
 repository provides a separate Jupyter notebook lecture series which introduces non-experts to galaxy morphology studies using `PyAutoGalaxy`. Readers can try `PyAutoGalaxy` right now by going 
-to [the introduction Jupyter notebook on Colab](https://colab.research.google.com/github/PyAutoLabs/autogalaxy_workspace/blob/2026.5.14.2/start_here.ipynb) or 
+to [the introduction Jupyter notebook on Colab](https://colab.research.google.com/github/PyAutoLabs/autogalaxy_workspace/blob/2026.5.14.2/notebooks/imaging/start_here.ipynb) or 
 checkout the [readthedocs](https://pyautogalaxy.readthedocs.io/en/latest/) for a complete overview of `PyAutoGalaxy`'s 
 features.
 
@@ -130,7 +130,7 @@ handles unit conversions and calculations are optimized using the packages `NumP
 and `PyNUFFT` [@pynufft].
 
 To perform model-fitting, `PyAutoGalaxy` adopts the probabilistic programming  
-language `PyAutoFit` (https://github.com/rhayes777/PyAutoFit). `PyAutoFit` allows users to compose a 
+language `PyAutoFit` (https://github.com/PyAutoLabs/PyAutoFit). `PyAutoFit` allows users to compose a 
 model from `LightProfile` and `Galaxy` objects, customize the model parameterization and fit it to data via a 
 non-linear search, for example, `dynesty` [@dynesty], `emcee` [@emcee] or `PySwarms` [@pyswarms]. By composing a model with 
 `Pixelization` objects, the galaxy's light is reconstructed using a non-parametric rectangular 
@@ -144,7 +144,7 @@ Automated fitting of complex galaxy models is possible using `PyAutoFit`'s searc
 a galaxy into a chained sequence of non-linear searches. These fits pass information gained about simpler models 
 fitted by earlier searches to subsequent searches, which fit progressively more complex models. By granularizing the 
 model-fitting procedure, automated pipelines that fit complex galaxy models without human intervention can be carefully 
-crafted, with example pipelines found on the [autogalaxy workspace](https://github.com/Jammy2211/autogalaxy_workspace). 
+crafted, with example pipelines found on the [autogalaxy workspace](https://github.com/PyAutoLabs/autogalaxy_workspace). 
 To ensure the analysis and interpretation of fits to large galaxy datasets is feasible, `PyAutoFit`'s database tools 
 write modeling results to a relational database which can be queried from a storage drive to a Python script or Jupyter 
 notebook. This uses memory-light `Python` generators, ensuring it is practical for results containing hundreds of thousands of galaxies.

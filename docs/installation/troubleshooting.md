@@ -21,7 +21,7 @@ instead, or visa versa.
 ## Support
 
 If you are still having issues with installation, please raise an issue on the
-[PyAutoGalaxy issues page](https://github.com/Jammy2211/PyAutoGalaxy/issues) with a description of the
+[PyAutoGalaxy issues page](https://github.com/PyAutoLabs/PyAutoGalaxy/issues) with a description of the
 problem and your system setup (operating system, Python version, etc.).
 
 ## Current Working Directory

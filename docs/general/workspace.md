@@ -2,7 +2,7 @@
 
 # Workspace Tour
 
-You should have downloaded and configured the [autogalaxy workspace](https://github.com/Jammy2211/autogalaxy_workspace)
+You should have downloaded and configured the [autogalaxy workspace](https://github.com/PyAutoLabs/autogalaxy_workspace)
 when you installed **PyAutoGalaxy**. If you didn't, checkout the
 [installation instructions](https://pyautogalaxy.readthedocs.io/en/latest/general/installation.html#installation-with-pip)
 for how to downloaded and configure the workspace.
@@ -18,7 +18,7 @@ There are numerous example describing how to perform calculations, galaxy modeli
 **PyAutoGalaxy** features. All examples are provided as Python scripts and Jupyter notebooks.
 
 A full description of the scripts available is given on
-the [autogalaxy workspace GitHub page](https://github.com/Jammy2211/autogalaxy_workspace).
+the [autogalaxy workspace GitHub page](https://github.com/PyAutoLabs/autogalaxy_workspace).
 
 ## Config
 
@@ -31,7 +31,7 @@ Here, you'll find the configuration files which customize:
 > - The generaltrue config which customizes other aspects of **PyAutoGalaxy**.
 
 Descriptions of every configuration file and their input parameters are provided in the `README.md` in
-the [config directory of the workspace](https://github.com/Jammy2211/autogalaxy_workspace/tree/release/config)
+the [config directory of the workspace](https://github.com/PyAutoLabs/autogalaxy_workspace/tree/main/config)
 
 ## Dataset
 

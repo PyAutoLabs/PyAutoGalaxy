@@ -22,11 +22,11 @@ our [building from source installation guide](https://pyautogalaxy.readthedocs.i
 
 **PyAutoGalaxy** has the following dependencies:
 
-**PyAutoConf** <https://github.com/rhayes777/PyAutoConf>
+**PyAutoConf** <https://github.com/PyAutoLabs/PyAutoConf>
 
-**PyAutoFit** <https://github.com/rhayes777/PyAutoFit>
+**PyAutoFit** <https://github.com/PyAutoLabs/PyAutoFit>
 
-**PyAutoArray** <https://github.com/Jammy2211/PyAutoArray>
+**PyAutoArray** <https://github.com/PyAutoLabs/PyAutoArray>
 
 **dynesty** <https://github.com/joshspeagle/dynesty>
 

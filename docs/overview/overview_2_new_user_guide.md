@@ -12,9 +12,9 @@ the most appropriate starting point, answer one simple question:
 
 You now need to decide what type of data you are interested in:
 
-- **CDD Imaging**: For image data from telescopes like Hubble and James Webb, go to [imaging/start_here.ipynb](https://github.com/Jammy2211/autogalaxy_workspace/blob/release/notebooks/imaging/start_here.ipynb).
-- **Interferometer**: For radio / sub-mm interferometer from instruments like ALMA, go to [interferometer/start_here.ipynb](https://github.com/Jammy2211/autogalaxy_workspace/blob/release/notebooks/interferometer/start_here.ipynb).
-- **Multi-Band Imaging**: For galaxies observed in multiple wavebands go to [multi_band//start_here.ipynb](hhttps://github.com/Jammy2211/autogalaxy_workspace/blob/release/notebooks/point_source/start_here.ipynb).
+- **CDD Imaging**: For image data from telescopes like Hubble and James Webb, go to [imaging/start_here.ipynb](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/imaging/start_here.ipynb).
+- **Interferometer**: For radio / sub-mm interferometer from instruments like ALMA, go to [interferometer/start_here.ipynb](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/interferometer/start_here.ipynb).
+- **Multi-Band Imaging**: For galaxies observed in multiple wavebands go to [multi/start_here.ipynb](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/multi/start_here.ipynb).
 
 ## Google Colab
 
