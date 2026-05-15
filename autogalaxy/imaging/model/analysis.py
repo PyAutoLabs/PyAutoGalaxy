@@ -153,7 +153,10 @@ class AnalysisImaging(AnalysisDataset):
         dataset_model = self.dataset_model_via_instance_from(instance=instance)
 
         adapt_images = self.adapt_images_via_instance_from(
-            instance=instance, galaxies=galaxies
+            instance=instance,
+            dataset_model=dataset_model,
+            galaxies=galaxies,
+            xp=self._xp,
         )
 
         return FitImaging(

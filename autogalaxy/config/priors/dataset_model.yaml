@@ -8,3 +8,6 @@ DatasetModel:
   grid_offset_1:
     type: Constant
     value: 0.0
+  grid_rotation_angle:
+    type: Constant
+    value: 0.0

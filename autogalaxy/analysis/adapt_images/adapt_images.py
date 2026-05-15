@@ -157,7 +157,12 @@ class AdaptImages:
         return adapt_model_image
 
     def updated_via_instance_from(
-        self, instance, mask=None, galaxies: Optional[List["Galaxy"]] = None
+        self,
+        instance,
+        dataset_model: Optional["aa.DatasetModel"] = None,
+        mask=None,
+        galaxies: Optional[List["Galaxy"]] = None,
+        xp=np,
     ) -> "AdaptImages":
         """
         Returns adapt-images which have been updated to map galaxy instances instead of galaxy names.
@@ -174,10 +179,19 @@ class AdaptImages:
         galaxy instances are also created on-fly from the database. Database images do not have a mask, so it is
         also applied to the adapt images on-the-fly during database loading.
 
+        When a ``dataset_model`` is supplied with a non-trivial ``grid_offset`` or ``grid_rotation_angle``, the cached
+        ``galaxy_name_image_plane_mesh_grid_dict`` entries are transformed into the same frame as the dataset's
+        image-plane grid (which ``FitDataset.grids`` rotates by the same amount). Without this transform the cached
+        mesh and the data grid would sit in different frames, producing a misaligned source reconstruction.
+
         Parameters
         ----------
         instance
             The instance of the model-fit (e.g. in a non-linear search) which is used to update the adapt images.
+        dataset_model
+            The dataset model whose ``grid_offset`` and ``grid_rotation_angle`` are applied to cached mesh grids so
+            they remain consistent with the rotated/shifted data grid produced by ``FitDataset.grids``. If ``None``,
+            the cached mesh grids are passed through unchanged.
         mask
             A mask which can be applied to the adapt images, which is used when setting up the adaptive images
             via the aggregator and autofit database tools.
@@ -188,6 +202,8 @@ class AdaptImages:
             galaxy instances into fresh objects. When ``None`` the path list is populated in ``path_instance_tuples_for_class``
             order, which matches ``Analysis.galaxies_via_instance_from`` for the common case (no
             ``extra_galaxies`` / ``scaling_galaxies``).
+        xp
+            Array backend (``numpy`` or ``jax.numpy``) used when transforming cached mesh grids.
 
         Returns
         -------
@@ -226,9 +242,14 @@ class AdaptImages:
                 galaxy_name = str(galaxy_name)
 
                 if galaxy_name in self.galaxy_name_image_plane_mesh_grid_dict:
-                    galaxy_image_plane_mesh_grid_dict[galaxy] = (
-                        self.galaxy_name_image_plane_mesh_grid_dict[galaxy_name]
-                    )
+                    cached_mesh = self.galaxy_name_image_plane_mesh_grid_dict[galaxy_name]
+                    if dataset_model is not None:
+                        cached_mesh = cached_mesh.subtracted_and_rotated_from(
+                            offset=dataset_model.grid_offset,
+                            angle=dataset_model.grid_rotation_angle,
+                            xp=xp,
+                        )
+                    galaxy_image_plane_mesh_grid_dict[galaxy] = cached_mesh
 
         if galaxies is not None:
             galaxy_path_list = [path_by_id.get(id(g)) for g in galaxies]

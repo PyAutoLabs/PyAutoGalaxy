@@ -172,11 +172,16 @@ class AnalysisDataset(Analysis):
     def adapt_images_via_instance_from(
         self,
         instance: af.ModelInstance,
+        dataset_model: Optional[aa.DatasetModel] = None,
         galaxies=None,
+        xp=np,
     ) -> AdaptImages:
         try:
             return self.adapt_images.updated_via_instance_from(
-                instance=instance, galaxies=galaxies
+                instance=instance,
+                dataset_model=dataset_model,
+                galaxies=galaxies,
+                xp=xp,
             )
         except AttributeError:
             pass
