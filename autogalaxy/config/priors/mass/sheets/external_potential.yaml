@@ -1,0 +1,81 @@
+ExternalPotential:
+  centre_0:
+    type: Gaussian
+    mean: 0.0
+    sigma: 0.1
+    width_modifier:
+      type: Absolute
+      value: 0.05
+    limits:
+      lower: -inf
+      upper: inf
+  centre_1:
+    type: Gaussian
+    mean: 0.0
+    sigma: 0.1
+    width_modifier:
+      type: Absolute
+      value: 0.05
+    limits:
+      lower: -inf
+      upper: inf
+  gamma_1:
+    type: Uniform
+    lower_limit: -0.3
+    upper_limit: 0.3
+    width_modifier:
+      type: Absolute
+      value: 0.05
+    limits:
+      lower: -inf
+      upper: inf
+  gamma_2:
+    type: Uniform
+    lower_limit: -0.3
+    upper_limit: 0.3
+    width_modifier:
+      type: Absolute
+      value: 0.05
+    limits:
+      lower: -inf
+      upper: inf
+  tau_1:
+    type: Uniform
+    lower_limit: -0.3
+    upper_limit: 0.3
+    width_modifier:
+      type: Absolute
+      value: 0.05
+    limits:
+      lower: -inf
+      upper: inf
+  tau_2:
+    type: Uniform
+    lower_limit: -0.3
+    upper_limit: 0.3
+    width_modifier:
+      type: Absolute
+      value: 0.05
+    limits:
+      lower: -inf
+      upper: inf
+  delta_1:
+    type: Uniform
+    lower_limit: -0.3
+    upper_limit: 0.3
+    width_modifier:
+      type: Absolute
+      value: 0.05
+    limits:
+      lower: -inf
+      upper: inf
+  delta_2:
+    type: Uniform
+    lower_limit: -0.3
+    upper_limit: 0.3
+    width_modifier:
+      type: Absolute
+      value: 0.05
+    limits:
+      lower: -inf
+      upper: inf
