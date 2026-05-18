@@ -49,8 +49,10 @@ many profiles to be combined efficiently without exploding the non-linear parame
 
    Gaussian
    GaussianSph
+   GaussianMultipole
    Sersic
    SersicSph
+   SersicMultipole
    Exponential
    ExponentialSph
    DevVaucouleurs
