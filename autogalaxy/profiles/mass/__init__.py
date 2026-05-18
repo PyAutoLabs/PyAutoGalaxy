@@ -60,4 +60,4 @@ from .stellar import (
     Chameleon,
     ChameleonSph,
 )
-from .sheets import ExternalShear, MassSheet
+from .sheets import ExternalPotential, ExternalShear, MassSheet
