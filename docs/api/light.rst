@@ -16,8 +16,10 @@ Standard parametric light profiles whose ``intensity`` is a free parameter of th
 
    Gaussian
    GaussianSph
+   GaussianMultipole
    Sersic
    SersicSph
+   SersicMultipole
    Exponential
    ExponentialSph
    DevVaucouleurs
