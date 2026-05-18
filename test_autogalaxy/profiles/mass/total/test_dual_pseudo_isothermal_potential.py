@@ -1,8 +1,21 @@
 import pytest
 
+import autoarray as aa
 import autogalaxy as ag
 
 grid = ag.Grid2DIrregular([[1.0, 1.0], [2.0, 2.0], [3.0, 3.0], [2.0, 4.0]])
+
+
+def test__convergence_2d_from__returns_array2d_not_vector():
+    # Regression test for a copy-paste typo: convergence_2d_from used to be
+    # decorated with @aa.decorators.to_vector_yx (the deflections decorator
+    # directly above it) which wrapped the scalar convergence in a VectorYX2D.
+    # The correct decorator is @aa.decorators.to_array.
+    mp = ag.mp.dPIEPotential(centre=(0.0, 0.0), ell_comps=(0.05, 0.0), ra=0.2, rs=2.0, b0=1.0)
+
+    convergence = mp.convergence_2d_from(grid=grid)
+
+    assert isinstance(convergence, aa.ArrayIrregular)
 
 
 def test__deflections_yx_2d_from__sph_config_1():
