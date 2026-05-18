@@ -118,7 +118,7 @@ class dPIEPotential(MassProfile):
 
         return xp.vstack((deflection_y, deflection_x)).T
 
-    @aa.decorators.to_vector_yx
+    @aa.decorators.to_array
     @aa.decorators.transform
     def convergence_2d_from(self, grid: aa.type.Grid2DLike, xp=np, **kwargs):
         """

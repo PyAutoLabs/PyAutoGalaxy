@@ -147,7 +147,9 @@ class Basis(LightProfile, MassProfile):
                     grid=grid, xp=xp, operated_only=operated_only
                 )
                 if not isinstance(light_profile, lp_linear.LightProfileLinear)
-                else xp.zeros((grid.shape[0],))
+                else aa.Array2D(
+                    values=xp.zeros((grid.shape[0],)), mask=grid.mask
+                )
             )
             for light_profile in self.light_profile_list
         ]

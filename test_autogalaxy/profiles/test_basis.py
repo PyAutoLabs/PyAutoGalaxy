@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
 
+import autoarray as aa
 import autogalaxy as ag
 
 
@@ -40,6 +41,24 @@ def test__image_2d_from__does_not_include_linear_light_profiles(grid_2d_7x7):
     image = basis.image_2d_from(grid=grid_2d_7x7)
 
     assert (image == lp_image).all()
+
+
+def test__image_2d_from__returns_array2d_for_linear_only_basis(grid_2d_7x7):
+    # Regression test for the case where every constituent is a LightProfileLinear:
+    # the placeholder for the linear-intensity-unknown image used to be a raw
+    # ndarray of zeros, which made `sum(...)` return a raw ndarray rather than an
+    # `Array2D`.  After the fix the placeholder is itself an `Array2D` so the
+    # summed return type is uniform regardless of the constituent mix.
+    basis = ag.lp_basis.Basis(
+        profile_list=[
+            ag.lp_linear.Gaussian(sigma=0.5),
+            ag.lp_linear.Gaussian(sigma=1.0),
+        ]
+    )
+
+    image = basis.image_2d_from(grid=grid_2d_7x7)
+
+    assert isinstance(image, aa.Array2D)
 
 
 def test__image_2d_from__operated_only_false__returns_only_non_operated_profile_image(
