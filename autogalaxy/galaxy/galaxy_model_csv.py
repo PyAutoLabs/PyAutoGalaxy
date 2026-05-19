@@ -154,10 +154,21 @@ def galaxy_models_to_csv(
             f"family must be one of {sorted(_FAMILY_NAMESPACES)}, got '{family}'."
         )
 
+    namespace = _FAMILY_NAMESPACES[family]
+
     rows: List[dict] = []
     for galaxy_name, attr_dict in profiles_by_galaxy.items():
         for attr_name, profile in attr_dict.items():
             cls = type(profile)
+            if getattr(namespace, cls.__name__, None) is not cls:
+                raise ValueError(
+                    f"Profile {galaxy_name!r}.{attr_name!r} has class "
+                    f"{cls.__name__!r} which is not exposed in family "
+                    f"namespace '{namespace.__name__}' (family '{family}'). "
+                    f"Check that the profile belongs to the family declared "
+                    f"on this CSV — mass profiles go in 'mass', light profiles "
+                    f"in 'light', point sources in 'point'."
+                )
             row: Dict[str, Any] = {
                 "galaxy": galaxy_name,
                 "attr_name": attr_name,

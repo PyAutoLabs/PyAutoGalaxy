@@ -233,6 +233,20 @@ def test__redshift_consistency_check__raises(tmp_path):
         )
 
 
+def test__writer_rejects_profile_from_wrong_family(tmp_path):
+    """Writing a SersicSph (light) under family='mass' must raise immediately."""
+    file_path = tmp_path / "mass.csv"
+
+    with pytest.raises(ValueError, match="not exposed in family namespace"):
+        ag.galaxy_models_to_csv(
+            profiles_by_galaxy={
+                "lens_0": {"bulge": ag.lp.SersicSph(centre=(0.0, 0.0), intensity=1.0, effective_radius=1.0, sersic_index=2.0)},
+            },
+            file_path=file_path,
+            family="mass",
+        )
+
+
 def test__class_not_found_in_namespace__raises(tmp_path):
     file_path = tmp_path / "mass.csv"
     file_path.write_text(
