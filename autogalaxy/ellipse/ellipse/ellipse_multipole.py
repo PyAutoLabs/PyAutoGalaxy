@@ -123,7 +123,7 @@ class EllipseMultipoleScaled(EllipseMultipole):
         self,
         m=4,
         scaled_multipole_comps: Tuple[float, float] = (0.0, 0.0),
-        major_axis=1.0,
+        major_axis: float = 1.0,
     ):
         r"""
         class representing the multipole of an ellipse, which is used to perform ellipse fitting to
@@ -152,26 +152,68 @@ class EllipseMultipoleScaled(EllipseMultipole):
         b = The amplitude of the sine term of the multipole.
         y = The y-coordinate of the ellipse perturbed by the multipole.
         x = The x-coordinate of the ellipse perturbed by the multipole.
+
+        Notes
+        -----
+        Unlike the previous implementation, the derivation of
+        ``specific_multipole_comps`` from ``scaled_multipole_comps`` is now
+        performed inside :meth:`points_perturbed_from` rather than at
+        ``__init__`` time. This makes the class JAX-traceable: under
+        ``jax.jit`` / ``jax.vmap``, ``scaled_multipole_comps`` arrive as
+        JAX tracers, and a deferred derivation can thread ``xp`` through to
+        the ``convert.py`` helpers. Pre-computing at ``__init__`` time would
+        (a) hardcode ``np.*`` (breaks under JAX) and (b) cache stale values
+        across ``vmap`` batch elements.
         """
 
         self.scaled_multipole_comps = scaled_multipole_comps
-        k, phi = multipole_k_m_and_phi_m_from(
-            multipole_comps=scaled_multipole_comps, m=m
-        )
-        k_adjusted = k * major_axis
-
-        specific_multipole_comps = multipole_comps_from(k_adjusted, phi, m)
-
-        super().__init__(m, specific_multipole_comps)
-
-        self.specific_multipole_comps = specific_multipole_comps
+        self.major_axis = major_axis
         self.m = m
+
+    def get_shape_angle(
+        self,
+        ellipse: Ellipse,
+        xp=np,
+    ) -> float:
+        """
+        The shape angle is the offset between the angle of the ellipse and the angle of the multipole,
+        this defines the shape that the multipole takes.
+
+        In the case of the m=4 multipole, angles of 0 indicate pure diskiness, angles +- 45
+        indicate pure boxiness.
+
+        This override derives (k_scaled, phi) directly from ``scaled_multipole_comps`` and
+        ``major_axis`` rather than from ``self.multipole_comps`` (which is not set on this class).
+
+        Parameters
+        ----------
+        ellipse
+            The base ellipse profile that is perturbed by the multipole.
+        xp
+            The array module to use (default: numpy).
+
+        Returns
+        -------
+        The angle between the ellipse and the multipole, in degrees between +- 180/m.
+        The boundary case `angle == period/2.0` exactly maps to `-period/2.0` after wrap.
+        """
+
+        k_scaled, phi = multipole_k_m_and_phi_m_from(
+            self.scaled_multipole_comps, self.m, xp=xp
+        )
+        angle = ellipse.angle(xp=xp) - phi
+        period = 360.0 / self.m
+        return xp.mod(angle + period / 2.0, period) - period / 2.0
 
     def points_perturbed_from(
         self, pixel_scale, points, ellipse: Ellipse, n_i: int = 0, xp=np
     ) -> np.ndarray:
         """
         Returns the (y,x) coordinates of the input points, which are perturbed by the multipole of the ellipse.
+
+        The derivation of ``specific_multipole_comps`` from ``scaled_multipole_comps`` is performed
+        here (rather than at ``__init__`` time) so that ``xp`` can be threaded through the
+        ``convert.py`` helpers. This makes the method JAX-traceable when ``xp=jnp`` is passed.
 
         Parameters
         ----------
@@ -188,34 +230,27 @@ class EllipseMultipoleScaled(EllipseMultipole):
         -------
         The (y,x) coordinates of the input points, which are perturbed by the multipole.
         """
-        symmetry = 360 / self.m
-        k_orig, phi_orig = multipole_k_m_and_phi_m_from(
-            self.specific_multipole_comps, self.m, xp=xp
+        k_scaled, phi = multipole_k_m_and_phi_m_from(
+            multipole_comps=self.scaled_multipole_comps, m=self.m, xp=xp
         )
+        k = k_scaled * self.major_axis
+
+        symmetry = 360.0 / self.m
         comps_adjusted = multipole_comps_from(
-            k_orig,
-            symmetry - 2 * phi_orig + (symmetry - (ellipse.angle(xp=xp) - phi_orig)),
+            k,
+            symmetry - 2 * phi + (symmetry - (ellipse.angle(xp=xp) - phi)),
             self.m,
             xp=xp,
         )
 
         # 1) compute cartesian (polar) angle
-        theta = xp.arctan2(points[:, 0], points[:, 1])  # <- true polar angle
+        theta = xp.arctan2(points[:, 0], points[:, 1])
 
         # 2) multipole in that same frame
         delta_theta = self.m * (theta - ellipse.angle_radians(xp=xp))
         radial = comps_adjusted[1] * xp.cos(delta_theta) + comps_adjusted[0] * xp.sin(
             delta_theta
         )
-
-        # Old code, delete in fuure but keep for debugging for now:
-
-        #         radial = np.add(
-        #             self.multipole_comps[1]
-        #             * np.cos(self.m * (angles - ellipse.angle_radians())),
-        #             self.multipole_comps[0]
-        #             * np.sin(self.m * (angles - ellipse.angle_radians())),
-        #         )
 
         # 3) perturb along the true radial direction
         x = points[:, 1] + radial * xp.cos(theta)
