@@ -49,7 +49,7 @@ local_scheme = "no-local-version"
 [project.optional-dependencies]
 jax = [
     "autoconf[jax]",
-    "jax_zero_contour; python_version >= '3.11'"
+    "jax_zero_contour>=2.0.0,<3.0.0; python_version >= '3.11'"
 ]
 optional = [
     "autogalaxy[jax]",
