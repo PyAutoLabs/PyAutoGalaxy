@@ -87,6 +87,7 @@ def evaluation_grid(func):
             shape_native=shape_native,
             pixel_scales=(pixel_scale, pixel_scale),
             origin=zoom.offset_scaled,
+            respect_small_datasets=False,
         )
 
         grid.is_evaluation_grid = True
