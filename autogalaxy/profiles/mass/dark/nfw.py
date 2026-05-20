@@ -317,9 +317,18 @@ class NFWSph(NFW):
             self.radial_grid_from(grid=grid, xp=xp, **kwargs).array,
         )
 
-        deflection_grid = xp.multiply(
-            (4.0 * self.kappa_s * self.scale_radius / eta),
-            self.deflection_func_sph(grid_radius=eta, xp=xp),
+        # Guard r=0: the deflection at the centre of a spherical profile is exactly
+        # zero by symmetry, but the analytic form here divides by eta and calls
+        # arccosh(1/r) which both blow up at the origin.
+        eta_safe = xp.where(eta < 1e-6, 1e-6, eta)
+
+        deflection_grid = xp.where(
+            eta < 1e-6,
+            0.0,
+            xp.multiply(
+                (4.0 * self.kappa_s * self.scale_radius / eta_safe),
+                self.deflection_func_sph(grid_radius=eta_safe, xp=xp),
+            ),
         )
 
         return self._cartesian_grid_via_radial_from(
