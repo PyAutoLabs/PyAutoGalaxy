@@ -189,6 +189,22 @@ def test__tangential_critical_curve_list_from__centre_at_origin__curve_centred_o
     assert -0.03 < x_centre < 0.03
 
 
+def test__tangential_critical_curve_list_from__small_datasets_env__evaluation_grid_keeps_extent(
+    monkeypatch,
+):
+    monkeypatch.setenv("PYAUTO_SMALL_DATASETS", "1")
+
+    grid = ag.Grid2D.uniform(
+        shape_native=(200, 200), pixel_scales=0.2, respect_small_datasets=False
+    )
+    mp = ag.mp.IsothermalSph(centre=(0.0, 0.0), einstein_radius=10.0)
+
+    od = LensCalc.from_mass_obj(mp)
+    tangential_critical_curve_list = od.tangential_critical_curve_list_from(grid=grid)
+
+    assert len(tangential_critical_curve_list) == 1
+
+
 def test__tangential_critical_curve_list_from__offset_centre__curve_centred_on_offset():
     grid = ag.Grid2D.uniform(shape_native=(50, 50), pixel_scales=0.2)
 
