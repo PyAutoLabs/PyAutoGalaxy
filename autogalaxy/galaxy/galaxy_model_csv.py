@@ -334,7 +334,16 @@ def galaxy_af_models_from_csv_tables(*tables: GalaxyModelTable) -> Dict[str, Any
     galaxy_models: Dict[str, Any] = {}
     for galaxy_name, rows in by_galaxy.items():
         redshift = _resolve_redshift(galaxy_name, rows)
-        attrs = {row.attr_name: af.Model(row.profile_class, **row.params) for row in rows}
+        attrs: Dict[str, Any] = {}
+        for row in rows:
+            model = af.Model(row.profile_class)
+            for name, value in row.params.items():
+                if isinstance(value, tuple):
+                    for i, component in enumerate(value):
+                        setattr(model, f"{name}_{i}", component)
+                else:
+                    setattr(model, name, value)
+            attrs[row.attr_name] = model
         galaxy_models[galaxy_name] = af.Model(Galaxy, redshift=redshift, **attrs)
 
     return galaxy_models
