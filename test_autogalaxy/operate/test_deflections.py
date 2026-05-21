@@ -560,3 +560,26 @@ def test__jacobian_from():
     assert magnification_via_jacobian == pytest.approx(
         np.array(magnification_via_hessian), rel=1e-6
     )
+
+
+def test__zero_contour_cache__starts_empty_and_is_per_instance():
+    """
+    `LensCalc._zero_contour_cache` must be initialised fresh per instance
+    so the closure cache reuse does not leak across LensCalc objects.
+    The cache stores `(f, ZeroSolver)` keyed on the call parameters; if it
+    were a class-level mutable default, mutating one instance's cache would
+    appear in every other instance.
+    """
+    mp = ag.mp.IsothermalSph(centre=(0.0, 0.0), einstein_radius=1.0)
+
+    od_a = LensCalc.from_mass_obj(mp)
+    od_b = LensCalc.from_mass_obj(mp)
+
+    assert od_a._zero_contour_cache == {}
+    assert od_b._zero_contour_cache == {}
+
+    od_a._zero_contour_cache[("tangential", (0.05, 0.05), 1e-6, 5)] = (
+        "f-stand-in",
+        "solver-stand-in",
+    )
+    assert od_b._zero_contour_cache == {}

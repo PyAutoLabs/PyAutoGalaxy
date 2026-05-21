@@ -119,6 +119,10 @@ class LensCalc:
     def __init__(self, deflections_yx_2d_from, potential_2d_from=None):
         self.deflections_yx_2d_from = deflections_yx_2d_from
         self.potential_2d_from = potential_2d_from
+        # Maps (kind, pixel_scales, tol, max_newton) -> (f, ZeroSolver). Lets
+        # repeat zero_contour calls reuse JAX's compile cache, since that
+        # cache is keyed on callable identity.
+        self._zero_contour_cache: dict = {}
 
     @classmethod
     def from_mass_obj(cls, mass_obj):
@@ -1164,8 +1168,18 @@ class LensCalc:
                 return []
 
         init_guess = jnp.atleast_2d(jnp.asarray(init_guess))
-        f = self._make_eigen_fn(kind=kind, pixel_scales=pixel_scales)
-        solver = ZeroSolver(tol=tol, max_newton=max_newton)
+
+        # Reuse the (f, solver) pair across calls so ZeroSolver hits its JAX
+        # compile cache. A fresh f / solver per call costs ~10s every time
+        # because the cache is keyed on callable identity.
+        cache_key = (kind, pixel_scales, tol, max_newton)
+        if cache_key not in self._zero_contour_cache:
+            self._zero_contour_cache[cache_key] = (
+                self._make_eigen_fn(kind=kind, pixel_scales=pixel_scales),
+                ZeroSolver(tol=tol, max_newton=max_newton),
+            )
+        f, solver = self._zero_contour_cache[cache_key]
+
         paths, _ = solver.zero_contour_finder(f, init_guess, delta=delta, N=N)
         paths = ZeroSolver.path_reduce(paths)
 
