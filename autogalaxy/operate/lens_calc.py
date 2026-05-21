@@ -1504,3 +1504,101 @@ class LensCalc:
                 max_newton=max_newton,
             )
         )
+
+    def einstein_radius_jit_from(
+        self,
+        init_guess,
+        delta: float = 0.05,
+        N: int = 500,
+        pixel_scales: Tuple[float, float] = (0.05, 0.05),
+        tol: float = 1e-6,
+        max_newton: int = 5,
+    ):
+        """
+        JIT-friendly Einstein radius from the tangential critical curve.
+
+        Designed for use inside ``jax.jit(...)`` (e.g. the per-sample latent
+        loop in ``autofit.Analysis.compute_latent_samples`` with
+        ``LATENT_BATCH_MODE='jit'``). Unlike ``einstein_radius_via_zero_contour_from``,
+        this method:
+
+        - Requires an explicit ``init_guess`` — no marching-squares seed search
+          (which would require ``skimage`` and break the JAX trace).
+        - Skips ``ZeroSolver.path_reduce`` (variable-length output, not jit-able).
+        - Computes the enclosed area directly from the raw NaN-padded paths
+          array via a JAX-vectorised shoelace formula.
+        - Returns a single scalar ``jax.Array`` (not a Python ``float``).
+
+        Do NOT combine this with ``jax.vmap`` — the underlying
+        ``jax_zero_contour.ZeroSolver.zero_contour_finder`` uses
+        ``jax.lax.cond`` / ``jax.lax.while_loop`` for early termination, which
+        upstream explicitly documents as incompatible with ``jax.vmap``. For
+        batched evaluation, wrap the caller in ``jax.jit`` and loop over
+        samples in Python (see ``Analysis.LATENT_BATCH_MODE='jit'``).
+
+        Parameters
+        ----------
+        init_guess
+            JAX or NumPy array of shape ``(n_seeds, 2)`` — seed positions
+            (y, x) near the expected critical curve. For typical galaxy-scale
+            lenses centred on the image, a single seed at ``[[1.0, 0.0]]``
+            works; for clusters or off-centre lenses pass a small fan of
+            seeds (e.g. four at cardinal positions).
+        delta
+            Arc-second step size along the contour. Forwarded to ``ZeroSolver``.
+        N
+            Maximum steps per seed direction. Forwarded to ``ZeroSolver``.
+        pixel_scales
+            Pixel scales passed to ``deflections_yx_scalar`` (used internally
+            by ``_make_eigen_fn``).
+        tol
+            Newton's method convergence tolerance.
+        max_newton
+            Maximum Newton iterations per step.
+
+        Returns
+        -------
+        jax.Array
+            Scalar Einstein radius in arc-seconds (``sqrt(area / pi)`` where
+            ``area`` is the largest enclosed area across all seeds — robust
+            to multiple seeds landing on the same critical curve).
+        """
+        try:
+            from jax_zero_contour import ZeroSolver
+        except ModuleNotFoundError as exc:
+            raise ModuleNotFoundError(
+                "jax_zero_contour is required for einstein_radius_jit_from. "
+                "Install it with: pip install jax_zero_contour"
+            ) from exc
+        import jax.numpy as jnp
+
+        init_guess = jnp.atleast_2d(jnp.asarray(init_guess))
+
+        # Reuse the (f, ZeroSolver) pair from PR #434's cache so the warm
+        # call inside a jit-cached `compute_latent_variables` reuses JAX's
+        # compile cache.
+        cache_key = ("tangential", pixel_scales, tol, max_newton)
+        if cache_key not in self._zero_contour_cache:
+            self._zero_contour_cache[cache_key] = (
+                self._make_eigen_fn(kind="tangential", pixel_scales=pixel_scales),
+                ZeroSolver(tol=tol, max_newton=max_newton),
+            )
+        f, solver = self._zero_contour_cache[cache_key]
+
+        # `paths["path"]` has shape (n_seeds, max_steps, 2) — NaN-padded for
+        # invalid / post-termination steps. We compute the shoelace area
+        # directly on the raw array, masking NaN-padded terms to zero.
+        paths, _ = solver.zero_contour_finder(f, init_guess, delta=delta, N=N)
+        paths_arr = paths["path"]
+        y = paths_arr[..., 0]
+        x = paths_arr[..., 1]
+        y_next = jnp.roll(y, -1, axis=-1)
+        x_next = jnp.roll(x, -1, axis=-1)
+        terms = x * y_next - x_next * y
+        valid_terms = jnp.where(jnp.isfinite(terms), terms, 0.0)
+        area_per_seed = 0.5 * jnp.abs(jnp.sum(valid_terms, axis=-1))
+        # If multiple seeds landed on the same curve, each computes the same
+        # area; take the max so we don't double-count nor under-count when
+        # some seeds diverged.
+        area = jnp.max(area_per_seed)
+        return jnp.sqrt(area / jnp.pi)

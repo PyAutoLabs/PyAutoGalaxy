@@ -562,6 +562,47 @@ def test__jacobian_from():
     )
 
 
+def test__einstein_radius_jit_from__method_exists_with_expected_signature():
+    """
+    `LensCalc.einstein_radius_jit_from` is the JIT-friendly Einstein-radius
+    helper added for `Analysis.LATENT_BATCH_MODE='jit'` (see PyAutoFit). It
+    must remain on the class with `init_guess` as the only required
+    argument — pipelines pass a static `jnp.array([[1.0, 0.0]])` etc.
+
+    Runtime JAX behaviour is exercised in the workspace_test integration
+    suite (no JAX in library unit tests per project policy).
+    """
+    import inspect
+
+    assert hasattr(LensCalc, "einstein_radius_jit_from"), (
+        "LensCalc.einstein_radius_jit_from missing — required by "
+        "Analysis.LATENT_BATCH_MODE='jit' callers"
+    )
+    sig = inspect.signature(LensCalc.einstein_radius_jit_from)
+    params = sig.parameters
+    assert "init_guess" in params
+    assert params["init_guess"].default is inspect.Parameter.empty, (
+        "init_guess must be a required argument — there is no JAX-friendly "
+        "default (the legacy `_init_guess_from_coarse_grid` uses skimage)"
+    )
+    for kw in ("delta", "N", "pixel_scales", "tol", "max_newton"):
+        assert kw in params, f"einstein_radius_jit_from missing kwarg {kw!r}"
+
+
+def test__analysis_dataset__latent_batch_mode_is_jit():
+    """
+    PyAutoGalaxy's `AnalysisDataset` overrides PyAutoFit's default
+    `LATENT_BATCH_MODE='vmap'` to `'jit'` because lensing latents call into
+    `jax_zero_contour.ZeroSolver`, which upstream documents as vmap-
+    incompatible. Inheriting analyses (`AnalysisImaging`,
+    `AnalysisInterferometer`, the PyAutoLens variants, etc.) must therefore
+    use jit-per-sample for their latent computation.
+    """
+    from autogalaxy.analysis.analysis.dataset import AnalysisDataset
+
+    assert AnalysisDataset.LATENT_BATCH_MODE == "jit"
+
+
 def test__zero_contour_cache__starts_empty_and_is_per_instance():
     """
     `LensCalc._zero_contour_cache` must be initialised fresh per instance

@@ -18,6 +18,15 @@ logger.setLevel(level="INFO")
 
 
 class AnalysisDataset(Analysis):
+    # Lensing latents (e.g. effective Einstein radius via
+    # `LensCalc.einstein_radius_jit_from`) call into `jax_zero_contour.ZeroSolver`,
+    # which upstream documents as incompatible with `jax.vmap` (uses
+    # `jax.lax.cond` / `jax.lax.while_loop` for early termination). Override
+    # the PyAutoFit default from "vmap" to per-sample "jit" so the JIT cache
+    # is reused across samples without invoking vmap on the inner zero-contour
+    # primitives.
+    LATENT_BATCH_MODE = "jit"
+
     def __init__(
         self,
         dataset: Union[aa.Imaging, aa.Interferometer],
