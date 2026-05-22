@@ -275,26 +275,57 @@ def hilbert_pixels_from_pixel_scale(pixel_scale: float) -> int:
         return 1750
 
 
-def simulator_start_here_model_from():
+SIMULATOR_RANDOM_GALAXY_SUMMARY = (
+    "Each simulated galaxy draws a fresh bulge from: "
+    "signal-to-noise ratio in [20, 60], "
+    "effective radius in [1.0, 5.0] arcsec, "
+    "sersic index in [3.5, 4.5], "
+    "ell_comps each ~ Normal(0, 0.2) clipped to [-1, 1]."
+)
 
+
+def random_galaxy_for_simulation_from(
+    rng: Optional[np.random.Generator] = None,
+) -> "Galaxy":
+    """
+    Sample a random ``Galaxy`` instance with an SNR-normalised Sersic bulge.
+
+    This helper is for **synthetic data generation only** — it draws each
+    parameter directly from a numpy ``Generator`` and returns a concrete
+    ``Galaxy`` instance whose bulge is an ``lp_snr.Sersic`` with a target
+    signal-to-noise ratio. The SNR profile internally back-computes the
+    matching ``intensity`` from the simulator's noise level.
+
+    Do **not** use the returned ``Galaxy`` as a fitting model — SNR is a
+    property of the data, not a parameter you fit. For fitting, build a
+    regular ``af.Model(ag.lp.Sersic)`` with an explicit ``intensity`` prior.
+
+    Parameters
+    ----------
+    rng
+        Optional ``numpy.random.Generator`` for reproducible sampling. If
+        ``None`` (default) a fresh ``default_rng()`` is created on each call,
+        so each call returns a different galaxy.
+
+    Returns
+    -------
+    Galaxy
+        A ``Galaxy`` at redshift 0.5 with a single ``lp_snr.Sersic`` bulge.
+    """
     from autogalaxy.profiles.light.snr import Sersic
     from autogalaxy.galaxy.galaxy import Galaxy
 
-    bulge = af.Model(Sersic)
+    rng = rng if rng is not None else np.random.default_rng()
 
-    bulge.centre = (0.0, 0.0)
-    bulge.ell_comps.ell_comps_0 = af.TruncatedGaussianPrior(
-        mean=0.0, sigma=0.2, lower_limit=-1.0, upper_limit=1.0
-    )
-    bulge.ell_comps.ell_comps_1 = af.TruncatedGaussianPrior(
-        mean=0.0, sigma=0.2, lower_limit=-1.0, upper_limit=1.0
-    )
-    bulge.signal_to_noise_ratio = af.UniformPrior(lower_limit=20.0, upper_limit=60.0)
-    bulge.effective_radius = af.UniformPrior(lower_limit=1.0, upper_limit=5.0)
-    bulge.sersic_index = af.TruncatedGaussianPrior(
-        mean=4.0, sigma=0.5, lower_limit=0.8, upper_limit=5.0
+    def _clipped_ell_comp() -> float:
+        return float(np.clip(rng.normal(0.0, 0.2), -1.0, 1.0))
+
+    bulge = Sersic(
+        centre=(0.0, 0.0),
+        ell_comps=(_clipped_ell_comp(), _clipped_ell_comp()),
+        effective_radius=float(rng.uniform(1.0, 5.0)),
+        sersic_index=float(rng.uniform(3.5, 4.5)),
+        signal_to_noise_ratio=float(rng.uniform(20.0, 60.0)),
     )
 
-    galaxy = af.Model(Galaxy, redshift=0.5, bulge=bulge)
-
-    return galaxy
+    return Galaxy(redshift=0.5, bulge=bulge)
