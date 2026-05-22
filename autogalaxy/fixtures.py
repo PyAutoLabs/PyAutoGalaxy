@@ -149,43 +149,6 @@ def make_dataset_interp_7x7():
     return ag.DatasetInterp(dataset=imaging_7x7)
 
 
-# QUANTITY DATASET AND FIT #
-
-
-def make_dataset_quantity_7x7_array_2d():
-    return ag.DatasetQuantity(
-        data=aa.Array2D.ones(shape_native=(7, 7), pixel_scales=1.0),
-        noise_map=aa.Array2D.full(
-            fill_value=2.0, shape_native=(7, 7), pixel_scales=1.0
-        ),
-    )
-
-
-def make_dataset_quantity_7x7_vector_yx_2d():
-    return ag.DatasetQuantity(
-        data=aa.VectorYX2D.ones(shape_native=(7, 7), pixel_scales=1.0),
-        noise_map=aa.VectorYX2D.full(
-            fill_value=2.0, shape_native=(7, 7), pixel_scales=1.0
-        ),
-    )
-
-
-def make_fit_quantity_7x7_array_2d():
-    return ag.FitQuantity(
-        dataset=make_dataset_quantity_7x7_array_2d(),
-        light_mass_obj=make_galaxies_7x7(),
-        func_str="convergence_2d_from",
-    )
-
-
-def make_fit_quantity_7x7_vector_yx_2d():
-    return ag.FitQuantity(
-        dataset=make_dataset_quantity_7x7_vector_yx_2d(),
-        light_mass_obj=make_galaxies_7x7(),
-        func_str="deflections_yx_2d_from",
-    )
-
-
 # galaxies #
 
 

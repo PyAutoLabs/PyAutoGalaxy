@@ -39,8 +39,6 @@ plots:
   fit_imaging: {}
   fit_interferometer:
     fits_dirty_images: true
-  fit_quantity:
-    subplot_fit: false
   adapt:
     subplot_adapt_images: true
   inversion:

@@ -46,10 +46,6 @@ from autogalaxy.interferometer.plot.fit_interferometer_plots import (
     subplot_fit_real_space,
 )
 
-from autogalaxy.quantity.plot.fit_quantity_plots import (
-    subplot_fit as subplot_fit_quantity,
-)
-
 from autogalaxy.ellipse.plot.fit_ellipse_plots import (
     subplot_fit_ellipse,
     subplot_ellipse_errors,

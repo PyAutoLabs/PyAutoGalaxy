@@ -83,7 +83,6 @@ Each dataset type has a `Fit*` class that orchestrates the full fitting pipeline
 
 - `FitImaging` (`imaging/fit_imaging.py`) – CCD imaging
 - `FitInterferometer` (`interferometer/fit_interferometer.py`) – ALMA/interferometry
-- `FitQuantity` (`quantity/fit_quantity.py`) – arbitrary quantity datasets
 - `FitEllipse` (`ellipse/fit_ellipse.py`) – isophote/ellipse fitting
 
 All inherit from `AbstractFitInversion` (`abstract_fit.py`), which handles the linear algebra inversion step when `LightProfileLinear` or pixelization-based profiles are present.
@@ -94,7 +93,6 @@ Each dataset type has an `Analysis*` class that implements `log_likelihood_funct
 
 - `AnalysisImaging` (`imaging/model/analysis.py`)
 - `AnalysisInterferometer` (`interferometer/model/analysis.py`)
-- `AnalysisQuantity` (`quantity/model/analysis.py`)
 - `AnalysisEllipse` (`ellipse/model/analysis.py`)
 
 These inherit from `AnalysisDataset` → `Analysis` (in `analysis/analysis/`), which inherits `af.Analysis`. The `log_likelihood_function` builds a `Fit*` object from the `af.ModelInstance` and returns its `figure_of_merit`.

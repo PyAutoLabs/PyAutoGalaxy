@@ -56,13 +56,6 @@ Create figures and subplots showing quantities of standard **PyAutoGalaxy** obje
     subplot_fit_dirty_images
     subplot_fit_real_space
 
-**Quantity Fit Subplots:**
-
-.. autosummary::
-   :toctree: _autosummary
-
-    subplot_fit_quantity
-
 **Ellipse Fit Subplots:**
 
 .. autosummary::

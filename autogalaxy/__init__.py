@@ -79,9 +79,6 @@ from .interferometer.simulator import SimulatorInterferometer
 from .interferometer.fit_interferometer import FitInterferometer
 from .interferometer.model.analysis import AnalysisInterferometer
 
-from .quantity.fit_quantity import FitQuantity
-from .quantity.model.analysis import AnalysisQuantity
-from .quantity.dataset_quantity import DatasetQuantity
 from .galaxy.galaxy import Galaxy
 from .galaxy.galaxies import Galaxies
 from .galaxy.galaxy_table import GalaxyTable

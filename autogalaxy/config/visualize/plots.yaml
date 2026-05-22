@@ -52,5 +52,3 @@ fit_ellipse:                               # Settings for plots of ellipse fitti
   data : true                              # Plot the data of the ellipse fit?
   data_no_ellipse: true                    # Plot the data without the black data ellipses, which obscure noisy data?
   ellipse_residuals: true                  # Plot the residuals of the ellipse fit?
-
-fit_quantity: {}                           # Settings for plots of fit quantities (e.g. FitQuantity).
