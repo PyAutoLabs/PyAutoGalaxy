@@ -2,7 +2,7 @@
 Abstract `Analysis` class providing shared functionality across all **PyAutoGalaxy** model-fitting analyses.
 
 This module provides `Analysis`, the root analysis class from which all dataset-specific analysis classes
-inherit (`AnalysisImaging`, `AnalysisInterferometer`, `AnalysisEllipse`, `AnalysisQuantity`).
+inherit (`AnalysisImaging`, `AnalysisInterferometer`, `AnalysisEllipse`).
 
 `Analysis` itself inherits from `af.Analysis` (from **PyAutoFit**) and extends it with:
 

@@ -26,7 +26,7 @@ NUMBA_CACHE_DIR=/tmp/numba_cache MPLCONFIGDIR=/tmp/matplotlib python -m pytest t
 
 - **Profiles**: `LightProfile` (`lp.*`), `MassProfile` (`mp.*`), `LightProfileLinear` (`lp_linear.*`)
 - **Galaxy** (`galaxy/galaxy.py`): holds light/mass profiles, pixelizations
-- **Fit classes**: `FitImaging`, `FitInterferometer`, `FitQuantity`, `FitEllipse`
+- **Fit classes**: `FitImaging`, `FitInterferometer`, `FitEllipse`
 - **Analysis classes**: `AnalysisImaging`, `AnalysisInterferometer` — implement `log_likelihood_function`
 - **Decorator system** (from autoarray): `@to_array`, `@to_grid`, `@to_vector_yx`, `@transform`
 - **Operate mixins**: `OperateImage`, `OperateDeflections`, `LensCalc`
