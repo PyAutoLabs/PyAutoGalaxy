@@ -182,17 +182,23 @@ class AnalysisImaging(AnalysisDataset):
         PyAutoFit zips it with the keys at
         ``autofit/non_linear/analysis/analysis.py:285`` and stacks per
         sample for the JIT batch path at lines 223-234.
+
+        Raises ``NotImplementedError`` when no latents are enabled so
+        PyAutoFit's outer ``except NotImplementedError`` short-circuits
+        the latent pipeline cleanly (no empty ``latent.csv`` written).
         """
         from autogalaxy.imaging.model.latent import LATENT_FUNCTIONS
+
+        keys = self.LATENT_KEYS
+        if not keys:
+            raise NotImplementedError
 
         xp = self._xp
         instance = model.instance_from_vector(vector=parameters)
         fit = self.fit_from(instance=instance)
         magzero = self.kwargs.get("magzero", None)
         context = {"fit": fit, "magzero": magzero, "xp": xp}
-        return tuple(
-            LATENT_FUNCTIONS[k](**context) for k in self.LATENT_KEYS
-        )
+        return tuple(LATENT_FUNCTIONS[k](**context) for k in keys)
 
     @staticmethod
     def _register_fit_imaging_pytrees() -> None:

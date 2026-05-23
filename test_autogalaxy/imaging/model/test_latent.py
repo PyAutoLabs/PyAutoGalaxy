@@ -109,6 +109,21 @@ def test_analysis_imaging_compute_latent_variables_aligns_with_latent_keys(
     assert np.isfinite(values[0])
 
 
+def test_analysis_imaging_compute_latent_variables_raises_when_empty(monkeypatch):
+    # When no latents are enabled, autofit's `except NotImplementedError`
+    # at autofit/non_linear/analysis/analysis.py:304 short-circuits the
+    # latent pipeline. We match that contract by raising explicitly.
+    monkeypatch.setattr(
+        ag.AnalysisImaging,
+        "LATENT_KEYS",
+        property(lambda self: []),
+    )
+    analysis = ag.AnalysisImaging(dataset=MagicMock(), use_jax=False)
+
+    with pytest.raises(NotImplementedError):
+        analysis.compute_latent_variables(parameters=np.array([]), model=MagicMock())
+
+
 def test_analysis_imaging_latent_keys_property_reads_config():
     # The autouse fixture in test_autogalaxy/conftest.py pushes the test
     # config dir whose latent.yaml enables total_galaxy_0_flux_mujy.
