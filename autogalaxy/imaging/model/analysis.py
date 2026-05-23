@@ -85,6 +85,11 @@ class AnalysisImaging(AnalysisDataset):
     def imaging(self):
         return self.dataset
 
+    @property
+    def LATENT_KEYS(self):
+        from autogalaxy.imaging.model.latent import latent_keys_enabled
+        return latent_keys_enabled()
+
     def log_likelihood_function(self, instance: af.ModelInstance) -> float:
         """
         Given an instance of the model, where the model parameters are set via a non-linear search, fit the model
@@ -166,6 +171,27 @@ class AnalysisImaging(AnalysisDataset):
             adapt_images=adapt_images,
             settings=self.settings,
             xp=self._xp,
+        )
+
+    def compute_latent_variables(self, parameters, model):
+        """
+        Compute the catalogue of latent variables enabled in
+        ``config/latent.yaml`` for the given parameter vector.
+
+        Returns a tuple positionally aligned with :attr:`LATENT_KEYS` —
+        PyAutoFit zips it with the keys at
+        ``autofit/non_linear/analysis/analysis.py:285`` and stacks per
+        sample for the JIT batch path at lines 223-234.
+        """
+        from autogalaxy.imaging.model.latent import LATENT_FUNCTIONS
+
+        xp = self._xp
+        instance = model.instance_from_vector(vector=parameters)
+        fit = self.fit_from(instance=instance)
+        magzero = self.kwargs.get("magzero", None)
+        context = {"fit": fit, "magzero": magzero, "xp": xp}
+        return tuple(
+            LATENT_FUNCTIONS[k](**context) for k in self.LATENT_KEYS
         )
 
     @staticmethod
