@@ -1,0 +1,4 @@
+# Test config mirror of `autogalaxy/config/latent.yaml`. Pushed by the
+# autouse `set_config_path` fixture in `test_autogalaxy/conftest.py`, which
+# shadows the library defaults during the test suite.
+total_galaxy_0_flux_mujy: true

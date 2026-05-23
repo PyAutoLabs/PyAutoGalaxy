@@ -1,0 +1,20 @@
+# Toggles for the catalogue of latent variables computed by `AnalysisImaging`.
+#
+# Each entry maps a registered latent name (see
+# `autogalaxy/imaging/model/latent.py::LATENT_FUNCTIONS`) to a bool. Setting
+# `false` excludes that latent from `LATENT_KEYS` so it is neither computed
+# nor written to `latent/samples.csv` / `latent/latent_summary.json`.
+#
+# Workspaces should mirror this file in their own `config/latent.yaml` to
+# override defaults locally (workspace values shadow library values).
+
+# `total_galaxy_0_flux_mujy` — total integrated flux of the first galaxy in
+# the fit (i.e. `fit.galaxies[0]`), converted from the fit's linear flux
+# units to microjanskies via `magzero` passed through Analysis kwargs.
+# Returns NaN when galaxy 0 has no light profile.
+#
+# Default `false` because computing this latent requires the user to pass
+# `magzero=<value>` to `AnalysisImaging(...)` — if the value is missing the
+# computation raises loudly (no silent NaN). Users who want this latent
+# should enable it here AND pass `magzero` via Analysis kwargs.
+total_galaxy_0_flux_mujy: false
