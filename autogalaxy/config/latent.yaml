@@ -11,7 +11,10 @@
 # `total_galaxy_0_flux_mujy` — total integrated flux of the first galaxy in
 # the fit (i.e. `fit.galaxies[0]`), converted from the fit's linear flux
 # units to microjanskies via `magzero` passed through Analysis kwargs.
-# Returns NaN when galaxy 0 has no light profile. Requires the user to
-# pass `magzero=<value>` when constructing `AnalysisImaging`; computation
-# raises loudly if the value is missing.
-total_galaxy_0_flux_mujy: true
+# Returns NaN when galaxy 0 has no light profile.
+#
+# Default `false` because computing this latent requires the user to pass
+# `magzero=<value>` to `AnalysisImaging(...)` — if the value is missing the
+# computation raises loudly (no silent NaN). Users who want this latent
+# should enable it here AND pass `magzero` via Analysis kwargs.
+total_galaxy_0_flux_mujy: false
