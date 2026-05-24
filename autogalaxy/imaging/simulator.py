@@ -20,7 +20,7 @@ from autogalaxy.galaxy.galaxies import Galaxies
 
 class SimulatorImaging(aa.SimulatorImaging):
     def via_galaxies_from(
-        self, galaxies: List[Galaxy], grid: aa.type.Grid2DLike
+        self, galaxies: List[Galaxy], grid: aa.type.Grid2DLike, xp=None
     ) -> aa.Imaging:
         """
         Simulate an `Imaging` dataset from an input list of `Galaxy` objects and a 2D grid of (y,x) coordinates.
@@ -48,6 +48,9 @@ class SimulatorImaging(aa.SimulatorImaging):
             to generate the image of the galaxies.
         """
 
+        if xp is None:
+            xp = self._xp
+
         galaxies = Galaxies(galaxies=galaxies)
 
         for galaxy in galaxies:
@@ -59,14 +62,14 @@ class SimulatorImaging(aa.SimulatorImaging):
             )
 
         image = galaxies.padded_image_2d_from(
-            grid=grid, psf_shape_2d=self.psf.kernel.shape_native
+            grid=grid, psf_shape_2d=self.psf.kernel.shape_native, xp=xp
         )
 
         over_sample_size = grid.over_sample_size.resized_from(
             new_shape=image.shape_native, mask_pad_value=1
         )
 
-        dataset = self.via_image_from(image=image, over_sample_size=over_sample_size)
+        dataset = self.via_image_from(image=image, over_sample_size=over_sample_size, xp=xp)
 
         return dataset.trimmed_after_convolution_from(
             kernel_shape=self.psf.kernel.shape_native
