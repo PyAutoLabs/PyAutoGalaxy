@@ -16,7 +16,7 @@ from autogalaxy.galaxy.galaxies import Galaxies
 
 
 class SimulatorInterferometer(aa.SimulatorInterferometer):
-    def via_galaxies_from(self, galaxies: List[Galaxy], grid: aa.type.Grid2DLike):
+    def via_galaxies_from(self, galaxies: List[Galaxy], grid: aa.type.Grid2DLike, xp=None):
         """
         Returns a realistic simulated image by applying effects to a plain simulated image.
 
@@ -37,8 +37,11 @@ class SimulatorInterferometer(aa.SimulatorInterferometer):
             A seed for random noise_maps generation
         """
 
+        if xp is None:
+            xp = self._xp
+
         galaxies = Galaxies(galaxies=galaxies)
 
-        image = galaxies.image_2d_from(grid=grid)
+        image = galaxies.image_2d_from(grid=grid, xp=xp)
 
-        return self.via_image_from(image=image)
+        return self.via_image_from(image=image, xp=xp)
