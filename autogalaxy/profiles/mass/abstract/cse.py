@@ -6,7 +6,7 @@ from typing import Callable, List, Tuple
 class MassProfileCSE(ABC):
     @staticmethod
     def convergence_cse_1d_from(
-        grid_radii: np.ndarray, core_radius: float
+        grid_radii: np.ndarray, core_radius: float, xp=np
     ) -> np.ndarray:
         """
         One dimensional function which is solved to decompose a convergence profile in cored steep ellipsoids, given by
@@ -30,6 +30,7 @@ class MassProfileCSE(ABC):
         term4: float,
         axis_ratio_squared: float,
         core_radius: float,
+        xp=np,
     ) -> np.ndarray:
         """
         Returns the deflection angles of a 1d cored steep ellisoid (CSE) profile, given by equation (19) and (20) of
@@ -40,12 +41,12 @@ class MassProfileCSE(ABC):
         Parameters
         ----------
         """
-        phi = np.sqrt(axis_ratio_squared * core_radius**2.0 + term1)
+        phi = xp.sqrt(axis_ratio_squared * core_radius**2.0 + term1)
         Psi = (phi + core_radius) ** 2.0 + term2
         bottom = core_radius * phi * Psi
         defl_x = (term3 * (phi + axis_ratio_squared * core_radius)) / bottom
         defl_y = (term4 * (phi + core_radius)) / bottom
-        return np.vstack((defl_y, defl_x))
+        return xp.vstack((defl_y, defl_x))
 
     @abstractmethod
     def decompose_convergence_via_cse(self, grid_radii: np.ndarray):
@@ -121,7 +122,7 @@ class MassProfileCSE(ABC):
         pass
 
     def _convergence_2d_via_cse_from(
-        self, grid_radii: np.ndarray, **kwargs
+        self, grid_radii: np.ndarray, xp=np, **kwargs
     ) -> np.ndarray:
         """
         Calculate the projected 2D convergence from a grid of radial coordinates, by computing and summing the
@@ -143,12 +144,12 @@ class MassProfileCSE(ABC):
         return sum(
             amplitude
             * self.convergence_cse_1d_from(
-                grid_radii=grid_radii, core_radius=core_radius
+                grid_radii=grid_radii, core_radius=core_radius, xp=xp
             )
             for amplitude, core_radius in zip(amplitude_list, core_radius_list)
         )
 
-    def _deflections_2d_via_cse_from(self, grid: np.ndarray, **kwargs) -> np.ndarray:
+    def _deflections_2d_via_cse_from(self, grid: np.ndarray, xp=np, **kwargs) -> np.ndarray:
         """
         Calculate the projected 2D deflection angles from a grid of radial coordinates, by computing and summing the
         deflections of each individual cse used to decompose the mass profile.
@@ -188,6 +189,7 @@ class MassProfileCSE(ABC):
                 term2=term2,
                 term3=term3,
                 term4=term4,
+                xp=xp,
             )
             for amplitude, core_radius in zip(amplitude_list, core_radius_list)
         )
