@@ -75,21 +75,31 @@ class cNFW(AbstractgNFW):
             * (r.array + self.scale_radius) ** (-2.0)
         )
 
+    @aa.over_sample
     @aa.decorators.to_array
+    @aa.decorators.transform
     def convergence_2d_from(self, grid: aa.type.Grid2DLike, xp=np, **kwargs):
-        """
-        Convergence (dimensionless surface mass density) for the cored NFW profile.
-        This is not yet implemented for `cNFW`.
-        """
-        return xp.zeros(shape=grid.shape[0])
+        radii_min = self.scale_radius / 1000.0
+        radii_max = self.scale_radius * 200.0
+        sigmas = xp.exp(xp.linspace(xp.log(radii_min), xp.log(radii_max), 20))
+        mge_decomp = MGEDecomposer(mass_profile=self)
+        return mge_decomp.convergence_2d_via_mge_from(
+            grid=grid, xp=xp, sigma_log_list=sigmas,
+            ellipticity_convention="major", three_D=True,
+        )
 
+    @aa.over_sample
     @aa.decorators.to_array
+    @aa.decorators.transform
     def potential_2d_from(self, grid: aa.type.Grid2DLike, xp=np, **kwargs):
-        """
-        Lensing potential for the cored NFW profile.
-        This is not yet implemented for `cNFW`.
-        """
-        return xp.zeros(shape=grid.shape[0])
+        radii_min = self.scale_radius / 1000.0
+        radii_max = self.scale_radius * 200.0
+        sigmas = xp.exp(xp.linspace(xp.log(radii_min), xp.log(radii_max), 20))
+        mge_decomp = MGEDecomposer(mass_profile=self)
+        return mge_decomp.potential_2d_via_mge_from(
+            grid=grid, xp=xp, sigma_log_list=sigmas,
+            ellipticity_convention="major", three_D=True,
+        )
 
 
 class cNFWSph(cNFW):
@@ -235,18 +245,28 @@ class cNFWSph(cNFW):
 
         return 2 * dev_F
 
+    @aa.over_sample
     @aa.decorators.to_array
+    @aa.decorators.transform
     def convergence_2d_from(self, grid: aa.type.Grid2DLike, xp=np, **kwargs):
-        """
-        Convergence (dimensionless surface mass density) for the cored NFW profile.
-        This is not yet implemented for `cNFWSph`.
-        """
-        return xp.zeros(shape=grid.shape[0])
+        radii_min = self.scale_radius / 1000.0
+        radii_max = self.scale_radius * 200.0
+        sigmas = xp.exp(xp.linspace(xp.log(radii_min), xp.log(radii_max), 20))
+        mge_decomp = MGEDecomposer(mass_profile=self)
+        return mge_decomp.convergence_2d_via_mge_from(
+            grid=grid, xp=xp, sigma_log_list=sigmas,
+            ellipticity_convention="major", three_D=True,
+        )
 
+    @aa.over_sample
     @aa.decorators.to_array
+    @aa.decorators.transform
     def potential_2d_from(self, grid: aa.type.Grid2DLike, xp=np, **kwargs):
-        """
-        Lensing potential for the cored NFW profile.
-        This is not yet implemented for `cNFWSph`.
-        """
-        return xp.zeros(shape=grid.shape[0])
+        radii_min = self.scale_radius / 1000.0
+        radii_max = self.scale_radius * 200.0
+        sigmas = xp.exp(xp.linspace(xp.log(radii_min), xp.log(radii_max), 20))
+        mge_decomp = MGEDecomposer(mass_profile=self)
+        return mge_decomp.potential_2d_via_mge_from(
+            grid=grid, xp=xp, sigma_log_list=sigmas,
+            ellipticity_convention="major", three_D=True,
+        )

@@ -149,9 +149,20 @@ class Chameleon(MassProfile, StellarProfile):
             grid_radius, xp=xp
         )
 
+    @aa.over_sample
     @aa.decorators.to_array
+    @aa.decorators.transform
     def potential_2d_from(self, grid: aa.type.Grid2DLike, xp=np, **kwargs):
-        return xp.zeros(shape=grid.shape[0])
+        from autogalaxy.profiles.mass.abstract.mge import MGEDecomposer
+
+        radii_min = self.core_radius_0 / 10.0
+        radii_max = self.core_radius_1 * 200.0
+        sigmas = xp.exp(xp.linspace(xp.log(radii_min), xp.log(radii_max), 30))
+        mge_decomp = MGEDecomposer(mass_profile=self)
+        return mge_decomp.potential_2d_via_mge_from(
+            grid=grid, xp=xp, sigma_log_list=sigmas,
+            ellipticity_convention="circularised", three_D=False,
+        )
 
     def image_2d_via_radii_from(self, grid_radii: np.ndarray, xp=np):
         """Calculate the intensity of the Chamelon light profile on a grid of radial coordinates.

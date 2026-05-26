@@ -30,7 +30,7 @@ class MassSheet(MassProfile):
 
     @aa.decorators.to_array
     def potential_2d_from(self, grid: aa.type.Grid2DLike, xp=np, **kwargs):
-        return xp.zeros(shape=grid.shape[0])
+        return 0.5 * self.kappa * (grid.array[:, 0] ** 2 + grid.array[:, 1] ** 2)
 
     @aa.decorators.to_vector_yx
     @aa.decorators.transform

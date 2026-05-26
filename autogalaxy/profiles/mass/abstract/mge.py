@@ -390,6 +390,134 @@ class MGEDecomposer:
             intensity, xp.exp(-0.5 * xp.square(xp.divide(grid_radii.array, sigma)))
         )
 
+    @staticmethod
+    def E1(x, xp=np):
+        """Exponential integral of the first order via Abramowitz & Stegun (1970).
+
+        Polynomial approximation for x <= 1, rational approximation for x > 1.
+        Uses xp.where for branchless evaluation (JAX-compatible).
+
+        Reference: Abramowitz & Stegun, Handbook of Mathematical Functions, 5.1.53 / 5.1.56.
+        Same approximation used in Jax-Lensing-Profiles (Herculens).
+        """
+        A0 = -0.57721566
+        A1 = 0.99999193
+        A2 = -0.24991055
+        A3 = 0.05519968
+        A4 = -0.00976004
+        A5 = 0.00107857
+        B1 = 8.5733287401
+        B2 = 18.059016973
+        B3 = 8.6347608925
+        B4 = 0.2677737343
+        C1 = 9.5733223454
+        C2 = 25.6329561486
+        C3 = 21.0996530827
+        C4 = 3.9584969228
+
+        x_safe = xp.where(x > 0, x, 1e-20)
+        x2 = x_safe ** 2
+        x3 = x_safe ** 3
+        x4 = x_safe ** 4
+        x5 = x_safe ** 5
+
+        small = (
+            -xp.log(x_safe) + A0 + A1 * x_safe + A2 * x2
+            + A3 * x3 + A4 * x4 + A5 * x5
+        )
+        num = xp.exp(-x_safe) * (x4 + B1 * x3 + B2 * x2 + B3 * x_safe + B4)
+        denom = x5 + C1 * x4 + C2 * x3 + C3 * x2 + C4 * x_safe
+        large = num / denom
+
+        return xp.where(x_safe <= 1.0, small, large)
+
+    def potential_func_gaussian(self, grid_radii, sigma, intensity, xp=np):
+        EULER_GAMMA = 0.5772156649015329
+        value = 0.5 * xp.square(xp.divide(grid_radii.array, sigma))
+        value_safe = xp.where(value > 0, value, 1e-20)
+        return xp.multiply(
+            intensity,
+            xp.multiply(
+                sigma ** 2,
+                EULER_GAMMA + xp.log(value_safe) + self.E1(value_safe, xp),
+            ),
+        )
+
+    @aa.over_sample
+    @aa.decorators.to_array
+    @aa.decorators.transform
+    def potential_2d_via_mge_from(
+        self,
+        grid: aa.type.Grid2DLike,
+        xp=np,
+        *,
+        sigma_log_list,
+        three_D: bool,
+        ellipticity_convention: str,
+        func_terms: int = 28,
+        **kwargs,
+    ):
+        """Calculate the projected lensing potential at a given set of arc-second
+        gridded coordinates, via MGE decomposition of the convergence profile.
+
+        The potential for each Gaussian component is computed analytically using
+        the E1 (exponential integral) formula from Shajib (2019).
+        """
+        eccentric_radii = self.mass_profile.eccentric_radii_grid_from(
+            grid=grid, xp=xp, **kwargs
+        )
+
+        sigmas_factor = self.sigmas_factor_from(
+            input_convention=ellipticity_convention,
+            target_convention="circularised",
+            xp=xp,
+        )
+
+        return self._potential_2d_via_mge_from(
+            grid_radii=eccentric_radii,
+            xp=xp,
+            sigma_log_list=sigma_log_list,
+            three_D=three_D,
+            sigmas_factor=sigmas_factor,
+            func_terms=func_terms,
+        )
+
+    def _potential_2d_via_mge_from(
+        self,
+        grid_radii,
+        xp=np,
+        *,
+        sigma_log_list,
+        three_D: bool,
+        sigmas_factor: float = 1.0,
+        func_terms: int = 28,
+        **kwargs,
+    ):
+        sigma_log_array = xp.asarray(sigma_log_list, dtype=xp.float64)
+
+        amps, sigmas = self.decompose_convergence_via_mge(
+            sigma_log_list=sigma_log_array,
+            func_terms=func_terms,
+            three_D=three_D,
+            xp=xp,
+        )
+
+        sigmas = sigmas_factor * xp.asarray(sigmas)[:, None]
+        amps = xp.asarray(amps)[:, None]
+
+        grid_radii = grid_radii[None, ...]
+
+        potential = xp.sum(
+            self.potential_func_gaussian(
+                grid_radii=aa.ArrayIrregular(grid_radii),
+                sigma=sigmas,
+                intensity=amps,
+                xp=xp,
+            ),
+            axis=0,
+        )
+        return potential
+
     def sigmas_factor_from(self, input_convention: str, target_convention: str, xp=np):
         """
         Returns the multiplicative factor required to convert a scale parameter (e.g. sigma)

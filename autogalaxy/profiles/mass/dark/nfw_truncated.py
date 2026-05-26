@@ -62,9 +62,20 @@ class NFWTruncatedSph(AbstractgNFW):
             2.0 * self.kappa_s * self.coord_func_l(grid_radius=grid_radius.array, xp=xp)
         )
 
+    @aa.over_sample
     @aa.decorators.to_array
+    @aa.decorators.transform
     def potential_2d_from(self, grid: aa.type.Grid2DLike, xp=np, **kwargs):
-        return xp.zeros(shape=grid.shape[0])
+        from autogalaxy.profiles.mass.abstract.mge import MGEDecomposer
+
+        radii_min = self.scale_radius / 1000.0
+        radii_max = self.truncation_radius * 5.0
+        sigmas = xp.exp(xp.linspace(xp.log(radii_min), xp.log(radii_max), 30))
+        mge_decomp = MGEDecomposer(mass_profile=self)
+        return mge_decomp.potential_2d_via_mge_from(
+            grid=grid, xp=xp, sigma_log_list=sigmas,
+            ellipticity_convention="major", three_D=True,
+        )
 
     def coord_func_k(self, grid_radius, xp=np):
         return xp.log(
