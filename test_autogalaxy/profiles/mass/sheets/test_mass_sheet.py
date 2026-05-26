@@ -97,6 +97,6 @@ def test__potential_2d_from():
         grid=ag.Grid2DIrregular([[1.0, 0.0], [3.0, 3.0], [5.0, -9.0]])
     )
 
-    assert potential[0] == pytest.approx(0.0, 1e-3)
-    assert potential[1] == pytest.approx(0.0, 1e-3)
-    assert potential[2] == pytest.approx(0.0, 1e-3)
+    assert potential[0] == pytest.approx(0.5, 1e-3)
+    assert potential[1] == pytest.approx(9.0, 1e-3)
+    assert potential[2] == pytest.approx(53.0, 1e-3)

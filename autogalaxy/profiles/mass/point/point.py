@@ -35,8 +35,10 @@ class PointMass(MassProfile):
         return convergence
 
     @aa.decorators.to_array
+    @aa.decorators.transform
     def potential_2d_from(self, grid: aa.type.Grid2DLike, xp=np, **kwargs):
-        return np.zeros(shape=grid.shape[0])
+        r = xp.sqrt(grid.array[:, 0] ** 2 + grid.array[:, 1] ** 2 + 1e-20)
+        return self.einstein_radius ** 2 * xp.log(r)
 
     @aa.decorators.to_vector_yx
     @aa.decorators.transform

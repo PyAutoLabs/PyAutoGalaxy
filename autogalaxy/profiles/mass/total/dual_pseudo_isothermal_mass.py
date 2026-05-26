@@ -529,9 +529,20 @@ class dPIEMass(MassProfile):
 
         return aa.Array2D(values=1.0 / det_A, mask=grid.mask)
 
+    @aa.over_sample
     @aa.decorators.to_array
+    @aa.decorators.transform
     def potential_2d_from(self, grid: aa.type.Grid2DLike, xp=np, **kwargs):
-        return xp.zeros(shape=grid.shape[0])
+        from autogalaxy.profiles.mass.abstract.mge import MGEDecomposer
+
+        radii_min = max(self.ra, 0.001) / 10.0
+        radii_max = self.rs * 20.0
+        sigmas = xp.exp(xp.linspace(xp.log(radii_min), xp.log(radii_max), 30))
+        mge_decomp = MGEDecomposer(mass_profile=self)
+        return mge_decomp.potential_2d_via_mge_from(
+            grid=grid, xp=xp, sigma_log_list=sigmas,
+            ellipticity_convention="major", three_D=False,
+        )
 
 
 class dPIEMassSph(dPIEMass):

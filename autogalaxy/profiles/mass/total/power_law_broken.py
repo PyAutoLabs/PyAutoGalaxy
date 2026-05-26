@@ -69,9 +69,20 @@ class PowerLawBroken(MassProfile):
             radius > self.break_radius
         )
 
+    @aa.over_sample
     @aa.decorators.to_array
+    @aa.decorators.transform
     def potential_2d_from(self, grid: aa.type.Grid2DLike, xp=np, **kwargs):
-        return xp.zeros(shape=grid.shape[0])
+        from autogalaxy.profiles.mass.abstract.mge import MGEDecomposer
+
+        radii_min = self.break_radius / 100.0
+        radii_max = self.einstein_radius * 20.0
+        sigmas = xp.exp(xp.linspace(xp.log(radii_min), xp.log(radii_max), 30))
+        mge_decomp = MGEDecomposer(mass_profile=self)
+        return mge_decomp.potential_2d_via_mge_from(
+            grid=grid, xp=xp, sigma_log_list=sigmas,
+            ellipticity_convention="major", three_D=False,
+        )
 
     @aa.decorators.to_vector_yx
     @aa.decorators.transform(rotate_back=True)
