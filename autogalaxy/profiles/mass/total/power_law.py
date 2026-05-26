@@ -7,6 +7,37 @@ from autogalaxy.profiles.mass.total.power_law_core import PowerLawCore
 
 
 class PowerLaw(PowerLawCore):
+    r"""Elliptical power-law (EPL / PEMD) mass profile.
+
+    The convergence of the elliptical power-law is:
+
+    .. math::
+
+        \kappa(R) = \frac{3 - \gamma}{2}
+                    \left(\frac{\theta_{\rm E}}{R}\right)^{\gamma - 1}
+
+    where :math:`\gamma` is the logarithmic density slope, :math:`\theta_{\rm E}`
+    is the Einstein radius, and :math:`R` is the elliptical radius.  The
+    isothermal case corresponds to :math:`\gamma = 2`.
+
+    Parameters
+    ----------
+    centre : (float, float)
+        (y, x) arc-second coordinates of the profile centre.
+    ell_comps : (float, float)
+        Ellipticity components (e1, e2) of the elliptical coordinate system.
+    einstein_radius : float
+        Einstein radius in arcseconds.
+    slope : float
+        Logarithmic density slope :math:`\gamma`; shallower profiles have
+        lower values, steeper profiles have higher values.
+
+    References
+    ----------
+    Tessore & Metcalf (2015), A&A, 580, A79.
+    Schneider, Ehlers & Falco (1992), *Gravitational Lenses*, Springer.
+    """
+
     def __init__(
         self,
         centre: Tuple[float, float] = (0.0, 0.0),
@@ -138,6 +169,33 @@ class PowerLaw(PowerLawCore):
 
 
 class PowerLawSph(PowerLaw):
+    r"""Spherical power-law mass profile.
+
+    The spherical limit of :class:`PowerLaw`.  The convergence is:
+
+    .. math::
+
+        \kappa(r) = \frac{3 - \gamma}{2}
+                    \left(\frac{\theta_{\rm E}}{r}\right)^{\gamma - 1}
+
+    where :math:`\gamma` is the logarithmic density slope, :math:`\theta_{\rm E}`
+    is the Einstein radius, and :math:`r` is the circular projected radius.
+
+    Parameters
+    ----------
+    centre : (float, float)
+        (y, x) arc-second coordinates of the profile centre.
+    einstein_radius : float
+        Einstein radius in arcseconds.
+    slope : float
+        Logarithmic density slope :math:`\gamma`; shallower profiles have
+        lower values, steeper profiles have higher values.
+
+    References
+    ----------
+    Tessore & Metcalf (2015), A&A, 580, A79.
+    """
+
     def __init__(
         self,
         centre: Tuple[float, float] = (0.0, 0.0),

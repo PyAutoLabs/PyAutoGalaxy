@@ -9,6 +9,30 @@ from autogalaxy.profiles.mass.stellar.abstract import StellarProfile
 
 
 class Gaussian(MassProfile, StellarProfile):
+    r"""
+    Elliptical Gaussian stellar mass profile.
+
+    The convergence of the Gaussian mass profile is proportional to the Gaussian surface
+    brightness scaled by a mass-to-light ratio:
+
+    .. math::
+
+        \kappa(R) = \Upsilon \, \frac{I}{2\pi\sigma^2}
+                    \exp\!\left(-\frac{R^2}{2\sigma^2}\right)
+
+    where :math:`\Upsilon` is the mass-to-light ratio (``mass_to_light_ratio``),
+    :math:`I` is the overall intensity normalisation (``intensity``), :math:`\sigma` is
+    the Gaussian width (``sigma``), and :math:`R` is the elliptical radius
+    :math:`R^2 = x^2 + y^2/q^2` with axis ratio :math:`q`.
+
+    Deflection angles are computed analytically via the Faddeeva (scaled complementary
+    error) function :math:`w(z)` following Shajib (2019).
+
+    References
+    ----------
+    - Shajib 2019, MNRAS, 488, 1387  (arXiv:1906.08263)
+    """
+
     def __init__(
         self,
         centre: Tuple[float, float] = (0.0, 0.0),
@@ -17,9 +41,7 @@ class Gaussian(MassProfile, StellarProfile):
         sigma: float = 1.0,
         mass_to_light_ratio: float = 1.0,
     ):
-        """
-        The elliptical Gaussian light profile.
-
+        r"""
         Parameters
         ----------
         centre
@@ -27,10 +49,11 @@ class Gaussian(MassProfile, StellarProfile):
         ell_comps
             The first and second ellipticity components of the elliptical coordinate system.
         intensity
-            Overall intensity normalisation of the light profile (units are dimensionless and derived from the data
-            the light profile's image is compared too, which is expected to be electrons per second).
+            Overall intensity normalisation :math:`I` of the Gaussian (electrons per second).
         sigma
-            The sigma value of the Gaussian.
+            The Gaussian width :math:`\sigma` in arcseconds.
+        mass_to_light_ratio
+            The mass-to-light ratio :math:`\Upsilon` in solar units.
         """
 
         super(MassProfile, self).__init__(centre=centre, ell_comps=ell_comps)

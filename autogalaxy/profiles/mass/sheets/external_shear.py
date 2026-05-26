@@ -8,6 +8,46 @@ from autogalaxy import convert
 
 
 class ExternalShear(MassProfile):
+    r"""
+    Constant external shear field used in strong-lens mass models.
+
+    The external shear represents the line-of-sight contribution to the lensing
+    potential from mass external to the primary lens (e.g. nearby group members,
+    large-scale structure).  Because this contribution is approximately uniform over
+    the small angular extent of a strong-lens system, it is modelled as a constant
+    shear with two Cartesian components :math:`(\gamma_1, \gamma_2)`.
+
+    The lensing potential is:
+
+    .. math::
+
+        \psi(\boldsymbol{\theta}) =
+            -\tfrac{1}{2} |\gamma| \, r^2 \cos\!\big(2(\varphi - \phi_\gamma)\big)
+
+    The deflection field in a reference frame aligned with the shear direction is:
+
+    .. math::
+
+        \alpha_y = -|\gamma| \, y, \qquad \alpha_x = +|\gamma| \, x
+
+    The convergence vanishes identically:
+
+    .. math::
+
+        \kappa = 0
+
+    The shear magnitude and position angle are:
+
+    .. math::
+
+        |\gamma| = \sqrt{\gamma_1^2 + \gamma_2^2}, \qquad
+        \phi_\gamma = \tfrac{1}{2} \mathrm{arctan2}(\gamma_2, \gamma_1)
+
+    References
+    ----------
+    - Schneider, Ehlers & Falco 1992, *Gravitational Lenses* (Springer)
+    """
+
     def __init__(self, gamma_1: float = 0.0, gamma_2: float = 0.0):
         r"""
         Constant external shear term used in strong-lens mass models.

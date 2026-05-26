@@ -39,6 +39,81 @@ def radial_and_angle_grid_from(
 
 
 class PowerLawMultipole(MassProfile):
+    r"""Angular multipole perturbation to a power-law total mass distribution.
+
+    This profile provides only the multipole perturbation; it must be combined
+    with a :class:`PowerLaw` profile that shares the same ``einstein_radius`` and
+    ``slope`` parameters.  The multipole convergence is:
+
+    .. math::
+
+        \kappa_m(r, \phi) = \frac{1}{2}
+            \left(\frac{\theta_{\rm E}}{r}\right)^{\gamma - 1}
+            k_m \cos\!\bigl(m(\phi - \phi_m)\bigr)
+
+    where :math:`m` is the multipole order, :math:`\gamma` is the power-law slope,
+    :math:`k_m` is the multipole amplitude, and :math:`\phi_m` is the multipole
+    orientation angle.  The amplitude and angle are parameterised via ellipticity
+    components :math:`(\epsilon_1^{\rm mp},\, \epsilon_2^{\rm mp})`:
+
+    .. math::
+
+        k_m = \sqrt{{\epsilon_1^{\rm mp}}^2 + {\epsilon_2^{\rm mp}}^2}, \qquad
+        \phi_m = \frac{1}{m} \arctan\!\frac{\epsilon_2^{\rm mp}}{\epsilon_1^{\rm mp}}
+
+    The pure deflection-only nature of the perturbation means the convergence
+    integrates to zero over all angular positions; the net mass contribution is
+    therefore zero.
+
+    Parameters
+    ----------
+    m : int
+        Multipole order (e.g. 4 for the quadrupole-like ``m=4`` mode).
+    centre : (float, float)
+        (y, x) arc-second coordinates of the profile centre.
+    einstein_radius : float
+        Einstein radius in arcseconds (shared with the base :class:`PowerLaw`).
+    slope : float
+        Logarithmic density slope :math:`\gamma` (shared with the base :class:`PowerLaw`).
+    multipole_comps : (float, float)
+        Ellipticity-like components :math:`(\epsilon_1^{\rm mp},\, \epsilon_2^{\rm mp})`
+        that encode the multipole amplitude and orientation.
+
+    References
+    ----------
+    Chu, Hu & Kneib (2013), ApJ, 765, 134.  arXiv:1302.5482
+    Evans & Witt (2003), MNRAS, 345, 1351.
+
+    Examples
+    --------
+
+    mass = al.mp.PowerLaw(
+        centre=(0.0, 0.0),
+        ell_comps=(-0.1, 0.2),
+        einstein_radius=1.0,
+        slope=2.2
+    )
+
+    multipole = al.mp.PowerLawMultipole(
+        centre=(0.0, 0.0),
+        einstein_radius=1.0,
+        slope=2.2,
+        multipole_comps=(0.3, 0.2)
+    )
+
+    galaxy = al.Galaxy(
+        redshift=0.5,
+        mass=mass,
+        multipole=multipole
+    )
+
+    grid=al.Grid2D.uniform(shape_native=(10, 10), pixel_scales=0.1)
+
+    deflections = galaxy.deflections_yx_2d_from(
+        grid=grid
+    )
+    """
+
     def __init__(
         self,
         m=4,
@@ -47,72 +122,6 @@ class PowerLawMultipole(MassProfile):
         slope: float = 2.0,
         multipole_comps: Tuple[float, float] = (0.0, 0.0),
     ):
-        r"""
-        A multipole extension with multipole order M to the power-law total mass distribution.
-
-        Quantities computed from this profile (e.g. deflections, convergence) are of only the multipole, and not the
-        power-law mass distribution itself.
-
-        The typical use case is therefore for the multipoles to be combined with a `PowerLaw` mass profile with the
-        same parameters (see example below).
-
-        When combined with a power-law, the functional form of the convergence is:
-
-        .. math::
-            \kappa(r, \phi) = \frac{1}{2} \left(\frac{\theta_{\rm E}^{\rm mass}}{r}\right)^{\gamma^{\rm mass} - 1}
-            k^{\rm mass}_m \, \cos(m(\phi - \phi^{\rm mass}_m)) \, ,
-
-        Where \\xi are elliptical coordinates calculated according to :class: SphProfile.
-
-        The parameters :math: k^{\rm mass}_m and :math: \phi^{\rm mass}_are parameterized as elliptical components
-        :math: (\epsilon_{\rm 1}^{\rm mp}\,\epsilon_{\rm 2}^{\rm mp}), which are given by:
-
-        .. math::
-                \phi^{\rm mass}_m = \frac{1}{m} \arctan{\frac{\epsilon_{\rm 2}^{\rm mp}}{\epsilon_{\rm 1}^{\rm mp}}}, \, \,
-                k^{\rm mass}_m = \sqrt{{\epsilon_{\rm 1}^{\rm mp}}^2 + {\epsilon_{\rm 2}^{\rm mp}}^2} \, .
-
-        This mass profile is described fully in the following paper: https://arxiv.org/abs/1302.5482
-
-        Parameters
-        ----------
-        centre
-            The (y,x) arc-second coordinates of the profile centre.
-        einstein_radius
-            The arc-second Einstein radius.
-        slope
-            The density slope of the power-law (lower value -> shallower profile, higher value -> steeper profile).
-        multipole_comps
-            The first and second ellipticity components of the multipole.
-
-        Examples
-        --------
-
-        mass = al.mp.PowerLaw(
-            centre=(0.0, 0.0),
-            ell_comps=(-0.1, 0.2),
-            einstein_radius=1.0,
-            slope=2.2
-        )
-
-        multipole = al.mp.PowerLawMultipole(
-            centre=(0.0, 0.0),
-            einstein_radius=1.0,
-            slope=2.2,
-            multipole_comps=(0.3, 0.2)
-        )
-
-        galaxy = al.Galaxy(
-            redshift=0.5,
-            mass=mass,
-            multipole=multipole
-        )
-
-        grid=al.Grid2D.uniform(shape_native=(10, 10), pixel_scales=0.1)
-
-        deflections = galaxy.deflections_yx_2d_from(
-            grid=grid
-        )
-        """
         super().__init__(centre=centre, ell_comps=(0.0, 0.0))
 
         self.m = int(m)

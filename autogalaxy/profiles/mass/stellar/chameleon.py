@@ -10,6 +10,33 @@ from autogalaxy.profiles.mass.total.isothermal import psi_from
 
 
 class Chameleon(MassProfile, StellarProfile):
+    r"""
+    Elliptical Chameleon stellar mass profile (Dutton et al. 2011).
+
+    The Chameleon profile is the difference of two cored isothermal (pseudo-Jaffe) profiles
+    with core radii :math:`s_0` and :math:`s_0 + s_1`, providing a flexible approximation
+    to a variety of stellar light profiles:
+
+    .. math::
+
+        \kappa(\xi) = \Upsilon \, I \left(
+            \frac{1}{\sqrt{\xi^2 + s_0^2}}
+            - \frac{1}{\sqrt{\xi^2 + (s_0 + s_1)^2}}
+        \right)
+
+    where :math:`\xi^2 = x^2 + (y/q)^2` is the elliptical radius, :math:`\Upsilon` is
+    the mass-to-light ratio (``mass_to_light_ratio``), :math:`I` is the intensity
+    normalisation (``intensity``), :math:`s_0` = ``core_radius_0``, and
+    :math:`s_1` = ``core_radius_1``.
+
+    Deflection angles are computed analytically via the cored isothermal deflection
+    formula (Eq. 15–16 of Dutton et al. 2011).
+
+    References
+    ----------
+    - Dutton, Brewer, Marshall et al. 2011, MNRAS, 417, 1621
+    """
+
     def __init__(
         self,
         centre: Tuple[float, float] = (0.0, 0.0),
@@ -19,9 +46,7 @@ class Chameleon(MassProfile, StellarProfile):
         core_radius_1: float = 0.02,
         mass_to_light_ratio: float = 1.0,
     ):
-        """
-        The elliptical Chamelon mass profile.
-
+        r"""
         Parameters
         ----------
         centre
@@ -29,15 +54,15 @@ class Chameleon(MassProfile, StellarProfile):
         ell_comps
             The first and second ellipticity components of the elliptical coordinate system.
         intensity
-            Overall intensity normalisation of the light profile (units are dimensionless and derived from the data
-            the light profile's image is compared too, which is expected to be electrons per second).
-        core_radius_0 : the core size of the first elliptical cored Isothermal profile.
-        core_radius_1 : core_radius_0 + core_radius_1 is the core size of the second elliptical cored Isothermal profile.
-            We use core_radius_1 here is to avoid negative values.
-
-        Profile form:
-            mass_to_light_ratio * intensity *\
-                (1.0 / Sqrt(x^2 + (y/q)^2 + core_radius_0^2) - 1.0 / Sqrt(x^2 + (y/q)^2 + (core_radius_0 + core_radius_1)**2.0))
+            Overall intensity normalisation :math:`I` (electrons per second).
+        core_radius_0
+            Core radius :math:`s_0` of the first cored isothermal component (arcseconds).
+        core_radius_1
+            Additional core size increment :math:`s_1` such that the second component has
+            core radius :math:`s_0 + s_1` (arcseconds).  Using an increment avoids
+            negative parameter values.
+        mass_to_light_ratio
+            The mass-to-light ratio :math:`\Upsilon` in solar units.
         """
 
         super(Chameleon, self).__init__(centre=centre, ell_comps=ell_comps)
@@ -205,6 +230,24 @@ class Chameleon(MassProfile, StellarProfile):
 
 
 class ChameleonSph(Chameleon):
+    r"""
+    Spherical Chameleon stellar mass profile.
+
+    A special case of :class:`Chameleon` with no ellipticity (:math:`q = 1`).
+    The convergence is:
+
+    .. math::
+
+        \kappa(r) = \Upsilon \, I \left(
+            \frac{1}{\sqrt{r^2 + s_0^2}}
+            - \frac{1}{\sqrt{r^2 + (s_0 + s_1)^2}}
+        \right)
+
+    References
+    ----------
+    - Dutton, Brewer, Marshall et al. 2011, MNRAS, 417, 1621
+    """
+
     def __init__(
         self,
         centre: Tuple[float, float] = (0.0, 0.0),
@@ -213,26 +256,21 @@ class ChameleonSph(Chameleon):
         core_radius_1: float = 0.02,
         mass_to_light_ratio: float = 1.0,
     ):
-        """
-        The spherica; Chameleon mass profile.
-
-        Profile form:
-            mass_to_light_ratio * intensity *\
-                (1.0 / Sqrt(x^2 + (y/q)^2 + core_radius_0^2) - 1.0 / Sqrt(x^2 + (y/q)^2 + (core_radius_0 + core_radius_1)**2.0))
-
+        r"""
         Parameters
         ----------
         centre
             The (y,x) arc-second coordinates of the profile centre.
-        ell_comps
-            The first and second ellipticity components of the elliptical coordinate system.
         intensity
-            Overall intensity normalisation of the light profile (units are dimensionless and derived from the data
-            the light profile's image is compared too, which is expected to be electrons per second).
-        core_radius_0 : the core size of the first elliptical cored Isothermal profile.
-        core_radius_1 : core_radius_0 + core_radius_1 is the core size of the second elliptical cored Isothermal profile.
-            We use core_radius_1 here is to avoid negative values.
-       """
+            Overall intensity normalisation :math:`I` (electrons per second).
+        core_radius_0
+            Core radius :math:`s_0` of the first cored isothermal component (arcseconds).
+        core_radius_1
+            Additional core size increment :math:`s_1` such that the second component has
+            core radius :math:`s_0 + s_1` (arcseconds).
+        mass_to_light_ratio
+            The mass-to-light ratio :math:`\Upsilon` in solar units.
+        """
 
         super().__init__(
             centre=centre,

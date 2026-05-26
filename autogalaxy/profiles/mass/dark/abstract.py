@@ -15,6 +15,36 @@ class DarkProfile:
 
 
 class AbstractgNFW(MassProfile, DarkProfile):
+    r"""
+    Abstract base class for generalised NFW (gNFW) dark matter halo profiles.
+
+    The three-dimensional density profile of the gNFW family is:
+
+    .. math::
+
+        \rho(r) = \frac{\rho_s}{(r/r_s)^{\gamma}(1 + r/r_s)^{3-\gamma}}
+
+    where :math:`\gamma` is the inner logarithmic slope (``inner_slope``), :math:`r_s` is
+    the scale radius, and :math:`\rho_s` is the characteristic density related to the
+    dimensionless convergence normalisation :math:`\kappa_s` via:
+
+    .. math::
+
+        \kappa_s = \frac{\rho_s \, r_s}{\Sigma_{\rm crit}}
+
+    The projected convergence is computed from this 3-D density via line-of-sight integration
+    using the auxiliary coordinate functions :math:`f(x)`, :math:`g(x)`, and :math:`h(x)`,
+    where :math:`x = \xi / r_s` and :math:`\xi` is the elliptical radius.
+
+    The standard NFW profile (:class:`NFW`) is recovered for :math:`\gamma = 1`.
+
+    References
+    ----------
+    - Navarro, Frenk & White 1996, ApJ, 462, 563
+    - Navarro, Frenk & White 1997, ApJ, 490, 493
+    - Wyithe, Turner & Spergel 2001, ApJ, 555, 504
+    """
+
     epsrel = 1.49e-5
 
     def __init__(

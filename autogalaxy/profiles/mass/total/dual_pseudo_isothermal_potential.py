@@ -6,6 +6,42 @@ from autogalaxy.profiles.mass.abstract.abstract import MassProfile
 
 
 class dPIEPotential(MassProfile):
+    r"""Dual pseudo-isothermal elliptical mass profile (dPIE, potential parameterisation).
+
+    A dPIE profile in which ellipticity is applied to the lensing potential rather
+    than the mass distribution.  The circularly symmetric convergence takes the
+    same functional form as :class:`dPIEMassSph`:
+
+    .. math::
+
+        \kappa(R) = \frac{b_0}{2} \frac{r_s}{r_s - r_a}
+        \left(
+            \frac{1}{\sqrt{r_a^2 + R^2}}
+            - \frac{1}{\sqrt{r_s^2 + R^2}}
+        \right)
+
+    but ellipticity enters through a pseudo-elliptical radius
+    :math:`R^2 = x^2(1-\epsilon) + y^2(1+\epsilon)` in the deflection, rather
+    than through a purely elliptical mass distribution.
+
+    Parameters
+    ----------
+    centre : (float, float)
+        (y, x) arc-second coordinates of the profile centre.
+    ell_comps : (float, float)
+        Ellipticity components (e1, e2) of the elliptical coordinate system.
+    ra : float
+        Inner core scale radius in arcseconds.
+    rs : float
+        Outer truncation scale radius in arcseconds.
+    b0 : float
+        Lens strength in arcseconds (Einstein radius in the limit
+        :math:`r_a \to 0`, :math:`r_s \to \infty`, :math:`q \to 1`).
+
+    References
+    ----------
+    Eliasdottir et al. (2007), arXiv:0710.5636.
+    """
 
     def __init__(
         self,
@@ -168,6 +204,38 @@ class dPIEPotential(MassProfile):
 
 
 class dPIEPotentialSph(dPIEPotential):
+    r"""Spherical dual pseudo-isothermal mass profile (dPIE, potential parameterisation).
+
+    The spherical limit of :class:`dPIEPotential`.  The convergence is:
+
+    .. math::
+
+        \kappa(r) = \frac{b_0}{2} \frac{r_s}{r_s - r_a}
+        \left(
+            \frac{1}{\sqrt{r_a^2 + r^2}}
+            - \frac{1}{\sqrt{r_s^2 + r^2}}
+        \right)
+
+    where :math:`r` is the circular projected radius.  This profile is
+    mathematically identical to :class:`dPIEMassSph`.
+
+    Parameters
+    ----------
+    centre : (float, float)
+        (y, x) arc-second coordinates of the profile centre.
+    ra : float
+        Inner core scale radius in arcseconds.
+    rs : float
+        Outer truncation scale radius in arcseconds.
+    b0 : float
+        Lens strength in arcseconds (Einstein radius in the limit
+        :math:`r_a \to 0`, :math:`r_s \to \infty`).
+
+    References
+    ----------
+    Eliasdottir et al. (2007), arXiv:0710.5636.
+    """
+
     def __init__(
         self,
         centre: Tuple[float, float] = (0.0, 0.0),

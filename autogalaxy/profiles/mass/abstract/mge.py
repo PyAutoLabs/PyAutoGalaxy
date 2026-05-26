@@ -5,11 +5,31 @@ from autogalaxy.profiles.mass.abstract.abstract import MassProfile
 
 
 class MGEDecomposer:
-    """
-    This class speeds up deflection angle calculations of certain mass profiles by decompositing them into many
-    Gaussians.
+    r"""
+    Multi-Gaussian Expansion (MGE) decomposer for arbitrary mass profiles.
 
-    This follows the method of Shajib 2019 - https://academic.oup.com/mnras/article/488/1/1387/5526256
+    Accelerates deflection-angle and convergence calculations by decomposing a mass
+    profile's projected convergence (or 3-D density) into a sum of Gaussian components,
+    each of which has an analytic deflection-angle formula via the Faddeeva (scaled
+    complementary error) function.
+
+    The decomposition of an arbitrary radial function :math:`f(\sigma)` into Gaussians
+    with amplitudes :math:`A_j` and widths :math:`\sigma_j` follows the numerical
+    contour-integration quadrature of Shajib (2019) Eq. 6:
+
+    .. math::
+
+        f(\sigma) \approx \sum_{j} A_j \exp\!\left(-\frac{r^2}{2\sigma_j^2}\right)
+
+    The deflection angles of each Gaussian component are then evaluated analytically via
+    the complex Faddeeva function :math:`w(z) = e^{-z^2}\,\mathrm{erfc}(-iz)`.
+
+    Supported ellipticity conventions for the scale-parameter :math:`\sigma` are
+    ``'major'``, ``'circularised'``, and ``'minor'`` (see :meth:`sigmas_factor_from`).
+
+    References
+    ----------
+    - Shajib 2019, MNRAS, 488, 1387  (arXiv:1906.08263)
     """
 
     def __init__(

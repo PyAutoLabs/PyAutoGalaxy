@@ -357,6 +357,54 @@ class PIEMass(MassProfile):
 
 
 class dPIEMass(MassProfile):
+    r"""Dual pseudo-isothermal elliptical mass distribution (dPIE, mass parameterisation).
+
+    A two-component PIE profile with both a core radius :math:`r_a` and a
+    truncation radius :math:`r_s`.  The three-dimensional density scales as
+    :math:`\rho \propto r^{-2}` in the transition region
+    :math:`r_a \leq R \leq r_s` and as :math:`\rho \propto r^{-4}` in the outer
+    parts, with the full form:
+
+    .. math::
+
+        \rho \propto \bigl[(r_a^2 + R^2)(r_s^2 + R^2)\bigr]^{-1}
+
+    The projected convergence is the difference of two PIE profiles:
+
+    .. math::
+
+        \kappa(r_{\rm em}) = \frac{b_0}{2} \frac{r_s}{r_s - r_a}
+        \left(
+            \frac{1}{\sqrt{r_a^2 + r_{\rm em}^2}}
+            - \frac{1}{\sqrt{r_s^2 + r_{\rm em}^2}}
+        \right)
+
+    where :math:`r_{\rm em}^2 = x^2/(1+\epsilon)^2 + y^2/(1-\epsilon)^2` is
+    the pseudo-elliptical radius and :math:`b_0` is the lens strength (equal to
+    the Einstein radius when :math:`r_a \to 0`, :math:`r_s \to \infty`, and
+    :math:`q \to 1`).  This profile is ported directly from Lenstool's C code.
+
+    Parameters
+    ----------
+    centre : (float, float)
+        (y, x) arc-second coordinates of the profile centre.
+    ell_comps : (float, float)
+        Ellipticity components (e1, e2) of the elliptical coordinate system.
+    ra : float
+        Inner core radius in arcseconds.
+    rs : float
+        Outer truncation radius in arcseconds.
+    b0 : float
+        Lens strength in arcseconds (Einstein radius in the limit
+        :math:`r_a \to 0`, :math:`r_s \to \infty`, :math:`q \to 1`).
+
+    References
+    ----------
+    Kassiola & Kovner (1993), ApJ, 417, 450.
+    Eliasdottir et al. (2007), arXiv:0710.5636.
+    Limousin et al. (2005), A&A, 461, 881.
+    """
+
     def __init__(
         self,
         centre: Tuple[float, float] = (0.0, 0.0),
@@ -546,6 +594,42 @@ class dPIEMass(MassProfile):
 
 
 class dPIEMassSph(dPIEMass):
+    r"""Spherical dual pseudo-isothermal mass distribution (dPIE, mass parameterisation).
+
+    The spherical limit of :class:`dPIEMass`.  The projected convergence is:
+
+    .. math::
+
+        \kappa(r) = \frac{b_0}{2} \frac{r_s}{r_s - r_a}
+        \left(
+            \frac{1}{\sqrt{r_a^2 + r^2}}
+            - \frac{1}{\sqrt{r_s^2 + r^2}}
+        \right)
+
+    where :math:`r` is the circular projected radius, :math:`r_a` is the core
+    radius, :math:`r_s` is the truncation radius, and :math:`b_0` is the lens
+    strength (Einstein radius in the limits :math:`r_a \to 0`,
+    :math:`r_s \to \infty`).
+
+    Parameters
+    ----------
+    centre : (float, float)
+        (y, x) arc-second coordinates of the profile centre.
+    ra : float
+        Inner core radius in arcseconds.
+    rs : float
+        Outer truncation radius in arcseconds.
+    b0 : float
+        Lens strength in arcseconds (Einstein radius in the limit
+        :math:`r_a \to 0`, :math:`r_s \to \infty`).
+
+    References
+    ----------
+    Kassiola & Kovner (1993), ApJ, 417, 450.
+    Eliasdottir et al. (2007), arXiv:0710.5636.
+    Limousin et al. (2005), A&A, 461, 881.
+    """
+
     def __init__(
         self,
         centre: Tuple[float, float] = (0.0, 0.0),
