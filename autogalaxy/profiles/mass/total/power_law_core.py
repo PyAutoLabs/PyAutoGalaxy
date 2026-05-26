@@ -7,6 +7,40 @@ from autogalaxy.profiles.mass.abstract.abstract import MassProfile
 
 
 class PowerLawCore(MassProfile):
+    r"""Cored elliptical power-law (cored EPL / SPEMD) mass profile.
+
+    The convergence of the cored elliptical power-law is:
+
+    .. math::
+
+        \kappa(R) = \frac{3 - \gamma}{2}
+                    \left(s^2 + R^2\right)^{-({\gamma - 1})/2}
+                    \theta_{\rm E}^{\,\gamma - 1}
+
+    where :math:`\gamma` is the logarithmic density slope, :math:`\theta_{\rm E}`
+    is the Einstein radius, :math:`R` is the elliptical radius, and :math:`s` is
+    the core radius that prevents the central divergence of the pure power-law.
+
+    Parameters
+    ----------
+    centre : (float, float)
+        (y, x) arc-second coordinates of the profile centre.
+    ell_comps : (float, float)
+        Ellipticity components (e1, e2) of the elliptical coordinate system.
+    einstein_radius : float
+        Einstein radius in arcseconds.
+    slope : float
+        Logarithmic density slope :math:`\gamma`; shallower profiles have
+        lower values, steeper profiles have higher values.
+    core_radius : float
+        Core radius :math:`s` in arcseconds.
+
+    References
+    ----------
+    Keeton (2001), arXiv:astro-ph/0102341.
+    Tessore & Metcalf (2015), A&A, 580, A79.
+    """
+
     def __init__(
         self,
         centre: Tuple[float, float] = (0.0, 0.0),
@@ -175,6 +209,38 @@ class PowerLawCore(MassProfile):
 
 
 class PowerLawCoreSph(PowerLawCore):
+    r"""Cored spherical power-law mass profile.
+
+    The spherical limit of :class:`PowerLawCore`.  The convergence is:
+
+    .. math::
+
+        \kappa(r) = \frac{3 - \gamma}{2}
+                    \left(s^2 + r^2\right)^{-({\gamma - 1})/2}
+                    \theta_{\rm E}^{\,\gamma - 1}
+
+    where :math:`\gamma` is the logarithmic density slope, :math:`\theta_{\rm E}`
+    is the Einstein radius, :math:`r` is the circular projected radius, and
+    :math:`s` is the core radius.
+
+    Parameters
+    ----------
+    centre : (float, float)
+        (y, x) arc-second coordinates of the profile centre.
+    einstein_radius : float
+        Einstein radius in arcseconds.
+    slope : float
+        Logarithmic density slope :math:`\gamma`; shallower profiles have
+        lower values, steeper profiles have higher values.
+    core_radius : float
+        Core radius :math:`s` in arcseconds.
+
+    References
+    ----------
+    Keeton (2001), arXiv:astro-ph/0102341.
+    Tessore & Metcalf (2015), A&A, 580, A79.
+    """
+
     def __init__(
         self,
         centre: Tuple[float, float] = (0.0, 0.0),

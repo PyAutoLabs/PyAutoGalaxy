@@ -8,6 +8,34 @@ from autogalaxy.profiles.mass.abstract.abstract import MassProfile
 
 
 class ExternalPotential(MassProfile):
+    r"""
+    Higher-order external potential extending the constant external shear.
+
+    The ``ExternalPotential`` captures up to spin-3 contributions from line-of-sight
+    mass in strong-lens models, following Powell et al. (2022) Eq. 4.  The lensing
+    potential is:
+
+    .. math::
+
+        \psi(\boldsymbol{r}) =
+            \tfrac{1}{2} r^2 (\gamma_1 \cos 2\theta + \gamma_2 \sin 2\theta)
+            + \tfrac{1}{4} r^3 (\tau_1 \cos\theta + \tau_2 \sin\theta)
+            + \tfrac{1}{6} r^3 (\delta_1 \cos 3\theta + \delta_2 \sin 3\theta)
+
+    where :math:`(r, \theta)` are polar coordinates centred on ``centre``.
+
+    - The :math:`\gamma` term is a constant external shear (spin-2); with
+      :math:`\tau_i = \delta_i = 0` this reduces to :class:`ExternalShear`.
+    - The :math:`\tau` term (spin-1) introduces a linear convergence gradient:
+      :math:`\kappa(x, y) = \tau_1 x + \tau_2 y`.
+    - The :math:`\delta` term (spin-3) is a higher-order generalised shear with zero
+      convergence contribution.
+
+    References
+    ----------
+    - Powell, Vegetti, McKean et al. 2022, MNRAS, 516, 1808
+    """
+
     def __init__(
         self,
         centre: Tuple[float, float] = (0.0, 0.0),

@@ -39,6 +39,34 @@ def psi_from(grid, axis_ratio, core_radius, xp=np):
 
 
 class Isothermal(PowerLaw):
+    r"""Singular isothermal ellipsoid (SIE) mass profile.
+
+    The convergence of the SIE is:
+
+    .. math::
+
+        \kappa(R) = \frac{\theta_{\rm E}}{2R}
+
+    where :math:`\theta_{\rm E}` is the Einstein radius and :math:`R` is the
+    elliptical radius defined as :math:`R^2 = q x^2 + y^2 / q` with axis ratio
+    :math:`q`.  This is the special case of the power-law profile with slope
+    :math:`\gamma = 2`.
+
+    Parameters
+    ----------
+    centre : (float, float)
+        (y, x) arc-second coordinates of the profile centre.
+    ell_comps : (float, float)
+        Ellipticity components (e1, e2) of the elliptical coordinate system.
+    einstein_radius : float
+        Einstein radius in arcseconds.
+
+    References
+    ----------
+    Kormann, Schneider & Bartelmann (1994), A&A, 284, 285.
+    Tessore & Metcalf (2015), A&A, 580, A79.
+    """
+
     def __init__(
         self,
         centre: Tuple[float, float] = (0.0, 0.0),
@@ -177,6 +205,30 @@ class Isothermal(PowerLaw):
 
 
 class IsothermalSph(Isothermal):
+    r"""Singular isothermal sphere (SIS) mass profile.
+
+    The spherical limit of the SIE.  The convergence is:
+
+    .. math::
+
+        \kappa(r) = \frac{\theta_{\rm E}}{2r}
+
+    where :math:`\theta_{\rm E}` is the Einstein radius and :math:`r` is the
+    circular projected radius.
+
+    Parameters
+    ----------
+    centre : (float, float)
+        (y, x) arc-second coordinates of the profile centre.
+    einstein_radius : float
+        Einstein radius in arcseconds.
+
+    References
+    ----------
+    Kormann, Schneider & Bartelmann (1994), A&A, 284, 285.
+    Tessore & Metcalf (2015), A&A, 580, A79.
+    """
+
     def __init__(
         self, centre: Tuple[float, float] = (0.0, 0.0), einstein_radius: float = 1.0
     ):

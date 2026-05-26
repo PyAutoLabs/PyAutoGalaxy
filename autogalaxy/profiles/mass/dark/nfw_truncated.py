@@ -8,6 +8,37 @@ from autogalaxy.profiles.mass.dark.abstract import AbstractgNFW
 
 
 class NFWTruncatedSph(AbstractgNFW):
+    r"""
+    Spherical truncated NFW (tNFW) dark matter halo profile (Baltz, Marshall & Oguri 2009).
+
+    The tNFW profile introduces a smooth truncation of the NFW density at a truncation
+    radius :math:`r_t`, characterised by the dimensionless truncation ratio
+    :math:`\tau = r_t / r_s`:
+
+    .. math::
+
+        \rho(r) = \frac{\rho_s}{(r/r_s)(1 + r/r_s)^2}
+                  \left(\frac{\tau^2}{\tau^2 + (r/r_s)^2}\right)
+
+    where :math:`r_s` is the scale radius and :math:`\rho_s` is related to the
+    dimensionless convergence normalisation via
+    :math:`\kappa_s = \rho_s r_s / \Sigma_{\rm crit}`.
+
+    The projected convergence is given by:
+
+    .. math::
+
+        \kappa(x) = 2 \kappa_s \, L(x, \tau)
+
+    where :math:`L(x, \tau)` is the auxiliary function defined in Baltz et al. (2009)
+    (implemented here as ``coord_func_l``).
+
+    References
+    ----------
+    - Baltz, Marshall & Oguri 2009, JCAP, 2009, 015  (arXiv:0705.0735)
+    - Navarro, Frenk & White 1997, ApJ, 490, 493
+    """
+
     def __init__(
         self,
         centre: Tuple[float, float] = (0.0, 0.0),
@@ -15,6 +46,20 @@ class NFWTruncatedSph(AbstractgNFW):
         scale_radius: float = 1.0,
         truncation_radius: float = 2.0,
     ):
+        r"""
+        Parameters
+        ----------
+        centre
+            The (y,x) arc-second coordinates of the profile centre.
+        kappa_s
+            The dimensionless convergence normalisation
+            (:math:`\kappa_s = \rho_s r_s / \Sigma_{\rm crit}`).
+        scale_radius
+            The NFW scale radius :math:`r_s`, as an angle on the sky in arcseconds.
+        truncation_radius
+            The truncation radius :math:`r_t`, as an angle on the sky in arcseconds.
+            The dimensionless truncation ratio is :math:`\tau = r_t / r_s`.
+        """
         super().__init__(
             centre=centre,
             ell_comps=(0.0, 0.0),

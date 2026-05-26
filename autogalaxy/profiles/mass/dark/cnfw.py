@@ -9,6 +9,29 @@ import autoarray as aa
 
 
 class cNFW(AbstractgNFW):
+    r"""
+    Elliptical cored NFW (cNFW) dark matter halo profile.
+
+    The three-dimensional density profile introduces a constant-density core of
+    radius :math:`r_c` that suppresses the central cusp of the standard NFW profile:
+
+    .. math::
+
+        \rho(r) = \frac{\rho_0 \, r_s^3}{(r + r_c)(r + r_s)^2}
+
+    where :math:`r_c` is the core radius (``core_radius``) and :math:`r_s` is the
+    scale radius (``scale_radius``).  In the limit :math:`r_c \to 0` the profile
+    approaches the standard NFW density.
+
+    The convergence and deflection angles are computed via a Multi-Gaussian
+    Expansion (MGE) decomposition following Shajib (2019).
+
+    References
+    ----------
+    - Read, Agertz & Collins 2016, MNRAS, 459, 2573
+    - Shajib 2019, MNRAS, 488, 1387  (arXiv:1906.08263)
+    """
+
     def __init__(
             self,
             centre: Tuple[float, float] = (0.0, 0.0),
@@ -17,9 +40,7 @@ class cNFW(AbstractgNFW):
             scale_radius: float = 1.0,
             core_radius: float = 0.01,
     ):
-        """
-        Represents a cored NFW density distribution
-
+        r"""
         Parameters
         ----------
         centre
@@ -28,11 +49,11 @@ class cNFW(AbstractgNFW):
             The first and second ellipticity components of the elliptical coordinate system.
         kappa_s
             The overall normalization of the dark matter halo
-            (kappa_s = (rho_0 * D_d * scale_radius)/lensing_critical_density)
+            (:math:`\kappa_s = \rho_0 D_d r_s / \Sigma_{\rm crit}`).
         scale_radius
-            The cored NFW scale radius `theta_s`, as an angle on the sky in arcseconds.
+            The cored NFW scale radius :math:`r_s`, as an angle on the sky in arcseconds.
         core_radius
-            The cored NFW core radius `theta_c`, as an angle on the sky in arcseconds.
+            The cored NFW core radius :math:`r_c`, as an angle on the sky in arcseconds.
         """
 
         super().__init__(centre=centre, ell_comps=ell_comps)
@@ -103,6 +124,22 @@ class cNFW(AbstractgNFW):
 
 
 class cNFWSph(cNFW):
+    r"""
+    Spherical cored NFW (cNFW) dark matter halo profile.
+
+    A special case of :class:`cNFW` with no ellipticity (:math:`q = 1`).  The 3-D
+    density and projected convergence follow the same cored-NFW expressions with
+    an analytic deflection-angle formula available for the spherical case:
+
+    .. math::
+
+        \rho(r) = \frac{\rho_0 \, r_s^3}{(r + r_c)(r + r_s)^2}
+
+    References
+    ----------
+    - Read, Agertz & Collins 2016, MNRAS, 459, 2573
+    """
+
     def __init__(
         self,
         centre: Tuple[float, float] = (0.0, 0.0),
@@ -110,20 +147,18 @@ class cNFWSph(cNFW):
         scale_radius: float = 1.0,
         core_radius: float = 0.01,
     ):
-        """
-        Represents a spherical cored NFW density distribution
-
+        r"""
         Parameters
         ----------
         centre
             The (y,x) arc-second coordinates of the profile centre.
         kappa_s
             The overall normalization of the dark matter halo
-            (kappa_s = (rho_0 * D_d * scale_radius)/lensing_critical_density)
+            (:math:`\kappa_s = \rho_0 D_d r_s / \Sigma_{\rm crit}`).
         scale_radius
-            The cored NFW scale radius `theta_s`, as an angle on the sky in arcseconds.
+            The cored NFW scale radius :math:`r_s`, as an angle on the sky in arcseconds.
         core_radius
-            The cored NFW core radius `theta_c`, as an angle on the sky in arcseconds.
+            The cored NFW core radius :math:`r_c`, as an angle on the sky in arcseconds.
         """
 
         super().__init__(centre=centre, ell_comps=(0.0, 0.0))

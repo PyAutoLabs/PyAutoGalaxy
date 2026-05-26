@@ -83,6 +83,34 @@ def cse_settings_from(
 
 
 class AbstractSersic(MassProfile, MassProfileCSE, StellarProfile):
+    r"""
+    Abstract base class for Sérsic stellar mass profiles.
+
+    The convergence of a Sérsic mass profile is proportional to the Sérsic surface
+    brightness profile scaled by a constant mass-to-light ratio:
+
+    .. math::
+
+        \kappa(R) = \Upsilon \, I_e \exp\!\left\{
+            -b_n \left[\left(\frac{R}{R_e}\right)^{1/n} - 1\right]
+        \right\}
+
+    where :math:`\Upsilon` is the mass-to-light ratio (``mass_to_light_ratio``),
+    :math:`I_e` is the intensity at the effective radius (``intensity``),
+    :math:`R_e` is the effective (half-light) radius (``effective_radius``), :math:`n` is
+    the Sérsic index (``sersic_index``), and :math:`b_n` is a constant that ensures the
+    effective radius encloses half the total luminosity (approximated by a polynomial in
+    :math:`n`).
+
+    Deflection angles are computed via a cored-steep-ellipsoid (CSE) decomposition
+    following Oguri (2021).
+
+    References
+    ----------
+    - Sérsic 1963, Boletin de la Asociacion Argentina de Astronomia, 6, 41
+    - Oguri 2021, PASP, 133, 074504  (arXiv:2106.11464)
+    """
+
     def __init__(
         self,
         centre: Tuple[float, float] = (0.0, 0.0),
@@ -92,10 +120,7 @@ class AbstractSersic(MassProfile, MassProfileCSE, StellarProfile):
         sersic_index: float = 0.6,
         mass_to_light_ratio: float = 1.0,
     ):
-        """
-        The Sersic mass profile, the mass profiles of the light profiles that are used to fit and subtract the lens \
-        model_galaxy's light.
-
+        r"""
         Parameters
         ----------
         centre
@@ -103,13 +128,15 @@ class AbstractSersic(MassProfile, MassProfileCSE, StellarProfile):
         ell_comps
             The first and second ellipticity components of the elliptical coordinate system.
         intensity
-            Overall flux intensity normalisation in the light profiles (electrons per second).
+            Overall intensity normalisation :math:`I_e` at the effective radius
+            (electrons per second).
         effective_radius
-            The radius containing half the light of this profile.
+            The effective (half-light) radius :math:`R_e` in arcseconds.
         sersic_index
-            Controls the concentration of the profile (lower -> less concentrated, higher -> more concentrated).
+            The Sérsic index :math:`n` controlling profile concentration
+            (lower -> less concentrated, higher -> more concentrated).
         mass_to_light_ratio
-            The mass-to-light ratio of the light profiles
+            The mass-to-light ratio :math:`\Upsilon` in solar units.
         """
         super(AbstractSersic, self).__init__(centre=centre, ell_comps=ell_comps)
         super(MassProfile, self).__init__(centre=centre, ell_comps=ell_comps)
@@ -307,10 +334,49 @@ class AbstractSersic(MassProfile, MassProfileCSE, StellarProfile):
 
 
 class Sersic(AbstractSersic, MassProfileCSE):
+    r"""
+    Elliptical Sérsic stellar mass profile.
+
+    Inherits the full Sérsic convergence and CSE deflection-angle machinery from
+    :class:`AbstractSersic`.  The convergence is:
+
+    .. math::
+
+        \kappa(R) = \Upsilon \, I_e \exp\!\left\{
+            -b_n \left[\left(\frac{R}{R_e}\right)^{1/n} - 1\right]
+        \right\}
+
+    where :math:`R` is the elliptical radius, :math:`\Upsilon` is the mass-to-light
+    ratio, :math:`I_e` is the intensity at the effective radius :math:`R_e`, and
+    :math:`b_n` is determined from the Sérsic index :math:`n`.
+
+    References
+    ----------
+    - Sérsic 1963, Boletin de la Asociacion Argentina de Astronomia, 6, 41
+    - Oguri 2021, PASP, 133, 074504  (arXiv:2106.11464)
+    """
+
     pass
 
 
 class SersicSph(Sersic):
+    r"""
+    Spherical Sérsic stellar mass profile.
+
+    A special case of :class:`Sersic` with no ellipticity (:math:`q = 1`).  The
+    convergence is evaluated on a circular radial grid:
+
+    .. math::
+
+        \kappa(r) = \Upsilon \, I_e \exp\!\left\{
+            -b_n \left[\left(\frac{r}{R_e}\right)^{1/n} - 1\right]
+        \right\}
+
+    References
+    ----------
+    - Sérsic 1963, Boletin de la Asociacion Argentina de Astronomia, 6, 41
+    """
+
     def __init__(
         self,
         centre: Tuple[float, float] = (0.0, 0.0),
@@ -319,22 +385,21 @@ class SersicSph(Sersic):
         sersic_index: float = 0.6,
         mass_to_light_ratio: float = 1.0,
     ):
-        """
-        The Sersic mass profile, the mass profiles of the light profiles that are used to fit and subtract the lens
-        model_galaxy's light.
-
+        r"""
         Parameters
         ----------
         centre
-            The (y,x) arc-second coordinates of the profile centre
+            The (y,x) arc-second coordinates of the profile centre.
         intensity
-            Overall flux intensity normalisation in the light profiles (electrons per second)
+            Overall intensity normalisation :math:`I_e` at the effective radius
+            (electrons per second).
         effective_radius
-            The circular radius containing half the light of this profile.
+            The effective (half-light) radius :math:`R_e` in arcseconds.
         sersic_index
-            Controls the concentration of the profile (lower -> less concentrated, higher -> more concentrated).
+            The Sérsic index :math:`n` controlling profile concentration
+            (lower -> less concentrated, higher -> more concentrated).
         mass_to_light_ratio
-            The mass-to-light ratio of the light profile.
+            The mass-to-light ratio :math:`\Upsilon` in solar units.
         """
         super().__init__(
             centre=centre,

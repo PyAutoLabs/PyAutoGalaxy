@@ -8,18 +8,43 @@ from autogalaxy.profiles.mass.abstract.abstract import MassProfile
 
 
 class PointMass(MassProfile):
+    r"""
+    Point mass lens profile.
+
+    A point mass produces a convergence that is a Dirac delta function at the lens
+    centre, a logarithmic potential, and a deflection angle that falls off as
+    :math:`1/r`:
+
+    .. math::
+
+        \kappa(\boldsymbol{\theta}) = \pi \theta_E^2 \, \delta^{(2)}(\boldsymbol{\theta})
+
+    .. math::
+
+        \psi(\boldsymbol{\theta}) = \theta_E^2 \ln r
+
+    .. math::
+
+        \boldsymbol{\alpha}(\boldsymbol{\theta}) = \frac{\theta_E^2}{r}\,\hat{r}
+
+    where :math:`\theta_E` is the Einstein radius (``einstein_radius``) and :math:`r`
+    is the angular distance from the lens centre.
+
+    This profile is used to represent compact objects such as black holes or stars.
+    In practice the convergence grid value at the centre pixel is set to zero; the
+    point-mass nature is captured entirely through the deflection and potential.
+    """
+
     def __init__(
         self, centre: Tuple[float, float] = (0.0, 0.0), einstein_radius: float = 1.0
     ):
-        """
-        Represents a point-mass.
-
+        r"""
         Parameters
         ----------
         centre
             The (y,x) arc-second coordinates of the profile centre.
         einstein_radius
-            The arc-second Einstein radius of the point-mass.
+            The Einstein radius :math:`\theta_E` of the point mass (arcseconds).
         """
         super().__init__(centre=centre, ell_comps=(0.0, 0.0))
         self.einstein_radius = einstein_radius

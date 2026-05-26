@@ -8,6 +8,38 @@ from autogalaxy.profiles.mass import MGEDecomposer
 
 
 class gNFW(AbstractgNFW):
+    r"""
+    Elliptical generalised NFW (gNFW) dark matter halo profile with a free inner slope.
+
+    The three-dimensional density profile is:
+
+    .. math::
+
+        \rho(r) = \frac{\rho_s}{(r/r_s)^{\gamma}(1 + r/r_s)^{3-\gamma}}
+
+    where :math:`\gamma` is the inner logarithmic slope (``inner_slope``).  For
+    :math:`\gamma = 1` this reduces to the standard :class:`NFW` profile.
+
+    The projected convergence is computed by numerical line-of-sight integration:
+
+    .. math::
+
+        \kappa(\xi) = 2 \kappa_s \, (\xi/r_s)^{1-\gamma}
+        \left[
+            (1 + \xi/r_s)^{\gamma-3}
+            + (3 - \gamma) \int_0^1 \frac{(y + \xi/r_s)^{\gamma-4}
+            \left(1 - \sqrt{1 - y^2}\right)}{1} \, \mathrm{d}y
+        \right]
+
+    Deflection angles are computed via a Multi-Gaussian Expansion (MGE) decomposition
+    following Shajib (2019).
+
+    References
+    ----------
+    - Wyithe, Turner & Spergel 2001, ApJ, 555, 504
+    - Shajib 2019, MNRAS, 488, 1387  (arXiv:1906.08263)
+    """
+
     def deflections_yx_2d_from(self, grid: aa.type.Grid2DLike, xp=np, **kwargs):
         return self.deflections_2d_via_mge_from(grid=grid, xp=xp, **kwargs)
 
@@ -60,6 +92,22 @@ class gNFW(AbstractgNFW):
 
 
 class gNFWSph(gNFW):
+    r"""
+    Spherical generalised NFW (gNFW) dark matter halo profile with a free inner slope.
+
+    A special case of :class:`gNFW` with no ellipticity (:math:`q = 1`).  The 3-D
+    density and projected convergence follow the same gNFW expressions as the
+    elliptical variant but evaluated on a circular radial grid.
+
+    .. math::
+
+        \rho(r) = \frac{\rho_s}{(r/r_s)^{\gamma}(1 + r/r_s)^{3-\gamma}}
+
+    References
+    ----------
+    - Wyithe, Turner & Spergel 2001, ApJ, 555, 504
+    """
+
     def __init__(
         self,
         centre: Tuple[float, float] = (0.0, 0.0),
@@ -67,21 +115,18 @@ class gNFWSph(gNFW):
         inner_slope: float = 1.0,
         scale_radius: float = 1.0,
     ):
-        """
-        The spherical NFW profiles, used to fit the dark matter halo of the lens.
-
+        r"""
         Parameters
         ----------
         centre
             The (y,x) arc-second coordinates of the profile centre.
         kappa_s
-            The overall normalization of the dark matter halo \
-            (kappa_s = (rho_s * scale_radius)/lensing_critical_density)
+            The overall normalization of the dark matter halo
+            (:math:`\kappa_s = \rho_s r_s / \Sigma_{\rm crit}`).
         inner_slope
-            The inner slope of the dark matter halo.
+            The inner logarithmic slope :math:`\gamma` of the dark matter density profile.
         scale_radius
-            The arc-second radius where the average density within this radius is 200 times the critical density of \
-            the Universe..
+            The NFW scale radius :math:`r_s`, as an angle on the sky in arcseconds.
         """
 
         super().__init__(

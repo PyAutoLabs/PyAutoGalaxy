@@ -7,6 +7,48 @@ from autogalaxy.profiles.mass.abstract.abstract import MassProfile
 
 
 class PowerLawBroken(MassProfile):
+    r"""Broken elliptical power-law mass profile with inner and outer slopes.
+
+    The convergence has a power-law form with different slopes inside and
+    outside a break radius :math:`\theta_{\rm b}`, matched to be continuous
+    at the break:
+
+    .. math::
+
+        \kappa(R) = \begin{cases}
+            \kappa_{\rm b}
+            \left(\dfrac{\theta_{\rm b}}{R}\right)^{\gamma_{\rm in}}
+            & R \leq \theta_{\rm b} \\[6pt]
+            \kappa_{\rm b}
+            \left(\dfrac{\theta_{\rm b}}{R}\right)^{\gamma_{\rm out}}
+            & R > \theta_{\rm b}
+        \end{cases}
+
+    where :math:`\gamma_{\rm in}` and :math:`\gamma_{\rm out}` are the inner and
+    outer logarithmic slopes, :math:`\theta_{\rm b}` is the break radius, and
+    :math:`\kappa_{\rm b}` is the convergence at the break radius (set by the
+    normalisation condition on the Einstein radius).
+
+    Parameters
+    ----------
+    centre : (float, float)
+        (y, x) arc-second coordinates of the profile centre.
+    ell_comps : (float, float)
+        Ellipticity components (e1, e2) of the elliptical coordinate system.
+    einstein_radius : float
+        Einstein radius in arcseconds.
+    inner_slope : float
+        Logarithmic density slope :math:`\gamma_{\rm in}` inside the break radius.
+    outer_slope : float
+        Logarithmic density slope :math:`\gamma_{\rm out}` outside the break radius.
+    break_radius : float
+        Break radius :math:`\theta_{\rm b}` in arcseconds separating the two power-law regimes.
+
+    References
+    ----------
+    Du, Metcalf & Barkana (2020), MNRAS, 495, 4209.
+    """
+
     def __init__(
         self,
         centre: Tuple[float, float] = (0.0, 0.0),
@@ -173,6 +215,43 @@ class PowerLawBroken(MassProfile):
 
 
 class PowerLawBrokenSph(PowerLawBroken):
+    r"""Broken spherical power-law mass profile with inner and outer slopes.
+
+    The spherical limit of :class:`PowerLawBroken`.  The convergence is:
+
+    .. math::
+
+        \kappa(r) = \begin{cases}
+            \kappa_{\rm b}
+            \left(\dfrac{\theta_{\rm b}}{r}\right)^{\gamma_{\rm in}}
+            & r \leq \theta_{\rm b} \\[6pt]
+            \kappa_{\rm b}
+            \left(\dfrac{\theta_{\rm b}}{r}\right)^{\gamma_{\rm out}}
+            & r > \theta_{\rm b}
+        \end{cases}
+
+    where :math:`r` is the circular projected radius, :math:`\theta_{\rm b}` is
+    the break radius, and :math:`\kappa_{\rm b}` is the convergence at the
+    break radius.
+
+    Parameters
+    ----------
+    centre : (float, float)
+        (y, x) arc-second coordinates of the profile centre.
+    einstein_radius : float
+        Einstein radius in arcseconds.
+    inner_slope : float
+        Logarithmic density slope :math:`\gamma_{\rm in}` inside the break radius.
+    outer_slope : float
+        Logarithmic density slope :math:`\gamma_{\rm out}` outside the break radius.
+    break_radius : float
+        Break radius :math:`\theta_{\rm b}` in arcseconds separating the two power-law regimes.
+
+    References
+    ----------
+    Du, Metcalf & Barkana (2020), MNRAS, 495, 4209.
+    """
+
     def __init__(
         self,
         centre: Tuple[float, float] = (0.0, 0.0),

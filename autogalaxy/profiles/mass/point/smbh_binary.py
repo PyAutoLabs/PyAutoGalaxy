@@ -8,6 +8,34 @@ from autogalaxy.profiles.mass.point.smbh import SMBH
 
 
 class SMBHBinary(MassProfile):
+    r"""
+    Binary supermassive black hole (SMBH) system modelled as two point masses.
+
+    The binary is represented by two :class:`SMBH` mass profiles placed symmetrically
+    about the system ``centre``.  The total mass :math:`M_{\rm tot}` and mass ratio
+    :math:`q_m` determine the individual masses:
+
+    .. math::
+
+        M_0 = M_{\rm tot} \frac{q_m}{1 + q_m}, \qquad
+        M_1 = M_{\rm tot} \frac{1}{1 + q_m}
+
+    Each component follows the point-mass lensing law:
+
+    .. math::
+
+        \boldsymbol{\alpha}_i(\boldsymbol{\theta}) =
+            \frac{\theta_{E,i}^2}{|\boldsymbol{\theta} - \boldsymbol{\theta}_i|}\,
+            \hat{r}_i
+
+    The total deflection, convergence, and potential are the sum of the two individual
+    :class:`SMBH` contributions.
+
+    This profile is used to model the lensing effect of SMBH binaries expected to
+    form following galaxy mergers, whose gravitational influence can perturb the
+    positions of images near the nucleus.
+    """
+
     def __init__(
         self,
         centre: Tuple[float, float] = (0.0, 0.0),
@@ -18,29 +46,24 @@ class SMBHBinary(MassProfile):
         redshift_object: float = 0.5,
         redshift_source: float = 1.0,
     ):
-        """
-        Represents a supermassive black hole (SMBH) binary (e.g. two merging SMBH's at the centre of a galaxy).
-
-        This uses two `SMBH` mass profiles to represent the SMBHs.
-
+        r"""
         Parameters
         ----------
         centre
-            The (y,x) arc-second coordinates of centre of the SMBH binary, defined as the mid-point between the
-            two SMBHs.
+            The (y,x) arc-second coordinates of the binary mid-point.
         separation
-            The arc-second separation between the two SMBHs.
+            The angular separation between the two SMBHs in arcseconds.
         angle_binary
-            The angle between the two SMBHs relative to the positive x-axis of the centre of the SMBH binary.
+            The orientation angle of the binary axis relative to the positive
+            x-axis (degrees, anticlockwise).
         mass
-            The sum of the masses of the two SMBHs in solar masses.
+            The total mass of the binary system in solar masses :math:`M_\odot`.
         mass_ratio
-            The ratio of the mass of the second SMBH to the first SMBH. A mass ratio of 2.0 gives two SMBHs where
-            the first SMBH has twice the mass of the second SMBH.
+            The mass ratio :math:`q_m = M_0 / M_1` (:math:`q_m \geq 1` by convention).
         redshift_object
-            The redshift of the SMBH, which is used to convert its mass to an Einstein radius.
+            The redshift of the SMBH binary (lens plane).
         redshift_source
-            The redshift of the source galaxy, which is used to convert the mass of the SMBH to an Einstein radius.
+            The redshift of the lensed source galaxy.
         """
 
         self.separation = separation

@@ -4,6 +4,36 @@ from typing import Callable, List, Tuple
 
 
 class MassProfileCSE(ABC):
+    r"""
+    Cored Steep Ellipsoid (CSE) decomposition mixin for mass profiles.
+
+    Provides the machinery to decompose an arbitrary projected convergence profile into
+    a sum of cored steep ellipsoid (CSE) basis functions, enabling analytic deflection
+    angle evaluation via Oguri (2021).
+
+    The 1-D CSE convergence basis function (Oguri 2021 Eq. 14) is:
+
+    .. math::
+
+        \kappa_{\rm CSE}(r; s) = \frac{1}{2(s^2 + r^2)^{3/2}}
+
+    where :math:`s` is the CSE core radius.  An arbitrary convergence profile
+    :math:`\kappa(r)` is approximated as:
+
+    .. math::
+
+        \kappa(r) \approx \sum_{j} A_j \, \kappa_{\rm CSE}(r; s_j)
+
+    The amplitudes :math:`A_j` and core radii :math:`s_j` are found by linear least
+    squares on a log-spaced radial grid.  The deflection angles of each CSE component
+    are computed analytically from Oguri (2021) Eq. 19–20, and the total deflection is
+    their sum.
+
+    References
+    ----------
+    - Oguri 2021, PASP, 133, 074504  (arXiv:2106.11464)
+    """
+
     @staticmethod
     def convergence_cse_1d_from(
         grid_radii: np.ndarray, core_radius: float, xp=np

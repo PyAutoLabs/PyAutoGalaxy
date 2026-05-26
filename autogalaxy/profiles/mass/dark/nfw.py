@@ -10,6 +10,42 @@ from autogalaxy.profiles.mass.dark import nfw_hk24_util
 
 
 class NFW(gNFW, MassProfileCSE):
+    r"""
+    Elliptical Navarro-Frenk-White (NFW) dark matter halo profile.
+
+    The NFW profile is the special case of the generalised NFW with inner slope
+    :math:`\gamma = 1`.  The projected surface mass density (convergence) is:
+
+    .. math::
+
+        \kappa_{\rm NFW}(x) = 2 \kappa_s \, g(x), \qquad x = \frac{\xi}{r_s}
+
+    where :math:`\xi` is the elliptical radius, :math:`r_s` is the scale radius,
+    :math:`\kappa_s = \rho_s r_s / \Sigma_{\rm crit}` is the dimensionless
+    characteristic convergence, and
+
+    .. math::
+
+        g(x) = \begin{cases}
+            \dfrac{1 - \tfrac{1}{\sqrt{1-x^2}}\,\mathrm{arccosh}(1/x)}{x^2 - 1}
+            & x < 1 \\[6pt]
+            \dfrac{1}{3} & x = 1 \\[6pt]
+            \dfrac{1 - \tfrac{1}{\sqrt{x^2-1}}\,\arccos(1/x)}{x^2 - 1}
+            & x > 1
+        \end{cases}
+
+    Deflection angles are computed analytically via the Heyrovský & Karamazov (2024)
+    formalism, or alternatively via a cored-steep-ellipsoid (CSE) decomposition
+    following Oguri (2021).
+
+    References
+    ----------
+    - Navarro, Frenk & White 1996, ApJ, 462, 563
+    - Navarro, Frenk & White 1997, ApJ, 490, 493
+    - Oguri 2021, PASP, 133, 074504  (arXiv:2106.11464)
+    - Heyrovský & Karamazov 2024 (arXiv:2407.xxxxx)
+    """
+
     def __init__(
         self,
         centre: Tuple[float, float] = (0.0, 0.0),
@@ -18,8 +54,6 @@ class NFW(gNFW, MassProfileCSE):
         scale_radius: float = 1.0,
     ):
         r"""
-        The elliptical NFW profiles, used to fit the dark matter halo of the lens.
-
         Parameters
         ----------
         centre
@@ -27,10 +61,10 @@ class NFW(gNFW, MassProfileCSE):
         ell_comps
             The first and second ellipticity components of the elliptical coordinate system.
         kappa_s
-            The overall normalization of the dark matter halo \|
-            (kappa_s = (rho_s * scale_radius)/lensing_critical_density)
+            The overall normalization of the dark matter halo
+            (:math:`\kappa_s = \rho_s r_s / \Sigma_{\rm crit}`).
         scale_radius
-            The NFW scale radius `r_s`, as an angle on the sky in arcseconds.
+            The NFW scale radius :math:`r_s`, as an angle on the sky in arcseconds.
         """
 
         super().__init__(
@@ -267,6 +301,32 @@ class NFW(gNFW, MassProfileCSE):
 
 
 class NFWSph(NFW):
+    r"""
+    Spherical Navarro-Frenk-White (NFW) dark matter halo profile.
+
+    A special case of :class:`NFW` with no ellipticity (:math:`q = 1`).  The convergence
+    is the standard NFW convergence evaluated on a circular radial grid:
+
+    .. math::
+
+        \kappa_{\rm NFW}(r) = 2 \kappa_s \, g(r/r_s)
+
+    and the analytic deflection angle at projected radius :math:`r` is:
+
+    .. math::
+
+        \alpha(r) = \frac{4 \kappa_s r_s}{r/r_s}\,h(r/r_s)
+
+    where :math:`h(x) = \ln(x/2) + f(x)` and :math:`f(x)` is the standard NFW
+    auxiliary function.  The lensing potential is also available analytically.
+
+    References
+    ----------
+    - Navarro, Frenk & White 1996, ApJ, 462, 563
+    - Navarro, Frenk & White 1997, ApJ, 490, 493
+    - Wright & Brainerd 2000, ApJ, 534, 34
+    """
+
     def __init__(
         self,
         centre: Tuple[float, float] = (0.0, 0.0),
@@ -274,18 +334,15 @@ class NFWSph(NFW):
         scale_radius: float = 1.0,
     ):
         r"""
-        The spherical NFW profiles, used to fit the dark matter halo of the lens.
-
         Parameters
         ----------
         centre
             The (y,x) arc-second coordinates of the profile centre.
         kappa_s
-            The overall normalization of the dark matter halo \
-            (kappa_s = (rho_s * scale_radius)/lensing_critical_density)
+            The overall normalization of the dark matter halo
+            (:math:`\kappa_s = \rho_s r_s / \Sigma_{\rm crit}`).
         scale_radius
-            The arc-second radius where the average density within this radius is 200 times the critical density of \
-            the Universe..
+            The NFW scale radius :math:`r_s`, as an angle on the sky in arcseconds.
         """
 
         super().__init__(
