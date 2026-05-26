@@ -108,7 +108,7 @@ class NFW(gNFW, MassProfileCSE):
     @aa.decorators.to_vector_yx
     @aa.decorators.transform(rotate_back=True)
     def deflections_2d_via_cse_from(self, grid: aa.type.Grid2DLike, xp=np, **kwargs):
-        return self._deflections_2d_via_cse_from(grid=grid, **kwargs)
+        return self._deflections_2d_via_cse_from(grid=grid, xp=xp, **kwargs)
 
     @aa.over_sample
     @aa.decorators.to_array
@@ -130,7 +130,7 @@ class NFW(gNFW, MassProfileCSE):
 
         elliptical_radii = self.elliptical_radii_grid_from(grid=grid, xp=xp, **kwargs)
 
-        return self._convergence_2d_via_cse_from(grid_radii=elliptical_radii)
+        return self._convergence_2d_via_cse_from(grid_radii=elliptical_radii, xp=xp)
 
     def convergence_func(self, grid_radius: float, xp=np) -> float:
         grid_radius = (1.0 / self.scale_radius) * grid_radius.array + 0j
