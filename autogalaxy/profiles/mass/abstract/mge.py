@@ -531,6 +531,8 @@ class MGEDecomposer:
 
         t_vals = 0.5 * (1.0 + gl_nodes)
 
+        factors = amps * sigmas_scaled * xp.sqrt(2.0 * xp.pi / (1.0 - q * q))
+
         potential = xp.zeros(n_pts, dtype=xp.float64)
 
         for k in range(n_quad):
@@ -539,23 +541,16 @@ class MGEDecomposer:
                 values=xp.stack([t * y, t * x], axis=-1)
             )
 
-            defl_at_t = xp.zeros((n_pts, 2), dtype=xp.float64)
-            for j in range(len(amps)):
-                sigma_j = sigmas_scaled[j]
-                amp_j = amps[j]
-                factor = amp_j * sigma_j * xp.sqrt(2.0 * xp.pi / (1.0 - q * q))
+            zeta = self.zeta_from(
+                grid=scaled_grid,
+                sigma_log_list=sigmas_scaled,
+                xp=xp,
+            )
 
-                zeta_j = self.zeta_from(
-                    grid=scaled_grid,
-                    sigma_log_list=xp.array([sigma_j]),
-                    xp=xp,
-                )[0]
+            defl_y = xp.sum(-factors[:, None] * xp.imag(zeta), axis=0)
+            defl_x = xp.sum(factors[:, None] * xp.real(zeta), axis=0)
 
-                defl_at_t[:, 0] += -factor * xp.imag(zeta_j)
-                defl_at_t[:, 1] += factor * xp.real(zeta_j)
-
-            dot = defl_at_t[:, 0] * y + defl_at_t[:, 1] * x
-            potential += 0.5 * gl_weights[k] * dot
+            potential += 0.5 * gl_weights[k] * (defl_y * y + defl_x * x)
 
         return potential
 
