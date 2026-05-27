@@ -8,6 +8,73 @@ from autogalaxy.profiles.mass.abstract.mge import MGEDecomposer
 import autoarray as aa
 
 
+def F_func_from(theta, radius, xp=np):
+    F = theta * 0.0
+
+    mask1 = (theta > 0) & (theta <= radius)
+    mask2 = theta > radius
+
+    F = xp.where(
+        mask1,
+        (
+            radius / 2 * xp.log(2 * radius / theta)
+            - xp.sqrt(radius**2 - theta**2)
+            * xp.arctanh(xp.sqrt((radius - theta) / (radius + theta)))
+        ),
+        F,
+    )
+
+    F = xp.where(
+        mask2,
+        (
+            radius / 2 * xp.log(2 * radius / theta)
+            + xp.sqrt(theta**2 - radius**2)
+            * xp.arctan(xp.sqrt((theta - radius) / (theta + radius)))
+        ),
+        F,
+    )
+
+    return 2 * radius * F
+
+
+def dev_F_func_from(theta, radius, xp=np):
+    dev_F = theta * 0.0
+
+    mask1 = (theta > 0) & (theta < radius)
+    mask2 = theta == radius
+    mask3 = theta > radius
+
+    dev_F = xp.where(
+        mask1,
+        (
+            radius * xp.log(2 * radius / theta)
+            - (2 * radius**2 - theta**2)
+            / xp.sqrt(radius**2 - theta**2)
+            * xp.arctanh(xp.sqrt((radius - theta) / (radius + theta)))
+        ),
+        dev_F,
+    )
+
+    dev_F = xp.where(
+        mask2,
+        radius * (xp.log(2) - 1 / 2),
+        dev_F,
+    )
+
+    dev_F = xp.where(
+        mask3,
+        (
+            radius * xp.log(2 * radius / theta)
+            + (theta**2 - 2 * radius**2)
+            / xp.sqrt(theta**2 - radius**2)
+            * xp.arctan(xp.sqrt((theta - radius) / (theta + radius)))
+        ),
+        dev_F,
+    )
+
+    return 2 * dev_F
+
+
 class cNFW(AbstractgNFW):
     r"""
     Elliptical cored NFW (cNFW) dark matter halo profile.
@@ -211,71 +278,26 @@ class cNFWSph(cNFW):
         )
 
     def F_func(self, theta, radius, xp=np):
-
-        F = theta * 0.0
-
-        mask1 = (theta > 0) & (theta <= radius)
-        mask2 = theta > radius
-
-        F = xp.where(
-            mask1,
-            (
-                radius / 2 * xp.log(2 * radius / theta)
-                - xp.sqrt(radius**2 - theta**2)
-                * xp.arctanh(xp.sqrt((radius - theta) / (radius + theta)))
-            ),
-            F,
-        )
-
-        F = xp.where(
-            mask2,
-            (
-                radius / 2 * xp.log(2 * radius / theta)
-                + xp.sqrt(theta**2 - radius**2)
-                * xp.arctan(xp.sqrt((theta - radius) / (theta + radius)))
-            ),
-            F,
-        )
-
-        return 2 * radius * F
+        return F_func_from(theta, radius, xp=xp)
 
     def dev_F_func(self, theta, radius, xp=np):
+        return dev_F_func_from(theta, radius, xp=xp)
 
-        dev_F = theta * 0.0
-
-        mask1 = (theta > 0) & (theta < radius)
-        mask2 = theta == radius
-        mask3 = theta > radius
-
-        dev_F = xp.where(
-            mask1,
-            (
-                radius * xp.log(2 * radius / theta)
-                - (2 * radius**2 - theta**2)
-                / xp.sqrt(radius**2 - theta**2)
-                * xp.arctanh(xp.sqrt((radius - theta) / (radius + theta)))
-            ),
-            dev_F,
+    @staticmethod
+    def radial_deflection_from(r, params, xp):
+        kappa_s, scale_radius, core_radius = params[0], params[1], params[2]
+        theta = xp.maximum(r, 1e-8)
+        factor = 4.0 * kappa_s * scale_radius**2
+        return (
+            factor
+            * (
+                F_func_from(theta, scale_radius, xp=xp)
+                - F_func_from(theta, core_radius, xp=xp)
+                - (scale_radius - core_radius)
+                * dev_F_func_from(theta, scale_radius, xp=xp)
+            )
+            / (theta * (scale_radius - core_radius) ** 2)
         )
-
-        dev_F = xp.where(
-            mask2,
-            radius * (xp.log(2) - 1 / 2),
-            dev_F,
-        )
-
-        dev_F = xp.where(
-            mask3,
-            (
-                radius * xp.log(2 * radius / theta)
-                + (theta**2 - 2 * radius**2)
-                / xp.sqrt(theta**2 - radius**2)
-                * xp.arctan(xp.sqrt((theta - radius) / (theta + radius)))
-            ),
-            dev_F,
-        )
-
-        return 2 * dev_F
 
     @aa.over_sample
     @aa.decorators.to_array

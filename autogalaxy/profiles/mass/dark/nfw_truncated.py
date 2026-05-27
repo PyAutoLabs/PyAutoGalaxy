@@ -4,7 +4,31 @@ from typing import Optional, Tuple
 import autoarray as aa
 
 from autogalaxy.cosmology.model import LensingCosmology
-from autogalaxy.profiles.mass.dark.abstract import AbstractgNFW
+from autogalaxy.profiles.mass.dark.abstract import AbstractgNFW, coord_func_f_from
+
+
+def coord_func_k_from(grid_radius, tau, xp=np):
+    return xp.log(
+        xp.divide(
+            grid_radius,
+            xp.sqrt(xp.square(grid_radius) + xp.square(tau)) + tau,
+        )
+    )
+
+
+def coord_func_m_from(grid_radius, tau, xp=np):
+    f_r = coord_func_f_from(grid_radius=grid_radius, xp=xp)
+    k_r = coord_func_k_from(grid_radius=grid_radius, tau=tau, xp=xp)
+
+    return (tau**2.0 / (tau**2.0 + 1.0) ** 2.0) * (
+        ((tau**2.0 + 2.0 * grid_radius**2.0 - 1.0) * f_r)
+        + (xp.pi * tau)
+        + ((tau**2.0 - 1.0) * xp.log(tau))
+        + (
+            xp.sqrt(grid_radius**2.0 + tau**2.0)
+            * (((tau**2.0 - 1.0) / tau) * k_r - xp.pi)
+        )
+    )
 
 
 class NFWTruncatedSph(AbstractgNFW):
@@ -123,12 +147,7 @@ class NFWTruncatedSph(AbstractgNFW):
         )
 
     def coord_func_k(self, grid_radius, xp=np):
-        return xp.log(
-            xp.divide(
-                grid_radius,
-                xp.sqrt(xp.square(grid_radius) + xp.square(self.tau)) + self.tau,
-            )
-        )
+        return coord_func_k_from(grid_radius, self.tau, xp=xp)
 
     def coord_func_l(self, grid_radius, xp=np):
         f_r = self.coord_func_f(grid_radius=grid_radius, xp=xp)
@@ -149,18 +168,15 @@ class NFWTruncatedSph(AbstractgNFW):
         )
 
     def coord_func_m(self, grid_radius, xp=np):
-        f_r = self.coord_func_f(grid_radius=grid_radius, xp=xp)
-        k_r = self.coord_func_k(grid_radius=grid_radius, xp=xp)
+        return coord_func_m_from(grid_radius, self.tau, xp=xp)
 
-        return (self.tau**2.0 / (self.tau**2.0 + 1.0) ** 2.0) * (
-            ((self.tau**2.0 + 2.0 * grid_radius**2.0 - 1.0) * f_r)
-            + (xp.pi * self.tau)
-            + ((self.tau**2.0 - 1.0) * xp.log(self.tau))
-            + (
-                xp.sqrt(grid_radius**2.0 + self.tau**2.0)
-                * (((self.tau**2.0 - 1.0) / self.tau) * k_r - xp.pi)
-            )
-        )
+    @staticmethod
+    def radial_deflection_from(r, params, xp):
+        kappa_s, scale_radius, truncation_radius = params[0], params[1], params[2]
+        eta = (r / scale_radius) + 0j
+        tau = truncation_radius / scale_radius
+        m = xp.real(coord_func_m_from(eta, tau, xp=xp))
+        return (4.0 * kappa_s * scale_radius / xp.real(eta)) * m
 
     @staticmethod
     def _delta_c_from_concentration(concentration: float) -> float:
