@@ -11,6 +11,7 @@ Fit an interferometer (ALMA/JVLA uv-plane) dataset with a model consisting of on
 5. Combine the profile visibilities and inversion reconstruction into ``model_data``.
 6. Compute residuals, chi-squared, and log-likelihood (or log-evidence when an inversion is used).
 """
+import functools
 import numpy as np
 from typing import Dict, List, Optional
 
@@ -90,7 +91,7 @@ class FitInterferometer(aa.FitInterferometer, AbstractFitInversion):
         self.adapt_images = adapt_images
         self.settings = settings or aa.Settings()
 
-    @property
+    @functools.cached_property
     def profile_visibilities(self) -> aa.Visibilities:
         """
         Returns the visibilities of every light profile of every galaxy, which are computed by performing
@@ -100,7 +101,7 @@ class FitInterferometer(aa.FitInterferometer, AbstractFitInversion):
             grid=self.grids.lp, transformer=self.dataset.transformer, xp=self._xp
         )
 
-    @property
+    @functools.cached_property
     def profile_subtracted_visibilities(self) -> aa.Visibilities:
         """
         Returns the interferometer dataset's visibilities with all transformed light profile images subtracted.
@@ -137,7 +138,7 @@ class FitInterferometer(aa.FitInterferometer, AbstractFitInversion):
         if self.perform_inversion:
             return self.galaxies_to_inversion.inversion
 
-    @property
+    @functools.cached_property
     def model_data(self) -> aa.Visibilities:
         """
         Returns the model data that is used to fit the data.
@@ -156,7 +157,7 @@ class FitInterferometer(aa.FitInterferometer, AbstractFitInversion):
 
         return self.profile_visibilities
 
-    @property
+    @functools.cached_property
     def galaxy_image_dict(self) -> Dict[Galaxy, np.ndarray]:
         """
         A dictionary which associates every galaxy with its `image`.
@@ -180,7 +181,7 @@ class FitInterferometer(aa.FitInterferometer, AbstractFitInversion):
 
         return {**galaxy_image_dict, **galaxy_linear_obj_image_dict}
 
-    @property
+    @functools.cached_property
     def galaxy_model_visibilities_dict(self) -> Dict[Galaxy, np.ndarray]:
         """
         A dictionary which associates every galaxy with its model visibilities.
@@ -204,7 +205,7 @@ class FitInterferometer(aa.FitInterferometer, AbstractFitInversion):
 
         return {**galaxy_model_visibilities_dict, **galaxy_linear_obj_data_dict}
 
-    @property
+    @functools.cached_property
     def model_visibilities_of_galaxies_list(self) -> List:
         """
         A list of the model visibilities of each galaxy.

@@ -14,6 +14,7 @@ Fit an imaging (CCD) dataset with a model consisting of one or more galaxies.
 When fitting a model via `AnalysisImaging`, the `figure_of_merit` property of `FitImaging` is
 evaluated inside `log_likelihood_function` and returned to the non-linear search.
 """
+import functools
 import numpy as np
 from typing import Dict, List, Optional
 
@@ -99,7 +100,7 @@ class FitImaging(aa.FitImaging, AbstractFitInversion):
         self.adapt_images = adapt_images
         self.settings = settings or aa.Settings()
 
-    @property
+    @functools.cached_property
     def blurred_image(self) -> aa.Array2D:
         """
         Returns the image of the light profiles of all galaxies in the fit, convolved with the imaging dataset's PSF.
@@ -123,7 +124,7 @@ class FitImaging(aa.FitImaging, AbstractFitInversion):
             xp=self._xp,
         )
 
-    @property
+    @functools.cached_property
     def profile_subtracted_image(self) -> aa.Array2D:
         """
         Returns the dataset's image data with all blurred light profile images in the fit subtracted.
@@ -169,7 +170,7 @@ class FitImaging(aa.FitImaging, AbstractFitInversion):
         if self.perform_inversion:
             return self.galaxies_to_inversion.inversion
 
-    @property
+    @functools.cached_property
     def model_data(self) -> aa.Array2D:
         """
         Returns the model-image that is used to fit the data.
@@ -187,7 +188,7 @@ class FitImaging(aa.FitImaging, AbstractFitInversion):
 
         return self.blurred_image
 
-    @property
+    @functools.cached_property
     def galaxy_image_dict(self) -> Dict[Galaxy, np.ndarray]:
         """
         A dictionary which associates every galaxy in the fit with its image before operation (e.g. no PSF convolution
@@ -212,7 +213,7 @@ class FitImaging(aa.FitImaging, AbstractFitInversion):
 
         return {**galaxy_image_2d_dict, **galaxy_linear_obj_image_dict}
 
-    @property
+    @functools.cached_property
     def galaxy_model_image_dict(self) -> Dict[Galaxy, np.ndarray]:
         """
         A dictionary which associates every galaxy in the fit with its `model_image`.
@@ -240,7 +241,7 @@ class FitImaging(aa.FitImaging, AbstractFitInversion):
 
         return {**galaxy_blurred_image_2d_dict, **galaxy_linear_obj_image_dict}
 
-    @property
+    @functools.cached_property
     def subtracted_images_of_galaxies_dict(self) -> Dict[Galaxy, aa.Array2D]:
         """
         A dictionary associating every galaxy with its `subtracted_image`.
@@ -270,14 +271,14 @@ class FitImaging(aa.FitImaging, AbstractFitInversion):
 
         return subtracted_images_of_galaxies_dict
 
-    @property
+    @functools.cached_property
     def model_images_of_galaxies_list(self) -> List:
         """
         A list of the model images of each galaxy.
         """
         return list(self.galaxy_model_image_dict.values())
 
-    @property
+    @functools.cached_property
     def subtracted_images_of_galaxies_list(self) -> List[aa.Array2D]:
         """
         A list of the subtracted image of every galaxy.
