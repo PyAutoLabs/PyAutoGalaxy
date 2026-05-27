@@ -164,7 +164,7 @@ class ExternalPotential(MassProfile):
     def delta_angle(self, xp=np):
         return self._angle_from(self.delta_1, self.delta_2, harmonic=3, xp=xp)
 
-    def convergence_func(self, grid_radius: float) -> float:
+    def convergence_func(self, grid_radius: float, xp=np) -> float:
         return 0.0
 
     def average_convergence_of_1_radius(self):

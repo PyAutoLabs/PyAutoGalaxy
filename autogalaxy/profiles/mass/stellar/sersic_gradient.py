@@ -65,7 +65,7 @@ class SersicGradient(AbstractSersic):
             self.eccentric_radii_grid_from(grid=grid, xp=xp, **kwargs)
         )
 
-    def convergence_func(self, grid_radius: float) -> float:
+    def convergence_func(self, grid_radius: float, xp=np) -> float:
         return (
             self.mass_to_light_ratio
             * (
