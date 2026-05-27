@@ -214,10 +214,7 @@ class cNFWSph(cNFW):
 
         F = theta * 0.0
 
-        # theta < radius
-        mask1 = (theta > 0) & (theta < radius)
-
-        # theta > radius
+        mask1 = (theta > 0) & (theta <= radius)
         mask2 = theta > radius
 
         F = xp.where(
