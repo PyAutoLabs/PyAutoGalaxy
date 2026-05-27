@@ -98,7 +98,7 @@ class ExternalShear(MassProfile):
             gamma_1=self.gamma_1, gamma_2=self.gamma_2, xp=xp
         )
 
-    def convergence_func(self, grid_radius: float) -> float:
+    def convergence_func(self, grid_radius: float, xp=np) -> float:
         return 0.0
 
     def average_convergence_of_1_radius(self):

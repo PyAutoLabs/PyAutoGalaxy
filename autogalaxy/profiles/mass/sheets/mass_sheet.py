@@ -47,7 +47,7 @@ class MassSheet(MassProfile):
         super().__init__(centre=centre, ell_comps=(0.0, 0.0))
         self.kappa = kappa
 
-    def convergence_func(self, grid_radius: float) -> float:
+    def convergence_func(self, grid_radius: float, xp=np) -> float:
         return 0.0
 
     @aa.decorators.to_array

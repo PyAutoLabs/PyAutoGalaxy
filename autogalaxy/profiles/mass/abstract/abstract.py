@@ -155,7 +155,7 @@ class MassProfile(EllProfile):
         """
         raise NotImplementedError
 
-    def convergence_func(self, grid_radius: float) -> float:
+    def convergence_func(self, grid_radius: float, xp=np) -> float:
         """
         Returns the convergence of the mass profile as a function of the radial coordinate.
 
