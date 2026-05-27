@@ -14,6 +14,21 @@ class DarkProfile:
     pass
 
 
+def coord_func_f_from(grid_radius, xp=np):
+    if isinstance(grid_radius, float) or isinstance(grid_radius, complex):
+        grid_radius = xp.array([grid_radius])
+
+    f = xp.ones(shape=grid_radius.shape[0], dtype="complex64")
+
+    r = grid_radius
+    inv_r = 1.0 / r
+
+    out_gt = (1.0 / xp.sqrt(r**2 - 1.0)) * xp.arccos(inv_r)
+    out_lt = (1.0 / xp.sqrt(1.0 - r**2)) * xp.arccosh(inv_r)
+
+    return xp.where(r > 1.0, out_gt, xp.where(r < 1.0, out_lt, f))
+
+
 class AbstractgNFW(MassProfile, DarkProfile):
     r"""
     Abstract base class for generalised NFW (gNFW) dark matter halo profiles.
@@ -111,33 +126,7 @@ class AbstractgNFW(MassProfile, DarkProfile):
         )
 
     def coord_func_f(self, grid_radius: np.ndarray, xp=np) -> np.ndarray:
-        """
-        Given an array `grid_radius` and a work array `f`, fill f[i] with
-
-          • (1 / sqrt(r_i^2 − 1)) * arccos(1 / r_i)   if r_i > 1
-          • (1 / sqrt(1 − r_i^2)) * arccosh(1 / r_i)  if r_i < 1
-          • leave f[i] unchanged if r_i == 1 (you can adjust this if you want a different convention)
-
-        This version uses only pure JAX ops, so it can be jitted or grad’ed without
-        any Python control flow on tracer values.
-        """
-        if isinstance(grid_radius, float) or isinstance(grid_radius, complex):
-            grid_radius = xp.array([grid_radius])
-
-        f = xp.ones(shape=grid_radius.shape[0], dtype="complex64")
-
-        # compute both branches
-        r = grid_radius
-        inv_r = 1.0 / r
-
-        # branch for r > 1
-        out_gt = (1.0 / xp.sqrt(r**2 - 1.0)) * xp.arccos(inv_r)
-
-        # branch for r < 1
-        out_lt = (1.0 / xp.sqrt(1.0 - r**2)) * xp.arccosh(inv_r)
-
-        # combine: if r>1 pick out_gt, elif r<1 pick out_lt, else keep original f
-        return xp.where(r > 1.0, out_gt, xp.where(r < 1.0, out_lt, f))
+        return coord_func_f_from(grid_radius, xp=xp)
 
     def coord_func_g(self, grid_radius: np.ndarray, xp=np) -> np.ndarray:
         """

@@ -38,6 +38,36 @@ class MassProfile(EllProfile):
         """
         super().__init__(centre=centre, ell_comps=ell_comps)
 
+    @staticmethod
+    def radial_deflection_from(r, params, xp):
+        raise NotImplementedError(
+            "vmapped_deflections_from is not yet supported for this profile. "
+            "Only spherical profiles with a radial_deflection_from "
+            "implementation are currently supported. If you need this for "
+            "your profile, please contact James "
+            "(jnightingale2211@gmail.com) or open a GitHub issue."
+        )
+
+    @classmethod
+    def vmapped_deflections_from(cls, grid, params_batch, mask, xp=None):
+        import jax
+        import jax.numpy as jnp
+
+        if xp is None:
+            xp = jnp
+
+        def single(params):
+            centred = grid - params[:2]
+            r = xp.sqrt(centred[:, 0] ** 2 + centred[:, 1] ** 2)
+            defl_r = cls.radial_deflection_from(r, params[2:], xp)
+            angle = xp.arctan2(centred[:, 0], centred[:, 1])
+            return defl_r[:, None] * xp.stack(
+                [xp.sin(angle), xp.cos(angle)], axis=-1
+            )
+
+        all_defl = jax.vmap(single)(params_batch)
+        return xp.sum(all_defl * mask[:, None, None], axis=0)
+
     def deflections_yx_2d_from(self, grid):
         """
         Returns the 2D deflection angles of the mass profile from a 2D grid of Cartesian (y,x) coordinates.
