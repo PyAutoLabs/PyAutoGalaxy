@@ -66,7 +66,9 @@ class MassProfile(EllProfile):
             )
 
         all_defl = jax.vmap(single)(params_batch)
-        return xp.sum(all_defl * mask[:, None, None], axis=0)
+        return xp.sum(
+            xp.where(mask[:, None, None], all_defl, 0.0), axis=0
+        )
 
     def deflections_yx_2d_from(self, grid):
         """
