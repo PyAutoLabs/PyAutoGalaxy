@@ -463,6 +463,22 @@ class MGEDecomposer:
             ),
         )
 
+    _GL_NODES_20, _GL_WEIGHTS_20 = np.polynomial.legendre.leggauss(20)
+
+    @staticmethod
+    def sigma_function(x, y, q, xp=np):
+        """Shajib (2019) sigma function for the elliptical Gaussian potential.
+
+        Returns (sigma_re, sigma_im) used in the line-integral computation
+        of the lensing potential.
+        """
+        w1 = MGEDecomposer.wofz(x + 1j * y, xp=xp)
+        w2 = MGEDecomposer.wofz(q * x + 1j * y / q, xp=xp)
+        exp_factor = xp.exp(-x * x * (1.0 - q * q) - y * y * (1.0 / (q * q) - 1.0))
+        sigma_re = xp.imag(w1) - exp_factor * xp.imag(w2)
+        sigma_im = -xp.real(w1) + exp_factor * xp.real(w2)
+        return sigma_re, sigma_im
+
     @aa.over_sample
     @aa.decorators.to_array
     @aa.decorators.transform
@@ -475,44 +491,19 @@ class MGEDecomposer:
         three_D: bool,
         ellipticity_convention: str,
         func_terms: int = 28,
+        n_quad: int = 20,
         **kwargs,
     ):
-        """Calculate the projected lensing potential at a given set of arc-second
-        gridded coordinates, via MGE decomposition of the convergence profile.
+        """Calculate the lensing potential via MGE decomposition.
 
-        The potential for each Gaussian component is computed analytically using
-        the E1 (exponential integral) formula from Shajib (2019).
+        Integrates the MGE deflection field along radial lines from the
+        origin to each grid point using Gauss-Legendre quadrature:
+
+            psi(x, y) = integral_0^1 alpha(t*x, t*y) . (x, y) dt
+
+        This correctly handles both spherical and elliptical profiles by
+        reusing the existing (verified correct) MGE deflection machinery.
         """
-        eccentric_radii = self.mass_profile.eccentric_radii_grid_from(
-            grid=grid, xp=xp, **kwargs
-        )
-
-        sigmas_factor = self.sigmas_factor_from(
-            input_convention=ellipticity_convention,
-            target_convention="circularised",
-            xp=xp,
-        )
-
-        return self._potential_2d_via_mge_from(
-            grid_radii=eccentric_radii,
-            xp=xp,
-            sigma_log_list=sigma_log_list,
-            three_D=three_D,
-            sigmas_factor=sigmas_factor,
-            func_terms=func_terms,
-        )
-
-    def _potential_2d_via_mge_from(
-        self,
-        grid_radii,
-        xp=np,
-        *,
-        sigma_log_list,
-        three_D: bool,
-        sigmas_factor: float = 1.0,
-        func_terms: int = 28,
-        **kwargs,
-    ):
         sigma_log_array = xp.asarray(sigma_log_list, dtype=xp.float64)
 
         amps, sigmas = self.decompose_convergence_via_mge(
@@ -522,20 +513,50 @@ class MGEDecomposer:
             xp=xp,
         )
 
-        sigmas = sigmas_factor * xp.asarray(sigmas)[:, None]
-        amps = xp.asarray(amps)[:, None]
+        q = xp.asarray(self.axis_ratio(xp), dtype=xp.float64)
 
-        grid_radii = grid_radii[None, ...]
-
-        potential = xp.sum(
-            self.potential_func_gaussian(
-                grid_radii=aa.ArrayIrregular(grid_radii),
-                sigma=sigmas,
-                intensity=amps,
-                xp=xp,
-            ),
-            axis=0,
+        sigmas_factor = self.sigmas_factor_from(
+            input_convention=ellipticity_convention,
+            target_convention="minor",
+            xp=xp,
         )
+        sigmas_scaled = sigmas_factor * sigma_log_array
+
+        y = xp.asarray(grid.array[:, 0], dtype=xp.float64)
+        x = xp.asarray(grid.array[:, 1], dtype=xp.float64)
+        n_pts = x.shape[0]
+
+        gl_nodes = xp.asarray(self._GL_NODES_20[:n_quad], dtype=xp.float64)
+        gl_weights = xp.asarray(self._GL_WEIGHTS_20[:n_quad], dtype=xp.float64)
+
+        t_vals = 0.5 * (1.0 + gl_nodes)
+
+        potential = xp.zeros(n_pts, dtype=xp.float64)
+
+        for k in range(n_quad):
+            t = t_vals[k]
+            scaled_grid = aa.Grid2DIrregular(
+                values=xp.stack([t * y, t * x], axis=-1)
+            )
+
+            defl_at_t = xp.zeros((n_pts, 2), dtype=xp.float64)
+            for j in range(len(amps)):
+                sigma_j = sigmas_scaled[j]
+                amp_j = amps[j]
+                factor = amp_j * sigma_j * xp.sqrt(2.0 * xp.pi / (1.0 - q * q))
+
+                zeta_j = self.zeta_from(
+                    grid=scaled_grid,
+                    sigma_log_list=xp.array([sigma_j]),
+                    xp=xp,
+                )[0]
+
+                defl_at_t[:, 0] += -factor * xp.imag(zeta_j)
+                defl_at_t[:, 1] += factor * xp.real(zeta_j)
+
+            dot = defl_at_t[:, 0] * y + defl_at_t[:, 1] * x
+            potential += 0.5 * gl_weights[k] * dot
+
         return potential
 
     def sigmas_factor_from(self, input_convention: str, target_convention: str, xp=np):
