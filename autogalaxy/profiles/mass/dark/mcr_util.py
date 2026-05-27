@@ -209,6 +209,20 @@ def kappa_s_scale_radius_and_core_radius_for_ludlow(
         (1 + concentration) * (1 - f_c)
     )  # mass concentration relation (Penarrubia+2012)
 
+    if xp is np and mcr_penarrubia <= 0:
+        import warnings
+
+        warnings.warn(
+            f"cNFW Penarrubia MCR integral factor is non-positive "
+            f"({mcr_penarrubia:.4e}) for f_c={f_c:.4f}, "
+            f"concentration={concentration:.2f}. This produces an unphysical "
+            f"negative kappa_s. The cored NFW parameterisation is not valid "
+            f"for core fractions this large (f_c > ~0.18 for typical "
+            f"concentrations). Clamping to a small positive value.",
+            stacklevel=3,
+        )
+        mcr_penarrubia = 1e-10
+
     scale_radius_kpc = radius_at_200 / concentration  # scale radius in kpc
     rho_0 = mass_at_200 / (4 * xp.pi * scale_radius_kpc**3 * mcr_penarrubia)
     kappa_s = rho_0 * scale_radius_kpc / critical_surface_density  # kappa_s
