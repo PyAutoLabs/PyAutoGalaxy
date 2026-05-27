@@ -127,7 +127,7 @@ class Gaussian(MassProfile, StellarProfile):
 
         radii_min = self.sigma / 100.0
         radii_max = self.sigma * 20.0
-        sigmas = xp.exp(xp.linspace(xp.log(radii_min), xp.log(radii_max), 30))
+        sigmas = xp.exp(xp.linspace(xp.log(radii_min), xp.log(radii_max), 100))
         mge_decomp = MGEDecomposer(mass_profile=self)
         return mge_decomp.potential_2d_via_mge_from(
             grid=grid, xp=xp, sigma_log_list=sigmas,
