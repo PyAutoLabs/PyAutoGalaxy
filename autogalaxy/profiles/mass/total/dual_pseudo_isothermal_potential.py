@@ -129,6 +129,9 @@ class dPIEPotential(MassProfile):
             * (1 / xp.sqrt(a**2 + radsq) - 1 / xp.sqrt(s**2 + radsq))
         )
 
+    def convergence_func(self, grid_radius, xp=np):
+        return self._convergence(grid_radius, xp=xp)
+
     @aa.decorators.to_vector_yx
     @aa.decorators.transform(rotate_back=True)
     def deflections_yx_2d_from(self, grid: aa.type.Grid2DLike, xp=np, **kwargs):
