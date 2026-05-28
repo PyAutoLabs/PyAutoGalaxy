@@ -45,3 +45,30 @@ def test__deflections_yx_2d_from__elliptical_vs_spherical():
     assert elliptical.deflections_yx_2d_from(grid=grid).array == pytest.approx(
         spherical.deflections_yx_2d_from(grid=grid).array, 1e-1
     )
+
+
+def test__convergence_func__matches_private_helper():
+    """Regression: dPIEMass must override the abstract `convergence_func`
+    so MGEDecomposer.decompose_convergence_via_mge (which walks the
+    convergence radially during MGE potential decomposition) doesn't
+    fall through to the abstract NotImplementedError. The shim delegates
+    to the existing `_convergence` radial helper that `convergence_2d_from`
+    already uses."""
+
+    import numpy as np
+
+    mp = ag.mp.dPIEMass(centre=(0.0, 0.0), b0=5.2, ra=2.0, rs=3.0)
+
+    # Scalar radius: equals the _convergence formula directly.
+    assert mp.convergence_func(1.5) == pytest.approx(mp._convergence(1.5), 1e-12)
+
+    # 1-D array of radii: shape preserved, element-wise equality.
+    radii = np.array([0.1, 0.5, 1.0, 2.5, 5.0])
+    expected = mp._convergence(radii)
+    actual = mp.convergence_func(radii)
+    assert actual.shape == radii.shape
+    assert actual == pytest.approx(expected, 1e-12)
+
+    # dPIEMassSph inherits the override from dPIEMass.
+    sph = ag.mp.dPIEMassSph(centre=(0.0, 0.0), b0=5.2, ra=2.0, rs=3.0)
+    assert sph.convergence_func(1.5) == pytest.approx(sph._convergence(1.5), 1e-12)
