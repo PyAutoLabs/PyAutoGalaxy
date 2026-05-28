@@ -2,6 +2,19 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Scientific Context
+
+Adjacent strong-lensing science — including topics that overlap galaxy
+modelling (light profiles + MGE, mass models, regularisation,
+pixelisation, kinematics, lens-galaxy structure) — lives in the lensing
+sub-wiki at
+[`PyAutoLabs/PyAutoPaper`](https://github.com/PyAutoLabs/PyAutoPaper),
+locally at `../PyAutoPaper/lensing_wiki/`. The wiki is lensing-focused
+but galaxy-modelling readers will find `concepts/source-reconstruction.md`,
+`concepts/regularization.md`, `concepts/bulge-halo-decomposition.md`,
+`concepts/kinematics-and-lensing.md`, and `concepts/multipoles.md`
+directly useful. Start at `../PyAutoPaper/lensing_wiki/index.md`.
+
 ## Commands
 
 ### Install
