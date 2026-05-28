@@ -17,6 +17,7 @@ Given any object that exposes `deflections_yx_2d_from` (a `MassProfile`, `Galaxy
 The class is constructed with `LensCalc.from_mass_obj(mass)` or `LensCalc.from_tracer(tracer)`.
 """
 from functools import wraps
+import importlib
 import logging
 import numpy as np
 from typing import List, Tuple, Union
@@ -28,6 +29,32 @@ import autoarray as aa
 from autogalaxy.util.shear_field import ShearYX2DIrregular
 
 logger = logging.getLogger(__name__)
+
+_OPTIONAL_DEP_WARNED: set = set()
+
+
+def _maybe_optional_dep_warn(import_name: str, feature_name: str) -> bool:
+    """
+    Return True (and warn once per process for ``feature_name``) if the
+    optional dependency ``import_name`` is not installed; False otherwise.
+
+    Callers that get True must early-return a soft-fail value (NaN, empty
+    list, etc.) — a search-killing raise here would discard the post-fit
+    metric write of an otherwise-converged search. Mirrors PyAutoLens's
+    ``_maybe_magzero_warn`` for the same reason.
+    """
+    try:
+        importlib.import_module(import_name)
+        return False
+    except ModuleNotFoundError:
+        if feature_name not in _OPTIONAL_DEP_WARNED:
+            logger.warning(
+                "Optional dependency '%s' not installed; '%s' returning "
+                "NaN/empty. pip install %s to enable it.",
+                import_name, feature_name, import_name,
+            )
+            _OPTIONAL_DEP_WARNED.add(feature_name)
+        return True
 
 
 def grid_scaled_2d_for_marching_squares_from(
@@ -1152,13 +1179,11 @@ class LensCalc:
         max_newton
             Maximum Newton iterations per step.
         """
-        try:
-            from jax_zero_contour import ZeroSolver
-        except ModuleNotFoundError as exc:
-            raise ModuleNotFoundError(
-                "jax_zero_contour is required for zero-contour critical curve tracing. "
-                "Install it with: pip install jax_zero_contour"
-            ) from exc
+        if _maybe_optional_dep_warn(
+            "jax_zero_contour", "critical_curve_list_via_zero_contour"
+        ):
+            return []
+        from jax_zero_contour import ZeroSolver
         import jax.numpy as jnp
 
         if init_guess is None:
@@ -1563,13 +1588,11 @@ class LensCalc:
             ``area`` is the largest enclosed area across all seeds — robust
             to multiple seeds landing on the same critical curve).
         """
-        try:
-            from jax_zero_contour import ZeroSolver
-        except ModuleNotFoundError as exc:
-            raise ModuleNotFoundError(
-                "jax_zero_contour is required for einstein_radius_jit_from. "
-                "Install it with: pip install jax_zero_contour"
-            ) from exc
+        if _maybe_optional_dep_warn(
+            "jax_zero_contour", "einstein_radius_jit_from"
+        ):
+            return float("nan")
+        from jax_zero_contour import ZeroSolver
         import jax.numpy as jnp
 
         init_guess = jnp.atleast_2d(jnp.asarray(init_guess))

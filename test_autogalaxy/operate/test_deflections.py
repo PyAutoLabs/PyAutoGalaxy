@@ -1,3 +1,7 @@
+import importlib
+import logging
+import math
+
 import numpy as np
 import pytest
 
@@ -5,6 +9,7 @@ from skimage import measure
 
 import autogalaxy as ag
 
+from autogalaxy.operate import lens_calc as _lens_calc_module
 from autogalaxy.operate.lens_calc import (
     grid_scaled_2d_for_marching_squares_from,
     LensCalc,
@@ -624,3 +629,93 @@ def test__zero_contour_cache__starts_empty_and_is_per_instance():
         "solver-stand-in",
     )
     assert od_b._zero_contour_cache == {}
+
+
+def _patch_missing_jax_zero_contour(monkeypatch):
+    """
+    Make ``importlib.import_module("jax_zero_contour")`` raise as if the
+    package were not installed, while leaving all other imports intact.
+    Used by the soft-fail tests below.
+    """
+    real_import = importlib.import_module
+
+    def fake_import(name, *args, **kwargs):
+        if name == "jax_zero_contour":
+            raise ModuleNotFoundError(f"No module named '{name}'")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(_lens_calc_module.importlib, "import_module", fake_import)
+
+
+def test__maybe_optional_dep_warn__logs_only_once_per_name(monkeypatch, caplog):
+    _lens_calc_module._OPTIONAL_DEP_WARNED.discard("test_feature_once")
+    _patch_missing_jax_zero_contour(monkeypatch)
+
+    with caplog.at_level(logging.WARNING, logger=_lens_calc_module.__name__):
+        first = _lens_calc_module._maybe_optional_dep_warn(
+            "jax_zero_contour", "test_feature_once"
+        )
+        second = _lens_calc_module._maybe_optional_dep_warn(
+            "jax_zero_contour", "test_feature_once"
+        )
+
+    assert first is True
+    assert second is True
+    matching = [r for r in caplog.records if "test_feature_once" in r.message]
+    assert len(matching) == 1
+
+
+def test__einstein_radius_jit_from__missing_jax_zero_contour__returns_nan_and_warns(
+    monkeypatch, caplog
+):
+    """
+    When ``jax_zero_contour`` isn't installed, ``einstein_radius_jit_from``
+    must soft-fail to NaN with a single warning per process — not raise
+    ``ModuleNotFoundError``, which would kill the post-fit metric write of
+    an otherwise-converged search.
+    """
+    _lens_calc_module._OPTIONAL_DEP_WARNED.discard("einstein_radius_jit_from")
+    _patch_missing_jax_zero_contour(monkeypatch)
+
+    mp = ag.mp.IsothermalSph(centre=(0.0, 0.0), einstein_radius=2.0)
+    od = LensCalc.from_mass_obj(mp)
+
+    with caplog.at_level(logging.WARNING, logger=_lens_calc_module.__name__):
+        result = od.einstein_radius_jit_from(init_guess=[[1.0, 0.0]])
+
+    assert math.isnan(result)
+    matching = [
+        r for r in caplog.records if "einstein_radius_jit_from" in r.message
+    ]
+    assert len(matching) == 1
+
+
+def test__tangential_critical_curve_list_via_zero_contour__missing_dep__returns_empty(
+    monkeypatch, caplog
+):
+    """
+    Parallel soft-fail check for the critical-curve helper. With
+    ``jax_zero_contour`` missing, ``_critical_curve_list_via_zero_contour``
+    returns ``[]`` (matching the existing ``ValueError → []`` early-out at
+    line 1167) with a single warning per process.
+    """
+    _lens_calc_module._OPTIONAL_DEP_WARNED.discard(
+        "critical_curve_list_via_zero_contour"
+    )
+    _patch_missing_jax_zero_contour(monkeypatch)
+
+    mp = ag.mp.IsothermalSph(centre=(0.0, 0.0), einstein_radius=2.0)
+    od = LensCalc.from_mass_obj(mp)
+
+    with caplog.at_level(logging.WARNING, logger=_lens_calc_module.__name__):
+        result = od.tangential_critical_curve_list_via_zero_contour_from(
+            init_guess=[[1.0, 0.0]]
+        )
+
+    assert result == []
+    matching = [
+        r
+        for r in caplog.records
+        if "critical_curve_list_via_zero_contour" in r.message
+    ]
+    assert len(matching) == 1
