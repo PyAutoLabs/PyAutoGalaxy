@@ -7,11 +7,13 @@ import pytest
 
 import autofit as af
 import autogalaxy as ag
+from autogalaxy.imaging.model import latent as _latent_module
 from autogalaxy.imaging.model.latent import (
     LATENT_FUNCTIONS,
     ab_mag_via_flux_from,
     flux_mujy_via_ab_mag_from,
     latent_keys_enabled,
+    total_galaxy_0_flux,
     total_galaxy_0_flux_mujy,
 )
 
@@ -55,29 +57,76 @@ def test_total_galaxy_0_flux_mujy_returns_nan_when_no_light_profile():
     assert np.isnan(result)
 
 
-def test_total_galaxy_0_flux_mujy_missing_magzero_raises():
-    fit = MagicMock()
+def test_total_galaxy_0_flux_mujy_missing_magzero_returns_nan_and_warns(caplog):
+    _latent_module._MAGZERO_WARNED.discard("total_galaxy_0_flux_mujy")
+    caplog.set_level(logging.WARNING)
 
-    with pytest.raises(ValueError, match="magzero"):
+    image = SimpleNamespace(array=np.array([1.0, 2.0, 3.0]))
+    galaxy = object()
+    fit = SimpleNamespace(galaxies=[galaxy], galaxy_image_dict={galaxy: image})
+
+    result = total_galaxy_0_flux_mujy(fit=fit, magzero=None)
+
+    assert np.isnan(result)
+    assert any(
+        "magzero" in rec.message and "total_galaxy_0_flux_mujy" in rec.message
+        for rec in caplog.records
+    )
+
+
+def test_total_galaxy_0_flux_against_known_image():
+    image = SimpleNamespace(array=np.array([1.0, 2.0, 3.0, 4.0]))
+    galaxy = object()
+    fit = SimpleNamespace(galaxies=[galaxy], galaxy_image_dict={galaxy: image})
+
+    # Raw sum — no AB-mag conversion. `magzero` is accepted but ignored.
+    assert total_galaxy_0_flux(fit=fit, magzero=None) == pytest.approx(10.0)
+    assert total_galaxy_0_flux(fit=fit, magzero=25.0) == pytest.approx(10.0)
+
+
+def test_total_galaxy_0_flux_returns_nan_when_no_light_profile():
+    fit = MagicMock()
+    fit.galaxy_image_dict.__getitem__.side_effect = KeyError("no light")
+    fit.galaxies = [object()]
+
+    assert np.isnan(total_galaxy_0_flux(fit=fit))
+
+
+def test_maybe_magzero_warn_logs_only_once_per_name(caplog):
+    _latent_module._MAGZERO_WARNED.discard("total_galaxy_0_flux_mujy")
+    caplog.set_level(logging.WARNING)
+
+    image = SimpleNamespace(array=np.array([1.0]))
+    galaxy = object()
+    fit = SimpleNamespace(galaxies=[galaxy], galaxy_image_dict={galaxy: image})
+
+    for _ in range(3):
         total_galaxy_0_flux_mujy(fit=fit, magzero=None)
+
+    matching = [
+        r for r in caplog.records if "total_galaxy_0_flux_mujy" in r.message
+    ]
+    assert len(matching) == 1
 
 
 def test_latent_keys_enabled_filters_disabled():
-    enabled = latent_keys_enabled(yaml_config={"total_galaxy_0_flux_mujy": False})
+    enabled = latent_keys_enabled(
+        yaml_config={
+            "total_galaxy_0_flux": False,
+            "total_galaxy_0_flux_mujy": False,
+        }
+    )
     assert enabled == []
 
 
 def test_latent_keys_enabled_preserves_yaml_order():
-    # Insert an unknown second key so we can assert ordering across two keys
-    # without depending on a future second registered latent.
     yaml_config = {
         "total_galaxy_0_flux_mujy": True,
-        "future_latent_zzz": True,
+        "total_galaxy_0_flux": True,
     }
     enabled = latent_keys_enabled(yaml_config=yaml_config)
 
-    # Unknown keys drop; the known key stays in its yaml-insertion position.
-    assert enabled == ["total_galaxy_0_flux_mujy"]
+    assert enabled == ["total_galaxy_0_flux_mujy", "total_galaxy_0_flux"]
 
 
 def test_latent_keys_enabled_drops_unknown_with_warning(caplog):
@@ -105,8 +154,9 @@ def test_analysis_imaging_compute_latent_variables_aligns_with_latent_keys(
 
     assert isinstance(values, tuple)
     assert len(values) == len(analysis.LATENT_KEYS)
-    assert analysis.LATENT_KEYS == ["total_galaxy_0_flux_mujy"]
-    assert np.isfinite(values[0])
+    # test_autogalaxy/config/latent.yaml enables both keys, raw flux first.
+    assert analysis.LATENT_KEYS == ["total_galaxy_0_flux", "total_galaxy_0_flux_mujy"]
+    assert all(np.isfinite(v) for v in values)
 
 
 def test_analysis_imaging_compute_latent_variables_raises_when_empty(monkeypatch):
@@ -126,9 +176,9 @@ def test_analysis_imaging_compute_latent_variables_raises_when_empty(monkeypatch
 
 def test_analysis_imaging_latent_keys_property_reads_config():
     # The autouse fixture in test_autogalaxy/conftest.py pushes the test
-    # config dir whose latent.yaml enables total_galaxy_0_flux_mujy.
+    # config dir whose latent.yaml enables both keys.
     dataset = MagicMock()
     analysis = ag.AnalysisImaging(dataset=dataset, use_jax=False)
 
-    assert analysis.LATENT_KEYS == ["total_galaxy_0_flux_mujy"]
+    assert analysis.LATENT_KEYS == ["total_galaxy_0_flux", "total_galaxy_0_flux_mujy"]
     assert set(analysis.LATENT_KEYS).issubset(LATENT_FUNCTIONS.keys())
