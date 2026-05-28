@@ -8,13 +8,22 @@
 # Workspaces should mirror this file in their own `config/latent.yaml` to
 # override defaults locally (workspace values shadow library values).
 
-# `total_galaxy_0_flux_mujy` — total integrated flux of the first galaxy in
-# the fit (i.e. `fit.galaxies[0]`), converted from the fit's linear flux
-# units to microjanskies via `magzero` passed through Analysis kwargs.
+# `total_galaxy_0_flux` — total integrated flux of the first galaxy
+# (`fit.galaxies[0]`) in the raw image units the fit was performed in.
 # Returns NaN when galaxy 0 has no light profile.
 #
-# Default `false` because computing this latent requires the user to pass
-# `magzero=<value>` to `AnalysisImaging(...)` — if the value is missing the
-# computation raises loudly (no silent NaN). Users who want this latent
-# should enable it here AND pass `magzero` via Analysis kwargs.
+# Requires no instrument inputs — default `true`. See the workspace flux
+# guide (`scripts/guides/units/flux.py`) for how to convert this to a
+# microjansky flux using a user-supplied `magzero`.
+total_galaxy_0_flux: true
+
+# `total_galaxy_0_flux_mujy` — the same total flux converted to
+# microjanskies via `magzero` passed through Analysis kwargs.
+#
+# Default `false` because the conversion needs a per-instrument zero-point
+# that the user must supply (`AnalysisImaging(..., magzero=<value>)`). When
+# enabled without a `magzero`, the latent returns NaN and emits a single
+# warning per process — it does not raise. Workspaces with a known
+# zero-point (e.g. the Euclid pipeline) override this to `true` and pass
+# `magzero` explicitly.
 total_galaxy_0_flux_mujy: false

@@ -20,6 +20,33 @@ from autoconf import conf
 
 logger = logging.getLogger(__name__)
 
+# Latent names that have already emitted a "magzero missing" warning in this
+# process. Used by ``_maybe_magzero_warn`` to deduplicate the message across
+# the many fit evaluations a single search performs.
+_MAGZERO_WARNED: set = set()
+
+
+def _maybe_magzero_warn(magzero, name) -> bool:
+    """
+    Return True when ``magzero`` is missing (and emit a one-time-per-process
+    warning for ``name``); False otherwise.
+
+    Callers that get True must early-return ``xp.nan`` — the µJy conversion
+    is meaningless without a zero-point, but a search-killing raise here
+    would discard otherwise-converged fits.
+    """
+    if magzero is None:
+        if name not in _MAGZERO_WARNED:
+            logger.warning(
+                "magzero not set on Analysis; '%s' latent will be NaN. "
+                "Pass magzero=<value> to AnalysisImaging to enable it, "
+                "or disable in config/latent.yaml to silence this warning.",
+                name,
+            )
+            _MAGZERO_WARNED.add(name)
+        return True
+    return False
+
 
 def ab_mag_via_flux_from(flux, magzero, xp=np):
     """
@@ -48,22 +75,43 @@ def flux_mujy_via_ab_mag_from(ab_mag, xp=np):
     return 10 ** ((23.9 - ab_mag) / 2.5)
 
 
+def total_galaxy_0_flux(fit, magzero=None, xp=np):
+    """
+    Total integrated flux of the first galaxy in the fit, in the raw image
+    units the fit was performed in (the sum of the model image pixels).
+
+    Requires no instrument inputs — ``magzero`` is accepted for uniform
+    dispatcher context but ignored. See ``autolens_workspace`` and
+    ``autogalaxy_workspace`` flux guides for how to convert this to a
+    microjansky flux using a user-supplied ``magzero``.
+
+    Returns NaN when the first galaxy has no light profile (which raises
+    inside ``fit.galaxy_image_dict``).
+    """
+    try:
+        image = fit.galaxy_image_dict[fit.galaxies[0]]
+    except (AttributeError, KeyError, IndexError):
+        return xp.nan
+    return xp.sum(image.array)
+
+
 def total_galaxy_0_flux_mujy(fit, magzero, xp=np):
     """
     Total integrated flux of the first galaxy in the fit, converted to
     microjanskies via the image's magnitude zero-point.
 
-    Returns NaN when the first galaxy has no light profile (which raises
-    AttributeError inside ``fit.galaxy_image_dict``). Raises if ``magzero``
-    is missing — there is no sensible default for a photometric calibration.
+    Returns NaN — with a one-time-per-process warning — when ``magzero``
+    is missing, rather than raising. The µJy conversion is meaningless
+    without a zero-point, but a hard raise during post-fit latent
+    computation would discard the result of an otherwise-converged
+    multi-hour search. Users who want this column populated should pass
+    ``magzero=<value>`` to ``AnalysisImaging`` (Euclid pipeline pattern)
+    or use :func:`total_galaxy_0_flux` and convert in post.
+
+    Also returns NaN when the first galaxy has no light profile.
     """
-    if magzero is None:
-        raise ValueError(
-            "magzero must be passed to AnalysisImaging via kwargs to compute "
-            "the 'total_galaxy_0_flux_mujy' latent. Disable it in "
-            "config/latent.yaml or pass magzero=<value> when constructing "
-            "the Analysis."
-        )
+    if _maybe_magzero_warn(magzero, "total_galaxy_0_flux_mujy"):
+        return xp.nan
 
     try:
         image = fit.galaxy_image_dict[fit.galaxies[0]]
@@ -76,6 +124,7 @@ def total_galaxy_0_flux_mujy(fit, magzero, xp=np):
 
 
 LATENT_FUNCTIONS: Dict[str, Callable] = {
+    "total_galaxy_0_flux": total_galaxy_0_flux,
     "total_galaxy_0_flux_mujy": total_galaxy_0_flux_mujy,
 }
 
