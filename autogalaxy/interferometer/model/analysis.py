@@ -30,6 +30,9 @@ logger = logging.getLogger(__name__)
 logger.setLevel(level="INFO")
 
 
+_FIT_INTERFEROMETER_PYTREES_REGISTERED = False
+
+
 class AnalysisInterferometer(AnalysisDataset):
     Result = ResultInterferometer
     Visualizer = VisualizerInterferometer
@@ -173,10 +176,32 @@ class AnalysisInterferometer(AnalysisDataset):
         analysis — ride as aux so JAX does not recurse into them. Everything
         else (``galaxies`` and the autoarray wrappers it carries) is dynamic
         per fit.
+
+        Idempotent — guarded by the module-level
+        ``_FIT_INTERFEROMETER_PYTREES_REGISTERED`` flag. See
+        ``autogalaxy/imaging/model/analysis.py`` for the cross-registration
+        rationale.
         """
-        from autoarray.abstract_ndarray import register_instance_pytree
+        global _FIT_INTERFEROMETER_PYTREES_REGISTERED
+        if _FIT_INTERFEROMETER_PYTREES_REGISTERED:
+            return
+
+        from autoarray.abstract_ndarray import (
+            register_instance_pytree,
+            _pytree_registered_classes,
+        )
         from autoarray.dataset.dataset_model import DatasetModel
         from autogalaxy.analysis.jax_pytrees import register_galaxies_pytree
+
+        try:
+            from autofit.jax.pytrees import (
+                _REGISTERED_INSTANCE_CLASSES as _af_registered,
+            )
+        except ImportError:
+            _af_registered = set()
+
+        if DatasetModel in _af_registered:
+            _pytree_registered_classes.add(DatasetModel)
 
         register_instance_pytree(
             FitInterferometer,
@@ -184,6 +209,8 @@ class AnalysisInterferometer(AnalysisDataset):
         )
         register_instance_pytree(DatasetModel)
         register_galaxies_pytree()
+
+        _FIT_INTERFEROMETER_PYTREES_REGISTERED = True
 
     def save_attributes(self, paths: af.DirectoryPaths):
         """
