@@ -289,6 +289,20 @@ class PowerLawMultipole(MassProfile):
             * xp.cos(self.m * (angle - angle_m))
         )
 
+    def convergence_func(self, grid_radius, xp=np):
+        """
+        The radial (azimuthally-averaged) convergence of a pure multipole perturbation is
+        identically zero — the `cos(m(phi - phi_m))` term integrates to zero over angle for
+        `m >= 1`, so the multipole adds no net azimuthally-symmetric mass.
+
+        This hook is reached only by radial integration (`mass_integral` ->
+        `mass_angular_within_circle_from`); returning the zero monopole means a pure
+        multipole correctly encloses zero net mass. `.array` is unwrapped first so the
+        return is a plain array rather than an `aa.ArrayIrregular`.
+        """
+        radii = grid_radius.array if hasattr(grid_radius, "array") else grid_radius
+        return xp.zeros_like(radii)
+
     @aa.decorators.to_array
     def potential_2d_from(
         self, grid: aa.type.Grid2DLike, xp=np, **kwargs
