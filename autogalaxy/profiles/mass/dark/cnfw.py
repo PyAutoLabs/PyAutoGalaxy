@@ -100,12 +100,12 @@ class cNFW(AbstractgNFW):
     """
 
     def __init__(
-            self,
-            centre: Tuple[float, float] = (0.0, 0.0),
-            ell_comps: Tuple[float, float] = (0.0, 0.0),
-            kappa_s: float = 0.05,
-            scale_radius: float = 1.0,
-            core_radius: float = 0.01,
+        self,
+        centre: Tuple[float, float] = (0.0, 0.0),
+        ell_comps: Tuple[float, float] = (0.0, 0.0),
+        kappa_s: float = 0.05,
+        scale_radius: float = 1.0,
+        core_radius: float = 0.01,
     ):
         r"""
         Parameters
@@ -129,7 +129,6 @@ class cNFW(AbstractgNFW):
         self.scale_radius = scale_radius
         self.core_radius = core_radius
 
-
     def deflections_yx_2d_from(self, grid: aa.type.Grid2DLike, xp=np, **kwargs):
         return self.deflections_2d_via_mge_from(grid=grid, xp=xp, **kwargs)
 
@@ -145,8 +144,8 @@ class cNFW(AbstractgNFW):
             grid=grid,
             xp=xp,
             sigma_log_list=sigmas,
-            ellipticity_convention='major',
-            three_D=True
+            ellipticity_convention="major",
+            three_D=True,
         )
         return deflections_via_mge
 
@@ -163,6 +162,45 @@ class cNFW(AbstractgNFW):
             * (r.array + self.scale_radius) ** (-2.0)
         )
 
+    def convergence_func(self, grid_radius, xp=np):
+        """
+        Radial projected convergence kappa(r), reusing the MGE-of-3D-density decomposition
+        (the same machinery `convergence_2d_from` uses with `three_D=True`) evaluated at the
+        radial coordinate `grid_radius`.
+
+        cNFW has no closed-form radial convergence helper, so this delegates to the MGE
+        Gaussian sum. This hook is reached by `MGEDecomposer.decompose_convergence_via_mge`
+        (`three_D=False`, not used by cNFW) and by radial mass integration (`mass_integral`
+        -> `mass_angular_within_circle_from` -> Einstein radius).
+
+        The result is the q-independent radial profile (like `NFW.convergence_func`):
+        ellipticity is re-introduced by the MGE machinery elsewhere, so no `sigmas_factor`
+        rescale is applied (`sigmas_factor=1.0`). Verified to match `convergence_2d_from` for
+        the spherical case and to be q-independent for the elliptical case.
+        """
+        radii = (
+            grid_radius.array
+            if hasattr(grid_radius, "array")
+            else xp.asarray(grid_radius)
+        )
+        # Track scalar input so we return a scalar (matching other `convergence_func`
+        # implementations). `mass_integral` -> scipy.quad feeds scalar radii and a length-1
+        # array return would warn (and eventually error) on the array->scalar conversion.
+        scalar_input = xp.ndim(radii) == 0
+        radii = xp.atleast_1d(radii)
+        radii_min = self.scale_radius / 1000.0
+        radii_max = self.scale_radius * 200.0
+        sigmas = xp.exp(xp.linspace(xp.log(radii_min), xp.log(radii_max), 20))
+        mge_decomp = MGEDecomposer(mass_profile=self)
+        convergence = mge_decomp._convergence_2d_via_mge_from(
+            grid_radii=radii,
+            xp=xp,
+            sigma_log_list=sigmas,
+            three_D=True,
+            sigmas_factor=1.0,
+        )
+        return convergence[0] if scalar_input else convergence
+
     @aa.over_sample
     @aa.decorators.to_array
     @aa.decorators.transform
@@ -172,8 +210,11 @@ class cNFW(AbstractgNFW):
         sigmas = xp.exp(xp.linspace(xp.log(radii_min), xp.log(radii_max), 20))
         mge_decomp = MGEDecomposer(mass_profile=self)
         return mge_decomp.convergence_2d_via_mge_from(
-            grid=grid, xp=xp, sigma_log_list=sigmas,
-            ellipticity_convention="major", three_D=True,
+            grid=grid,
+            xp=xp,
+            sigma_log_list=sigmas,
+            ellipticity_convention="major",
+            three_D=True,
         )
 
     @aa.over_sample
@@ -185,8 +226,11 @@ class cNFW(AbstractgNFW):
         sigmas = xp.exp(xp.linspace(xp.log(radii_min), xp.log(radii_max), 20))
         mge_decomp = MGEDecomposer(mass_profile=self)
         return mge_decomp.potential_2d_via_mge_from(
-            grid=grid, xp=xp, sigma_log_list=sigmas,
-            ellipticity_convention="major", three_D=True,
+            grid=grid,
+            xp=xp,
+            sigma_log_list=sigmas,
+            ellipticity_convention="major",
+            three_D=True,
         )
 
 
@@ -308,8 +352,11 @@ class cNFWSph(cNFW):
         sigmas = xp.exp(xp.linspace(xp.log(radii_min), xp.log(radii_max), 20))
         mge_decomp = MGEDecomposer(mass_profile=self)
         return mge_decomp.convergence_2d_via_mge_from(
-            grid=grid, xp=xp, sigma_log_list=sigmas,
-            ellipticity_convention="major", three_D=True,
+            grid=grid,
+            xp=xp,
+            sigma_log_list=sigmas,
+            ellipticity_convention="major",
+            three_D=True,
         )
 
     @aa.over_sample
@@ -321,6 +368,9 @@ class cNFWSph(cNFW):
         sigmas = xp.exp(xp.linspace(xp.log(radii_min), xp.log(radii_max), 20))
         mge_decomp = MGEDecomposer(mass_profile=self)
         return mge_decomp.potential_2d_via_mge_from(
-            grid=grid, xp=xp, sigma_log_list=sigmas,
-            ellipticity_convention="major", three_D=True,
+            grid=grid,
+            xp=xp,
+            sigma_log_list=sigmas,
+            ellipticity_convention="major",
+            three_D=True,
         )

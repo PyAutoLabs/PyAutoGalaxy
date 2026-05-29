@@ -90,6 +90,34 @@ class PowerLawBroken(MassProfile):
         else:
             self.kB = (2 - self.inner_slope) / (2 * self.nu**2)
 
+    def _convergence(self, radii, xp=np):
+        """
+        Returns the dimensionless density kappa=Sigma/Sigma_c (eq. 1) as a function of the
+        (elliptical or circular) radial coordinate `radii`.
+
+        Shared by `convergence_2d_from` (which passes the elliptical radius) and the
+        `convergence_func` hook (which passes the radial coordinate directly). `radii` is a
+        plain array/scalar (callers unwrap `aa.ArrayIrregular` to `.array` first), so the
+        boolean masks `(radii <= break_radius)` return raw numpy bool arrays.
+        """
+
+        # Inside break radius
+        kappa_inner = self.kB * (self.break_radius / radii) ** self.inner_slope
+
+        # Outside break radius
+        kappa_outer = self.kB * (self.break_radius / radii) ** self.outer_slope
+
+        return kappa_inner * (radii <= self.break_radius) + kappa_outer * (
+            radii > self.break_radius
+        )
+
+    def convergence_func(self, grid_radius, xp=np):
+        # Unwrap `aa.ArrayIrregular` -> plain array so `_convergence` returns a plain array
+        # (matching e.g. `Isothermal.convergence_func`). `mass_integral` -> scipy.quad cannot
+        # consume an `aa.ArrayIrregular` return.
+        radii = grid_radius.array if hasattr(grid_radius, "array") else grid_radius
+        return self._convergence(radii, xp=xp)
+
     @aa.over_sample
     @aa.decorators.to_array
     @aa.decorators.transform
@@ -101,29 +129,29 @@ class PowerLawBroken(MassProfile):
         # Ell radius
         radius = xp.hypot(grid.array[:, 1] * self.axis_ratio(xp), grid.array[:, 0])
 
-        # Inside break radius
-        kappa_inner = self.kB * (self.break_radius / radius) ** self.inner_slope
+        return self._convergence(radius, xp=xp)
 
-        # Outside break radius
-        kappa_outer = self.kB * (self.break_radius / radius) ** self.outer_slope
-
-        return kappa_inner * (radius <= self.break_radius) + kappa_outer * (
-            radius > self.break_radius
-        )
-
-    @aa.over_sample
-    @aa.decorators.to_array
-    @aa.decorators.transform
     def potential_2d_from(self, grid: aa.type.Grid2DLike, xp=np, **kwargs):
-        from autogalaxy.profiles.mass.abstract.mge import MGEDecomposer
+        """
+        The lensing potential is not available for the broken power law.
 
-        radii_min = self.break_radius / 100.0
-        radii_max = self.einstein_radius * 20.0
-        sigmas = xp.exp(xp.linspace(xp.log(radii_min), xp.log(radii_max), 30))
-        mge_decomp = MGEDecomposer(mass_profile=self)
-        return mge_decomp.potential_2d_via_mge_from(
-            grid=grid, xp=xp, sigma_log_list=sigmas,
-            ellipticity_convention="major", three_D=False,
+        It would be computed by decomposing the projected convergence into Gaussians via
+        `potential_2d_via_mge_from` (`three_D=False`), but that decomposition integrates the
+        convergence along a *complex* contour and therefore requires an analytic convergence
+        profile. The broken power law's convergence is piecewise — a slope discontinuity at
+        `break_radius` — so it is non-analytic and the MGE potential is numerically invalid
+        (wrong by many orders of magnitude). A correct potential would integrate this
+        profile's own analytic deflection field (eq. 18-19) along radial lines, which is not
+        yet implemented.
+
+        `convergence_2d_from`, `deflections_yx_2d_from`, and `convergence_func` (and hence the
+        Einstein-radius / enclosed-mass integrals) are all available and correct.
+        """
+        raise NotImplementedError(
+            "PowerLawBroken.potential_2d_from is not implemented: the MGE potential "
+            "decomposition requires an analytic convergence profile, but the broken power "
+            "law's convergence is piecewise (a kink at break_radius). Use deflections / "
+            "convergence instead, or integrate the analytic deflections for the potential."
         )
 
     @aa.decorators.to_vector_yx

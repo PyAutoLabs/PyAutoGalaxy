@@ -75,3 +75,31 @@ def test__potential_2d_from():
     potential = mp.potential_2d_from(grid=ag.Grid2DIrregular([[1.0, 0.0]]))
 
     assert potential[0] == pytest.approx(0.0, 1e-3)
+
+
+def test__convergence_func__returns_zero_monopole():
+    """Regression: PowerLawMultipole overrides the abstract `convergence_func` to return
+    the zero monopole. The multipole convergence is angle-dependent (cos(m(phi - phi_m)))
+    so its azimuthal average is identically zero — a pure multipole encloses zero net
+    azimuthally-symmetric mass. `convergence_func` is reached only by radial mass
+    integration (`mass_integral` -> `mass_angular_within_circle_from`)."""
+
+    import numpy as np
+
+    mp = ag.mp.PowerLawMultipole(
+        m=4,
+        centre=(0.0, 0.0),
+        einstein_radius=1.0,
+        slope=2.0,
+        multipole_comps=(0.1, 0.2),
+    )
+
+    assert mp.convergence_func(1.5) == pytest.approx(0.0, 1e-12)
+
+    radii = np.array([0.1, 0.5, 1.0, 2.5])
+    actual = mp.convergence_func(radii)
+    assert actual.shape == radii.shape
+    assert actual == pytest.approx(np.zeros_like(radii), 1e-12)
+
+    # A pure multipole encloses zero net mass.
+    assert mp.mass_angular_within_circle_from(radius=2.0) == pytest.approx(0.0, 1e-9)
