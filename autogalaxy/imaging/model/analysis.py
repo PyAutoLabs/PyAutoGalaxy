@@ -27,6 +27,9 @@ from autogalaxy.imaging.model.visualizer import VisualizerImaging
 from autogalaxy.imaging.fit_imaging import FitImaging
 
 
+_FIT_IMAGING_PYTREES_REGISTERED = False
+
+
 class AnalysisImaging(AnalysisDataset):
     Result = ResultImaging
     Visualizer = VisualizerImaging
@@ -209,10 +212,37 @@ class AnalysisImaging(AnalysisDataset):
         analysis — ride as aux so JAX does not recurse into them. Everything
         else (``galaxies``, ``dataset_model`` and the autoarray wrappers they
         carry) is dynamic per fit.
+
+        Idempotent — guarded by the module-level
+        ``_FIT_IMAGING_PYTREES_REGISTERED`` flag so repeated calls from each
+        ``fit_from`` invocation are cheap. ``DatasetModel`` may already be
+        registered by ``autofit.jax.pytrees.register_model`` (its
+        ``_REGISTERED_INSTANCE_CLASSES`` set is independent of autoarray's
+        ``_pytree_registered_classes``); cross-populate so
+        ``register_instance_pytree`` short-circuits instead of asking JAX to
+        register it twice. Mirrors the defense in
+        ``autogalaxy/ellipse/model/analysis.py``.
         """
-        from autoarray.abstract_ndarray import register_instance_pytree
+        global _FIT_IMAGING_PYTREES_REGISTERED
+        if _FIT_IMAGING_PYTREES_REGISTERED:
+            return
+
+        from autoarray.abstract_ndarray import (
+            register_instance_pytree,
+            _pytree_registered_classes,
+        )
         from autoarray.dataset.dataset_model import DatasetModel
         from autogalaxy.analysis.jax_pytrees import register_galaxies_pytree
+
+        try:
+            from autofit.jax.pytrees import (
+                _REGISTERED_INSTANCE_CLASSES as _af_registered,
+            )
+        except ImportError:
+            _af_registered = set()
+
+        if DatasetModel in _af_registered:
+            _pytree_registered_classes.add(DatasetModel)
 
         register_instance_pytree(
             FitImaging,
@@ -220,6 +250,8 @@ class AnalysisImaging(AnalysisDataset):
         )
         register_instance_pytree(DatasetModel)
         register_galaxies_pytree()
+
+        _FIT_IMAGING_PYTREES_REGISTERED = True
 
     def save_attributes(self, paths: af.DirectoryPaths):
         """
