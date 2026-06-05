@@ -173,7 +173,7 @@ class MassProfile(EllProfile):
         """
         raise NotImplementedError
 
-    def potential_2d_from(self, grid):
+    def potential_2d_from(self, grid, xp=np, **kwargs):
         """
         Returns the 2D lensing potential of the mass profile from a 2D grid of Cartesian (y,x) coordinates.
 

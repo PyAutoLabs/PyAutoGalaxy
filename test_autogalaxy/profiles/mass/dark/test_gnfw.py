@@ -67,8 +67,8 @@ def test__potential_2d_from__elliptical_vs_spherical():
         centre=(0.1, 0.2), kappa_s=2.0, inner_slope=1.5, scale_radius=3.0
     )
 
-    assert elliptical.convergence_2d_from(grid) == pytest.approx(
-        spherical.convergence_2d_from(grid).array, 1e-4
+    assert elliptical.potential_2d_from(grid) == pytest.approx(
+        spherical.potential_2d_from(grid).array, 1e-4
     )
 
 

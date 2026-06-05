@@ -287,46 +287,28 @@ def test__convergence_2d_from__nfw_ell():
     assert convergence == pytest.approx(1.388511, 1e-3)
 
 
-# def test__potential_2d_from():
-#     nfw = ag.mp.NFWSph(centre=(0.3, 0.2), kappa_s=2.5, scale_radius=4.0)
-#
-#     potential = nfw.potential_2d_from(grid=ag.Grid2DIrregular([[0.1875, 0.1625]]))
-#
-#     assert potential == pytest.approx(0.03702, 1e-3)
-#
-#     nfw = ag.mp.NFWSph(centre=(0.3, 0.2), kappa_s=2.5, scale_radius=4.0)
-#
-#     potential = nfw.potential_2d_from(grid=ag.Grid2DIrregular([[0.1875, 0.1625]]))
-#
-#     assert potential == pytest.approx(0.03702, 1e-3)
-#
-#     nfw = ag.mp.NFW(
-#         centre=(0.3, 0.2),
-#         ell_comps=(0.03669, 0.172614),
-#         kappa_s=2.5,
-#         scale_radius=4.0,
-#     )
-#
-#     potential = nfw.potential_2d_from(grid=ag.Grid2DIrregular([[0.1625, 0.1625]]))
-#
-#     assert potential == pytest.approx(0.05380, 1e-3)
-#
-#     nfw_spherical = ag.mp.NFWSph(centre=(0.3, 0.2), kappa_s=2.5, scale_radius=4.0)
-#     nfw_elliptical = ag.mp.NFW(
-#         centre=(0.3, 0.2),
-#         ell_comps=(0.0, 0.0),
-#         kappa_s=2.5,
-#         scale_radius=4.0,
-#     )
-#
-#     potential_spherical = nfw_spherical.potential_2d_from(
-#         grid=ag.Grid2DIrregular([[0.1875, 0.1625]])
-#     )
-#     potential_elliptical = nfw_elliptical.potential_2d_from(
-#         grid=ag.Grid2DIrregular([[0.1875, 0.1625]])
-#     )
-#
-#     assert potential_spherical == pytest.approx(potential_elliptical, 1e-3)
+def test__potential_2d_from__nfw_sph():
+    nfw = ag.mp.NFWSph(centre=(0.3, 0.2), kappa_s=2.5, scale_radius=4.0)
+
+    potential = nfw.potential_2d_from(grid=ag.Grid2DIrregular([[0.1875, 0.1625]]))
+
+    assert potential == pytest.approx(0.148108, 1e-3)
+
+
+def test__potential_2d_from__elliptical_reduces_to_spherical():
+    # At zero ellipticity the elliptical NFW (MGE potential) must match the
+    # spherical NFW (analytic potential) — a cross-check of two independent
+    # implementations.
+    spherical = ag.mp.NFWSph(centre=(0.3, 0.2), kappa_s=2.5, scale_radius=4.0)
+    elliptical = ag.mp.NFW(
+        centre=(0.3, 0.2), ell_comps=(0.0, 0.0), kappa_s=2.5, scale_radius=4.0
+    )
+
+    grid = ag.Grid2DIrregular([[0.1875, 0.1625]])
+
+    assert elliptical.potential_2d_from(grid=grid) == pytest.approx(
+        spherical.potential_2d_from(grid=grid).array, 1e-3
+    )
 
 
 def test__shear_yx_2d_from__nfw_sph_config_1():
