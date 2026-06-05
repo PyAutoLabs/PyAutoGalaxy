@@ -413,11 +413,19 @@ class NFWSph(NFW):
             grid=grid, **kwargs
         ) + 0j
         return np.real(
-            2.0 * self.scale_radius * self.kappa_s * self.potential_func_sph(eta, xp=xp)
+            2.0
+            * self.scale_radius**2
+            * self.kappa_s
+            * self.potential_func_sph(eta, xp=xp)
         )
 
     @staticmethod
     def potential_func_sph(eta, xp=np):
+        # Spherical NFW lensing potential psi(x) = 2 kappa_s r_s^2 g(x), with
+        # g(x) = ln^2(x/2) - arctanh^2(sqrt(1 - x^2)), obtained by integrating
+        # the deflection field radially. The previous prefactor used a single
+        # factor of r_s instead of r_s^2, so grad(psi) came out a factor 1/r_s
+        # too small relative to deflections_yx_2d_from.
         return ((xp.log(eta.array / 2.0)) ** 2) - (
             xp.arctanh(xp.sqrt(1 - eta.array**2))
         ) ** 2

@@ -60,6 +60,33 @@ class gNFW(AbstractgNFW):
         )
         return deflections_via_mge
 
+    @aa.over_sample
+    @aa.decorators.to_array
+    @aa.decorators.transform
+    def potential_2d_from(self, grid: aa.type.Grid2DLike, xp=np, **kwargs):
+        """
+        Returns the 2D lensing potential via the same MGE decomposition used for the
+        deflection angles, so that ``grad(psi)`` is self-consistent with ``deflections_yx_2d_from``.
+
+        This implementation is inherited by every elliptical and spherical gNFW/NFW variant
+        (``NFW``, ``gNFWSph``, and the MCR / Virial-mass subclasses), none of which have a
+        closed-form elliptical potential. The MGE decomposer expands the 3D density into a
+        Gaussian sum and integrates each Gaussian's analytic potential.
+        """
+        radii_min = self.scale_radius / 20000.0
+        radii_max = self.scale_radius * 200.0
+        sigmas = xp.exp(xp.linspace(xp.log(radii_min), xp.log(radii_max), 30))
+
+        mge_decomp = MGEDecomposer(mass_profile=self)
+
+        return mge_decomp.potential_2d_via_mge_from(
+            grid=grid,
+            xp=xp,
+            sigma_log_list=sigmas,
+            ellipticity_convention="major",
+            three_D=True,
+        )
+
     def convergence_func(self, grid_radius: float, xp=np) -> float:
 
         from scipy.integrate import quad
