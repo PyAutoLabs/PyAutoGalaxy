@@ -12,3 +12,5 @@ from .nfw_virial_mass_conc import NFWVirialMassConcSph
 from .cnfw import cNFW, cNFWSph
 from .cnfw_mcr import cNFWMCRLudlow, cNFWMCRLudlowSph
 from .cnfw_mcr_scatter import cNFWMCRScatterLudlow, cNFWMCRScatterLudlowSph
+from .kaplinghat import KaplinghatCoredNFWSph
+from .kaplinghat_mcr import KaplinghatCoredNFWMCRLudlowSph
