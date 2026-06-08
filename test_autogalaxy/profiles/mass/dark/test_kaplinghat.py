@@ -59,6 +59,82 @@ def test__lensing_quantities_are_finite_and_positive():
     assert deflections[0] == pytest.approx(np.array([0.0, 0.0]), abs=1.0e-8)
 
 
+def test__vmapped_deflections_match_instance_path_for_zero_interaction():
+    profile = ag.mp.KaplinghatCoredNFWSph(
+        centre=(0.1, -0.2),
+        kappa_s=0.2,
+        scale_radius=2.0,
+        interaction_radius=0.0,
+    )
+    grid = np.array([[0.5, 0.2], [1.0, -0.2], [2.0, 1.0]])
+
+    params = np.array(
+        [
+            [
+                profile.centre[0],
+                profile.centre[1],
+                profile.kappa_s,
+                profile.scale_radius,
+                profile.interaction_radius,
+                profile.central_density,
+                profile.isothermal_radius,
+            ]
+        ]
+    )
+    mask = np.array([True])
+
+    vmapped = ag.mp.KaplinghatCoredNFWSph.vmapped_deflections_from(
+        grid=grid,
+        params_batch=params,
+        mask=mask,
+    )
+
+    np.testing.assert_allclose(
+        np.asarray(vmapped),
+        profile.deflections_yx_2d_from(grid=ag.Grid2DIrregular(grid)).array,
+        rtol=1.0e-6,
+        atol=1.0e-8,
+    )
+
+
+def test__vmapped_deflections_match_instance_path_for_sidm_core():
+    profile = ag.mp.KaplinghatCoredNFWSph(
+        centre=(0.1, -0.2),
+        kappa_s=0.2,
+        scale_radius=2.0,
+        interaction_radius=0.5,
+    )
+    grid = np.array([[0.5, 0.2], [1.0, -0.2], [2.0, 1.0]])
+
+    params = np.array(
+        [
+            [
+                profile.centre[0],
+                profile.centre[1],
+                profile.kappa_s,
+                profile.scale_radius,
+                profile.interaction_radius,
+                profile.central_density,
+                profile.isothermal_radius,
+            ]
+        ]
+    )
+    mask = np.array([True])
+
+    vmapped = ag.mp.KaplinghatCoredNFWSph.vmapped_deflections_from(
+        grid=grid,
+        params_batch=params,
+        mask=mask,
+    )
+
+    np.testing.assert_allclose(
+        np.asarray(vmapped),
+        profile.deflections_yx_2d_from(grid=ag.Grid2DIrregular(grid)).array,
+        rtol=5.0e-2,
+        atol=1.0e-3,
+    )
+
+
 def test__mcr_constructor_reduces_to_nfw_when_interaction_is_zero():
     kaplinghat = ag.mp.KaplinghatCoredNFWMCRLudlowSph(
         centre=(1.0, 2.0),

@@ -65,6 +65,62 @@ def _nfw_mass_3d_within_radius_from(r, kappa_s, scale_radius):
     return 4.0 * np.pi * (kappa_s / scale_radius) * scale_radius**3 * mass_factor
 
 
+def _trapezoid_from(y, x, axis, xp):
+    if hasattr(xp, "trapezoid"):
+        return xp.trapezoid(y, x=x, axis=axis)
+    return xp.trapz(y, x=x, axis=axis)
+
+
+def _interp_lane_emden_xp(x, xp):
+    x_table, h_table, _ = _isothermal_lane_emden_table()
+    return xp.interp(x, xp.asarray(x_table), xp.asarray(h_table))
+
+
+def _nfw_radial_deflection_from(r, kappa_s, scale_radius, xp):
+    x = xp.maximum(r / scale_radius, 1.0e-8)
+
+    below = x < 1.0
+    above = x > 1.0
+    x_below = xp.minimum(x, 1.0 - 1.0e-8)
+    x_above = xp.maximum(x, 1.0 + 1.0e-8)
+
+    f_below = xp.arccosh(1.0 / x_below) / xp.sqrt(1.0 - x_below**2)
+    f_above = xp.arccos(1.0 / x_above) / xp.sqrt(x_above**2 - 1.0)
+    f_at_one = 1.0
+    f = xp.where(below, f_below, xp.where(above, f_above, f_at_one))
+
+    g = xp.log(x / 2.0) + f
+    return 4.0 * kappa_s * scale_radius * g / x
+
+
+def _kaplinghat_density_3d_from_radius(
+    radii,
+    kappa_s,
+    scale_radius,
+    interaction_radius,
+    central_density,
+    isothermal_radius,
+    xp,
+):
+    x_nfw = xp.maximum(radii / scale_radius, 1.0e-12)
+    nfw_density = (kappa_s / scale_radius) / (x_nfw * (1.0 + x_nfw) ** 2)
+
+    safe_isothermal_radius = xp.maximum(isothermal_radius, 1.0e-12)
+    x_iso = xp.maximum(radii / safe_isothermal_radius, 1.0e-5)
+    h = _interp_lane_emden_xp(x_iso, xp=xp)
+    safe_central_density = xp.where(xp.isfinite(central_density), central_density, 0.0)
+    iso_density = safe_central_density * xp.exp(-h)
+
+    use_iso = (
+        (interaction_radius > 0.0)
+        & (isothermal_radius > 0.0)
+        & xp.isfinite(central_density)
+        & (radii < interaction_radius)
+    )
+
+    return xp.where(use_iso, iso_density, nfw_density)
+
+
 def _matched_isothermal_parameters_from(interaction_radius, kappa_s, scale_radius):
     rho_1 = _nfw_density_from(
         r=interaction_radius,
@@ -242,6 +298,57 @@ class KaplinghatCoredNFWSph(MassProfile, DarkProfile):
             limit=100,
         )[0]
         return 2.0 * mass_2d / radius
+
+    @staticmethod
+    def radial_deflection_from(r, params, xp):
+        kappa_s = params[0]
+        scale_radius = params[1]
+        interaction_radius = params[2]
+        central_density = params[3]
+        isothermal_radius = params[4]
+
+        r = xp.asarray(r)
+        r_safe = xp.maximum(r, 1.0e-8)
+
+        z_max = xp.maximum(500.0 * scale_radius, 50.0 * interaction_radius)
+        z_unit = xp.linspace(1.0e-5, 1.0, 160)
+        z = z_max * z_unit**3
+        u = xp.linspace(0.0, 1.0, 64)
+
+        projected_radii = xp.maximum(r_safe[:, None] * u[None, :], 1.0e-6)
+        three_d_radii = xp.sqrt(
+            projected_radii[:, :, None] ** 2 + z[None, None, :] ** 2
+        )
+
+        density = _kaplinghat_density_3d_from_radius(
+            radii=three_d_radii,
+            kappa_s=kappa_s,
+            scale_radius=scale_radius,
+            interaction_radius=interaction_radius,
+            central_density=central_density,
+            isothermal_radius=isothermal_radius,
+            xp=xp,
+        )
+        convergence = 2.0 * _trapezoid_from(density, x=z, axis=-1, xp=xp)
+
+        mass_integral = r_safe**2 * _trapezoid_from(
+            convergence * u[None, :], x=u, axis=-1, xp=xp
+        )
+        numerical = 2.0 * mass_integral / r_safe
+        analytic_nfw = _nfw_radial_deflection_from(
+            r=r_safe,
+            kappa_s=kappa_s,
+            scale_radius=scale_radius,
+            xp=xp,
+        )
+
+        radial_deflection = xp.where(
+            interaction_radius > 0.0,
+            numerical,
+            analytic_nfw,
+        )
+
+        return xp.where(r > 1.0e-8, radial_deflection, 0.0)
 
     @aa.decorators.to_vector_yx
     @aa.decorators.transform
