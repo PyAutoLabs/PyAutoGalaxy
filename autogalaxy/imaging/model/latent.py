@@ -16,6 +16,7 @@ from typing import Callable, Dict, List, Optional
 
 import numpy as np
 
+import autofit as af
 from autoconf import conf
 
 logger = logging.getLogger(__name__)
@@ -160,3 +161,38 @@ def latent_keys_enabled(yaml_config: Optional[Dict[str, bool]] = None) -> List[s
             continue
         enabled.append(key)
     return enabled
+
+
+class LatentGalaxy(af.Latent):
+    """
+    Latent-variable catalogue for galaxy imaging fits, declared on
+    ``AnalysisImaging`` as ``Latent = LatentGalaxy`` (mirrors ``Visualizer`` /
+    ``Result``).
+
+    :meth:`keys` returns the config-enabled latent names; :meth:`variables`
+    dispatches the :data:`LATENT_FUNCTIONS` registry on a per-sample fit.
+    Subclass to add project-specific latents, composing the library values via
+    ``LatentGalaxy.variables(analysis, parameters, model)``.
+    """
+
+    # Preserves the previous ``AnalysisDataset.LATENT_BATCH_MODE = "jit"``: the
+    # per-sample jit path is used because the lensing Einstein-radius latent
+    # (shared dataset base) routes through ``ZeroSolver``, which is
+    # vmap-incompatible.
+    BATCH_MODE = "jit"
+
+    @staticmethod
+    def keys(analysis) -> List[str]:
+        return latent_keys_enabled()
+
+    @staticmethod
+    def variables(analysis, parameters, model):
+        keys = latent_keys_enabled()
+        if not keys:
+            raise NotImplementedError
+        xp = analysis._xp
+        instance = model.instance_from_vector(vector=parameters)
+        fit = analysis.fit_from(instance=instance)
+        magzero = analysis.kwargs.get("magzero", None)
+        context = {"fit": fit, "magzero": magzero, "xp": xp}
+        return tuple(LATENT_FUNCTIONS[k](**context) for k in keys)
