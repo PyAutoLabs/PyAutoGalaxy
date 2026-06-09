@@ -10,6 +10,7 @@ import autogalaxy as ag
 from autogalaxy.imaging.model import latent as _latent_module
 from autogalaxy.imaging.model.latent import (
     LATENT_FUNCTIONS,
+    LatentGalaxy,
     ab_mag_via_flux_from,
     flux_mujy_via_ab_mag_from,
     latent_keys_enabled,
@@ -139,7 +140,7 @@ def test_latent_keys_enabled_drops_unknown_with_warning(caplog):
     assert any("never_registered_latent" in rec.message for rec in caplog.records)
 
 
-def test_analysis_imaging_compute_latent_variables_aligns_with_latent_keys(
+def test_latent_galaxy_variables_aligns_with_keys(
     masked_imaging_7x7,
 ):
     galaxy = ag.Galaxy(redshift=0.5, light=ag.lp.Sersic(intensity=0.1))
@@ -150,35 +151,34 @@ def test_analysis_imaging_compute_latent_variables_aligns_with_latent_keys(
     )
 
     parameters = np.array(model.physical_values_from_prior_medians)
-    values = analysis.compute_latent_variables(parameters=parameters, model=model)
+    values = LatentGalaxy.variables(analysis, parameters=parameters, model=model)
+    keys = LatentGalaxy.keys(analysis)
 
     assert isinstance(values, tuple)
-    assert len(values) == len(analysis.LATENT_KEYS)
+    assert len(values) == len(keys)
     # test_autogalaxy/config/latent.yaml enables both keys, raw flux first.
-    assert analysis.LATENT_KEYS == ["total_galaxy_0_flux", "total_galaxy_0_flux_mujy"]
+    assert keys == ["total_galaxy_0_flux", "total_galaxy_0_flux_mujy"]
     assert all(np.isfinite(v) for v in values)
 
 
-def test_analysis_imaging_compute_latent_variables_raises_when_empty(monkeypatch):
+def test_latent_galaxy_variables_raises_when_empty(monkeypatch):
     # When no latents are enabled, autofit's `except NotImplementedError`
-    # at autofit/non_linear/analysis/analysis.py:304 short-circuits the
-    # latent pipeline. We match that contract by raising explicitly.
-    monkeypatch.setattr(
-        ag.AnalysisImaging,
-        "LATENT_KEYS",
-        property(lambda self: []),
-    )
+    # short-circuits the latent pipeline. LatentGalaxy.variables matches that
+    # contract by raising explicitly.
+    monkeypatch.setattr(_latent_module, "latent_keys_enabled", lambda *a, **k: [])
     analysis = ag.AnalysisImaging(dataset=MagicMock(), use_jax=False)
 
     with pytest.raises(NotImplementedError):
-        analysis.compute_latent_variables(parameters=np.array([]), model=MagicMock())
+        LatentGalaxy.variables(analysis, parameters=np.array([]), model=MagicMock())
 
 
-def test_analysis_imaging_latent_keys_property_reads_config():
+def test_analysis_imaging_declares_latent_galaxy_and_keys_read_config():
     # The autouse fixture in test_autogalaxy/conftest.py pushes the test
     # config dir whose latent.yaml enables both keys.
     dataset = MagicMock()
     analysis = ag.AnalysisImaging(dataset=dataset, use_jax=False)
 
-    assert analysis.LATENT_KEYS == ["total_galaxy_0_flux", "total_galaxy_0_flux_mujy"]
-    assert set(analysis.LATENT_KEYS).issubset(LATENT_FUNCTIONS.keys())
+    assert ag.AnalysisImaging.Latent is LatentGalaxy
+    keys = ag.AnalysisImaging.Latent.keys(analysis)
+    assert keys == ["total_galaxy_0_flux", "total_galaxy_0_flux_mujy"]
+    assert set(keys).issubset(LATENT_FUNCTIONS.keys())

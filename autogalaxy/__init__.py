@@ -74,6 +74,8 @@ from .operate.lens_calc import LensCalc
 from .gui.scribbler import Scribbler
 from .imaging.fit_imaging import FitImaging
 from .imaging.model.analysis import AnalysisImaging
+from autofit import Latent
+from .imaging.model.latent import LatentGalaxy
 from .imaging.simulator import SimulatorImaging
 from .interferometer.simulator import SimulatorInterferometer
 from .interferometer.fit_interferometer import FitInterferometer
