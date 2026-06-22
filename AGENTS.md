@@ -1,72 +1,126 @@
 # PyAutoGalaxy — Agent Instructions
 
-**PyAutoGalaxy** is a Bayesian galaxy morphology fitting library. It depends on `autoarray` (data structures) and `autofit` (model-fitting framework).
+Canonical, agent-agnostic instructions for this repo. `CLAUDE.md` imports this
+file; any tool that does not process `@`-imports should read this directly.
 
-## Setup
+## What this repo is
+
+**PyAutoGalaxy** (package `autogalaxy`) is a Bayesian galaxy-morphology fitting
+library: light/mass profiles (incl. MGE/linear/operated), `Galaxy`/`Galaxies`,
+per-dataset `Fit*` and `Analysis*` classes (imaging, interferometer, ellipse),
+inversions for linear profiles/pixelizations, and adapt-image multi-stage
+fitting.
+
+Dependency direction: autogalaxy may import **autoarray** (data structures),
+**autofit** (model-fitting), and **autoconf** (config). It must **never**
+import `autolens` — lensing lives one layer up.
+
+## Related repos
+
+- **Source siblings:** PyAutoConf, PyAutoArray, PyAutoFit (upstream);
+  PyAutoLens (downstream — builds multi-plane lensing on autogalaxy).
+- **autogalaxy_workspace** — runnable tutorials/examples (`../autogalaxy_workspace`).
+- **autogalaxy_workspace_test** — integration + JAX/likelihood parity scripts.
+- **HowToGalaxy** — the lecture-style tutorial series (`../HowToGalaxy`).
+- **docs/** — Sphinx source; published to ReadTheDocs.
+- **Science context:** the lensing-focused knowledge wiki at
+  `autolens_assistant/wiki/literature/` (concepts, entities, sources) covers
+  source reconstruction, regularization, bulge/halo decomposition, kinematics,
+  and multipoles useful to galaxy modelling.
+
+## Quick commands
 
 ```bash
-pip install -e ".[dev]"
+pip install -e ".[dev]"                                    # install with dev/test extras
+python -m pytest test_autogalaxy/                          # full test suite
+python -m pytest test_autogalaxy/galaxy/test_galaxy.py     # one focused test (add -s for output)
+black autogalaxy/                                          # formatter (advisory — not gated)
 ```
 
-## Running Tests
-
-```bash
-python -m pytest test_autogalaxy/
-python -m pytest test_autogalaxy/galaxy/test_galaxy.py
-python -m pytest test_autogalaxy/galaxy/test_galaxy.py::TestGalaxy::test_name
-```
-
-### Sandboxed / Codex runs
+In a sandboxed / restricted environment, point numba and matplotlib at
+writable caches:
 
 ```bash
 NUMBA_CACHE_DIR=/tmp/numba_cache MPLCONFIGDIR=/tmp/matplotlib python -m pytest test_autogalaxy/
 ```
 
-## Key Architecture
+## CI / definition of green
 
-- **Profiles**: `LightProfile` (`lp.*`), `MassProfile` (`mp.*`), `LightProfileLinear` (`lp_linear.*`)
-- **Galaxy** (`galaxy/galaxy.py`): holds light/mass profiles, pixelizations
-- **Fit classes**: `FitImaging`, `FitInterferometer`, `FitEllipse`
-- **Analysis classes**: `AnalysisImaging`, `AnalysisInterferometer` — implement `log_likelihood_function`
-- **Decorator system** (from autoarray): `@to_array`, `@to_grid`, `@to_vector_yx`, `@transform`
-- **Operate mixins**: `OperateImage`, `OperateDeflections`, `LensCalc`
+PRs must pass `pytest --cov` on the CI matrix (Python 3.12 **and** 3.13). There
+is no black/ruff/flake8 gate — formatting is advisory. (`requires-python` in
+`pyproject.toml` is `>=3.9`.)
 
-## Key Rules
+## Configuration & defaults
 
-- The `xp` parameter controls NumPy vs JAX: `xp=np` (default) or `xp=jnp`
-- Functions inside `jax.jit` must guard autoarray wrapping with `if xp is np:`
-- Decorated functions return **raw arrays** — the decorator wraps them
-- Use `grid.array[:, 0]` to access grid coordinates (not `grid[:, 0]`)
-- All files must use Unix line endings (LF)
-- Format with `black autogalaxy/`
+autoconf supplies the packaged defaults under `autogalaxy/config/`. Workspaces
+override them via their own `config/` directory; the test suite pushes a local
+config dir via `conf.instance.push(...)` in `test_autogalaxy/conftest.py`. When
+a change adds a new config key, mirror it into the packaged defaults so
+downstream workspaces inherit it.
 
-## Working on Issues
+## JAX & `xp`
+
+NumPy is the default everywhere; JAX is opt-in and never imported at module
+level. `xp=np` (default) selects NumPy; `xp=jnp` selects JAX (imported locally).
+Thread `xp` through **every** nested call — a missed site silently defaults to
+`xp=np` and fails when a tracer hits an `np.*` op. Two patterns cross the
+`jax.jit` boundary: the `if xp is np:` **guard** for raw `jax.Array` returns
+(used by all `LensCalc` hessian methods in `operate/lens_calc.py`), and
+**pytree registration** for functions returning a real wrapper/structured
+object.
+
+**Unit tests are NumPy-only.** A JAX/`xp` change is validated only by the
+parity scripts in `autogalaxy_workspace_test` (`jax.jit` round-trip +
+`fitness._vmap` batch eval) — never by `test_autogalaxy/`.
+
+Full detail lives in PyAutoArray:
+**[`PyAutoArray/docs/agents/jax_and_decorators.md`](../PyAutoArray/docs/agents/jax_and_decorators.md)**.
+
+## Public API
+
+The public surface is defined authoritatively in `autogalaxy/__init__.py` —
+read it rather than trusting a hand-maintained namespace table. Canonical
+import:
+
+```python
+import autogalaxy as ag
+```
+
+Profiles are namespaced there (`ag.lp.*`, `ag.lp_linear.*`, `ag.mp.*`,
+`ag.lmp.*`, …) alongside `ag.Galaxy`, `ag.FitImaging`, `ag.AnalysisImaging`.
+
+## Key rules / footguns
+
+- Import direction: autoarray / autofit / autoconf only — **never** `autolens`.
+- Operate mixins are `OperateImage` (`operate/image.py`) and `LensCalc`
+  (`operate/lens_calc.py`). There is no `OperateDeflections` / `operate/
+  deflections.py`.
+- Grid-decorated profile methods return a **raw array** (the decorator wraps
+  it); write `aa.decorators.*` and read coordinates via `grid.array[:, 0]`.
+- All files use Unix line endings (LF, `\n`) — never `\r\n`.
+
+## Working on issues
 
 1. Read the issue description and any linked plan.
-2. Identify affected files and write your changes.
-3. Run the full test suite: `python -m pytest test_autogalaxy/`
-4. Ensure all tests pass before opening a PR.
-5. If changing public API, note the change in your PR description — downstream packages (PyAutoLens) and workspaces may need updates.
-## Never rewrite history
+2. Identify affected files and make the change.
+3. Run the full suite: `python -m pytest test_autogalaxy/`.
+4. If you changed public API, say so explicitly — PyAutoLens and the workspaces
+   may need updates.
+5. Ensure all tests pass before opening a PR.
 
-NEVER perform these operations on any repo with a remote:
+## Deep dives
 
-- `git init` in a directory already tracked by git
-- `rm -rf .git && git init`
-- Commit with subject "Initial commit", "Fresh start", "Start fresh", "Reset
-  for AI workflow", or any equivalent message on a branch with a remote
-- `git push --force` to `main` (or any branch tracked as `origin/HEAD`)
-- `git filter-repo` / `git filter-branch` on shared branches
-- `git rebase -i` rewriting commits already pushed to a shared branch
+- [`PyAutoArray/docs/agents/jax_and_decorators.md`](../PyAutoArray/docs/agents/jax_and_decorators.md)
+  — decorator system, `xp` backend pattern, and the `jax.jit` boundary.
 
-If the working tree needs a clean state, the **only** correct sequence is:
+## Clean state
 
-    git fetch origin
-    git reset --hard origin/main
-    git clean -fd
+Never rewrite history on a repo with a remote (no `git init` over a tracked
+tree, no force-push to `main`, no rebasing pushed shared branches). To reset a
+dirty tree the only correct sequence is:
 
-This applies equally to humans, local Claude Code, cloud Claude agents, Codex,
-and any other agent. The "Initial commit — fresh start for AI workflow" pattern
-that appeared independently on origin and local for three workspace repos is
-exactly what this rule prevents — it costs ~40 commits of redundant local work
-every time it happens.
+```bash
+git fetch origin
+git reset --hard origin/main
+git clean -fd
+```
