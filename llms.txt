@@ -1,0 +1,20 @@
+# PyAutoGalaxy
+
+> PyAutoGalaxy (package `autogalaxy`) is a Bayesian galaxy-morphology fitting library — light/mass profiles, `Galaxy`/`Galaxies`, per-dataset `Fit`/`Analysis` classes, and inversions for linear profiles and pixelizations. This file is a signpost: it points you to the right resource by intent — use the API, learn it, or work on the library itself.
+
+## Use it (examples & tutorials)
+
+- [autogalaxy_workspace navigator](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/llms.txt): end-to-end example scripts and notebooks per science case — the paste-friendly task router. Send any "how do I model / simulate / analyse X?" question here.
+- [HowToGalaxy](https://github.com/PyAutoLabs/HowToGalaxy): from-first-principles lecture series on galaxy morphology and Bayesian fitting.
+
+## API reference & docs
+
+- [PyAutoGalaxy documentation (ReadTheDocs)](https://pyautogalaxy.readthedocs.io/en/latest/): API reference, feature overviews, and the installation guide.
+
+## Work on it (contributors / coding agents)
+
+- [AGENTS.md](./AGENTS.md): build, tests, architecture, and the JAX / decorator conventions.
+
+## Ecosystem
+
+- Built on PyAutoArray (data structures) + PyAutoFit (inference) + PyAutoConf (config); used by PyAutoLens, which builds multi-plane lensing on it.
