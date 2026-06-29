@@ -1,6 +1,6 @@
 # PyAutoGalaxy: Open-Source Multi Wavelength Galaxy Structure & Morphology
 
-[![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/PyAutoLabs/autogalaxy_workspace/blob/2026.6.26.642/notebooks/imaging/start_here.ipynb)
+[![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/PyAutoLabs/autogalaxy_workspace/blob/2026.6.29.643/notebooks/imaging/start_here.ipynb)
 [![Documentation Status](https://readthedocs.org/projects/pyautogalaxy/badge/?version=latest)](https://pyautogalaxy.readthedocs.io/en/latest/?badge=latest)
 [![Tests](https://github.com/PyAutoLabs/PyAutoGalaxy/actions/workflows/main.yml/badge.svg)](https://github.com/PyAutoLabs/PyAutoGalaxy/actions)
 [![Build](https://github.com/Jammy2211/PyAutoBuild/actions/workflows/release.yml/badge.svg)](https://github.com/Jammy2211/PyAutoBuild/actions)
@@ -14,7 +14,7 @@
 
 [Installation Guide](https://pyautogalaxy.readthedocs.io/en/latest/installation/overview.html) |
 [readthedocs](https://pyautogalaxy.readthedocs.io/en/latest/index.html) |
-[Introduction on Colab](https://colab.research.google.com/github/PyAutoLabs/autogalaxy_workspace/blob/2026.6.26.642/notebooks/imaging/start_here.ipynb) |
+[Introduction on Colab](https://colab.research.google.com/github/PyAutoLabs/autogalaxy_workspace/blob/2026.6.29.643/notebooks/imaging/start_here.ipynb) |
 [HowToGalaxy](https://pyautogalaxy.readthedocs.io/en/latest/howtogalaxy/howtogalaxy.html)
 
 **PyAutoGalaxy** is software for analysing the morphologies and structures of galaxies:
@@ -30,7 +30,7 @@
 The following links are useful for new starters:
 
 - [The PyAutoGalaxy readthedocs](https://pyautogalaxy.readthedocs.io/en/latest), which includes [an overview of PyAutoGalaxy's core features](https://pyautogalaxy.readthedocs.io/en/latest/overview/overview_1_start_here.html), [a new user starting guide](https://pyautogalaxy.readthedocs.io/en/latest/overview/overview_2_new_user_guide.html) and [an installation guide](https://pyautogalaxy.readthedocs.io/en/latest/installation/overview.html).
-- [The introduction Jupyter Notebook on Google Colab](https://colab.research.google.com/github/PyAutoLabs/autogalaxy_workspace/blob/2026.6.26.642/notebooks/imaging/start_here.ipynb), where you can try **PyAutoGalaxy** in a web browser (without installation).
+- [The introduction Jupyter Notebook on Google Colab](https://colab.research.google.com/github/PyAutoLabs/autogalaxy_workspace/blob/2026.6.29.643/notebooks/imaging/start_here.ipynb), where you can try **PyAutoGalaxy** in a web browser (without installation).
 - [The autogalaxy_workspace GitHub repository](https://github.com/PyAutoLabs/autogalaxy_workspace): example scripts covering every **PyAutoGalaxy** use case.
 - [The HowToGalaxy GitHub repository](https://github.com/PyAutoLabs/HowToGalaxy): a Jupyter notebook lecture series teaching galaxy modeling from the ground up.
 
