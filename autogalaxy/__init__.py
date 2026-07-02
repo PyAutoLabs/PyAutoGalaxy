@@ -128,7 +128,7 @@ from autoconf.fitsable import header_obj_from
 from autoconf.fitsable import output_to_fits
 from autoconf.fitsable import hdu_list_for_output_from
 
-__version__ = "2026.7.1.646"
+__version__ = "2026.7.2.647"
 
 from autoconf import check_version
 
