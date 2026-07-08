@@ -68,6 +68,26 @@ class OperateImage:
         raise NotImplementedError
 
     @staticmethod
+    def _binned_for_convolution(values, grid, psf, xp=np):
+        """
+        Partially bin values evaluated on ``grid``'s over-sampled coordinates (per-pixel
+        sizes k_i * s) down to the uniform s the oversampled Convolver requires — the
+        k x s coupling. A no-op when the grid's sizes already equal s.
+        """
+        from autoarray.operators.over_sampling.over_sample_util import (
+            binned_to_convolve_size_from,
+        )
+
+        values = values.array if hasattr(values, "array") else values
+
+        return binned_to_convolve_size_from(
+            values=values,
+            sub_size=np.array(grid.over_sample_size),
+            convolve_over_sample_size=psf.convolve_over_sample_size,
+            xp=xp,
+        )
+
+    @staticmethod
     def _psf_evaluation_grids_from(grid, blurring_grid, psf):
         """
         The grids a light object is evaluated on for PSF convolution, and the mask
@@ -163,8 +183,12 @@ class OperateImage:
 
         if convolution_mask is not None:
             blurred_image_2d = psf.convolved_image_from(
-                image=image_2d_not_operated,
-                blurring_image=blurring_image_2d_not_operated,
+                image=self._binned_for_convolution(
+                    image_2d_not_operated, grid, psf, xp=xp
+                ),
+                blurring_image=self._binned_for_convolution(
+                    blurring_image_2d_not_operated, blurring_grid, psf, xp=xp
+                ),
                 mask=convolution_mask,
                 xp=xp,
             )
@@ -247,14 +271,32 @@ class OperateImage:
             origin=grid.origin,
         )
 
-        padded_grid = aa.Grid2D.from_mask(mask=padded_mask, over_sample_size=s)
+        # The padded grid inherits the input grid's (possibly adaptive, k x s
+        # coupled) evaluation sizes, padded with s in the border region.
+        pad_width = (
+            (padded_shape[0] - grid.mask.shape_native[0]) // 2,
+            (padded_shape[1] - grid.mask.shape_native[1]) // 2,
+        )
+        over_sample_size = np.pad(
+            np.array(grid.over_sample_size.native),
+            pad_width,
+            mode="constant",
+            constant_values=s,
+        )
+        over_sample_size[over_sample_size == 0] = s
+
+        padded_grid = aa.Grid2D.from_mask(
+            mask=padded_mask, over_sample_size=over_sample_size
+        )
 
         image_over_sampled = self.image_2d_from(
             grid=padded_grid.over_sampled, xp=xp, operated_only=False
         )
 
         convolved = psf.convolved_image_from(
-            image=image_over_sampled,
+            image=self._binned_for_convolution(
+                image_over_sampled, padded_grid, psf, xp=xp
+            ),
             blurring_image=None,
             mask=padded_mask,
             xp=xp,
@@ -416,8 +458,12 @@ class OperateImageList(OperateImage):
 
             if convolution_mask is not None:
                 blurred_image_2d = psf.convolved_image_from(
-                    image=image_2d_not_operated,
-                    blurring_image=blurring_image_2d_not_operated,
+                    image=self._binned_for_convolution(
+                        image_2d_not_operated, grid, psf
+                    ),
+                    blurring_image=self._binned_for_convolution(
+                        blurring_image_2d_not_operated, blurring_grid, psf
+                    ),
                     mask=convolution_mask,
                 )
             else:
@@ -583,6 +629,14 @@ class OperateImageGalaxies(OperateImageList):
             blurring_image_2d_not_operated = galaxy_blurring_image_2d_not_operated_dict[
                 galaxy_key
             ]
+
+            if convolution_mask is not None:
+                image_2d_not_operated = self._binned_for_convolution(
+                    image_2d_not_operated, grid, psf, xp=xp
+                )
+                blurring_image_2d_not_operated = self._binned_for_convolution(
+                    blurring_image_2d_not_operated, blurring_grid, psf, xp=xp
+                )
 
             blurred_image_2d = psf.convolved_image_from(
                 image=image_2d_not_operated,
