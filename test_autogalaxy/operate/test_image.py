@@ -374,3 +374,89 @@ def test__galaxy_visibilities_dict_from(grid_2d_7x7, transformer_7x7_7):
     assert (visibilities_dict[g0] == visibilities_list[1]).all()
     assert (visibilities_dict[g1] == visibilities_list[0]).all()
     assert (visibilities_dict[g2] == visibilities_list[2]).all()
+
+
+def _oversampled_psf_scene():
+    import autoarray as aa
+
+    mask = aa.Mask2D.circular(shape_native=(11, 11), pixel_scales=1.0, radius=3.5)
+
+    s = 2
+    n = 9
+    c = (np.arange(n) - (n - 1) / 2.0) * (1.0 / s)
+    yy, xx = np.meshgrid(-c, c, indexing="ij")
+    kernel = np.exp(-0.5 * (yy**2 + xx**2) / 0.8**2)
+    kernel = aa.Array2D.no_mask(values=kernel / kernel.sum(), pixel_scales=1.0 / s)
+    psf = aa.Convolver(kernel=kernel, convolve_over_sample_size=s)
+
+    grid = aa.Grid2D.from_mask(mask=mask, over_sample_size=s)
+    blurring_mask = mask.derive_mask.blurring_from(
+        kernel_shape_native=psf.kernel_shape_image_resolution, allow_padding=True
+    )
+    blurring_grid = aa.Grid2D.from_mask(mask=blurring_mask, over_sample_size=s)
+
+    return mask, psf, grid, blurring_grid
+
+
+def test__blurred_image_2d_from__oversampled_psf__matches_direct_convolver_call():
+    # The consumer switch evaluates on the over-sampled grids and hands the
+    # sub-block ordered values to the oversampled Convolver — the result must
+    # equal calling that (phase-2a tested) API directly.
+    mask, psf, grid, blurring_grid = _oversampled_psf_scene()
+
+    galaxy = ag.Galaxy(
+        redshift=0.5,
+        light=ag.lp.Sersic(
+            centre=(0.3, -0.4), intensity=1.0, effective_radius=1.0, sersic_index=2.0
+        ),
+    )
+    galaxies = ag.Galaxies(galaxies=[galaxy])
+
+    blurred = galaxies.blurred_image_2d_from(
+        grid=grid, blurring_grid=blurring_grid, psf=psf
+    )
+
+    image_sub = galaxy.image_2d_from(grid=grid.over_sampled)
+    blurring_sub = galaxy.image_2d_from(grid=blurring_grid.over_sampled)
+    direct = psf.convolved_image_from(
+        image=image_sub, blurring_image=blurring_sub, mask=mask
+    )
+
+    assert np.array(blurred) == pytest.approx(np.array(direct), abs=1.0e-14)
+
+    # The result is at image resolution and differs from the binned-then-convolved
+    # (s=1 style) computation — the oversampling is actually doing something.
+    assert np.array(blurred).shape == (mask.pixels_in_mask,)
+
+
+def test__blurred_image_2d_list_and_dict__oversampled_psf__match_scalar_path():
+    mask, psf, grid, blurring_grid = _oversampled_psf_scene()
+
+    galaxy_0 = ag.Galaxy(
+        redshift=0.5,
+        light=ag.lp.Sersic(centre=(0.3, -0.4), intensity=1.0, effective_radius=1.0),
+    )
+    galaxy_1 = ag.Galaxy(
+        redshift=0.5,
+        light=ag.lp.Gaussian(centre=(-0.5, 0.2), intensity=2.0, sigma=0.7),
+    )
+    galaxies = ag.Galaxies(galaxies=[galaxy_0, galaxy_1])
+
+    blurred_list = galaxies.blurred_image_2d_list_from(
+        grid=grid, blurring_grid=blurring_grid, psf=psf
+    )
+    blurred_dict = galaxies.galaxy_blurred_image_2d_dict_from(
+        grid=grid, blurring_grid=blurring_grid, psf=psf
+    )
+
+    total_from_list = np.sum([np.array(b) for b in blurred_list], axis=0)
+    blurred_total = galaxies.blurred_image_2d_from(
+        grid=grid, blurring_grid=blurring_grid, psf=psf
+    )
+
+    assert total_from_list == pytest.approx(np.array(blurred_total), abs=1.0e-12)
+
+    for galaxy, blurred_scalar in zip([galaxy_0, galaxy_1], blurred_list):
+        assert np.array(blurred_dict[galaxy]) == pytest.approx(
+            np.array(blurred_scalar), abs=1.0e-14
+        )
