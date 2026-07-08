@@ -490,3 +490,60 @@ def test__linear_light_profiles_agree_with_standard__galaxy_model_image_matches_
     assert fit_linear.galaxy_model_image_dict[galaxy_linear] == pytest.approx(
         galaxy_image.array, 1.0e-4
     )
+
+
+def test__perfect_fit__chi_squared_0__oversampled_psf():
+    # Simulate with an oversampled PSF (convolution at 2x the image resolution)
+    # via via_galaxies_from and fit the same galaxies at s=2: exact round trip.
+    s = 2
+    pixel_scales = 0.2
+
+    grid = ag.Grid2D.uniform(
+        shape_native=(21, 21), pixel_scales=pixel_scales, over_sample_size=s
+    )
+
+    psf = ag.Convolver.from_gaussian(
+        shape_native=(11, 11),
+        pixel_scales=pixel_scales / s,
+        sigma=0.15,
+        normalize=True,
+        convolve_over_sample_size=s,
+    )
+
+    galaxy_0 = ag.Galaxy(
+        redshift=0.5,
+        light=ag.lp.Sersic(centre=(0.0, 0.0), intensity=0.5, effective_radius=0.4),
+    )
+    galaxy_1 = ag.Galaxy(
+        redshift=0.5,
+        light=ag.lp.Exponential(centre=(0.05, 0.05), intensity=0.3, effective_radius=0.2),
+    )
+
+    simulator = ag.SimulatorImaging(
+        exposure_time=300.0, psf=psf, add_poisson_noise_to_data=False
+    )
+    dataset = simulator.via_galaxies_from(galaxies=[galaxy_0, galaxy_1], grid=grid)
+
+    dataset.noise_map = ag.Array2D.ones(
+        shape_native=dataset.data.shape_native, pixel_scales=pixel_scales
+    )
+
+    mask = ag.Mask2D.circular(
+        shape_native=dataset.data.shape_native, pixel_scales=pixel_scales, radius=1.8
+    )
+
+    masked = ag.Imaging(
+        data=dataset.data,
+        noise_map=dataset.noise_map,
+        psf=psf,
+        over_sample_size_lp=s,
+        over_sample_size_pixelization=s,
+        convolve_over_sample_size_lp=s,
+        convolve_over_sample_size_pixelization=s,
+    ).apply_mask(mask=mask)
+
+    fit = ag.FitImaging(
+        dataset=masked, galaxies=ag.Galaxies(galaxies=[galaxy_0, galaxy_1])
+    )
+
+    assert fit.chi_squared == pytest.approx(0.0, abs=1.0e-10)
