@@ -1,0 +1,71 @@
+KaplinghatCoredNFWSph:
+  centre_0:
+    type: Gaussian
+    mean: 0.0
+    sigma: 0.1
+    width_modifier:
+      type: Absolute
+      value: 0.05
+    limits:
+      lower: -inf
+      upper: inf
+  centre_1:
+    type: Gaussian
+    mean: 0.0
+    sigma: 0.1
+    width_modifier:
+      type: Absolute
+      value: 0.05
+    limits:
+      lower: -inf
+      upper: inf
+  kappa_s:
+    type: Uniform
+    lower_limit: 0.0
+    upper_limit: 1.0
+    width_modifier:
+      type: Relative
+      value: 0.2
+    limits:
+      lower: 0.0
+      upper: inf
+  scale_radius:
+    type: Uniform
+    lower_limit: 0.0
+    upper_limit: 30.0
+    width_modifier:
+      type: Relative
+      value: 0.2
+    limits:
+      lower: 0.0
+      upper: inf
+  sigma_over_m:
+    type: Uniform
+    lower_limit: 0.0
+    upper_limit: 10.0
+    width_modifier:
+      type: Relative
+      value: 0.5
+    limits:
+      lower: 0.0
+      upper: inf
+  t_age:
+    type: Uniform
+    lower_limit: 0.0
+    upper_limit: 13.8
+    width_modifier:
+      type: Relative
+      value: 0.2
+    limits:
+      lower: 0.0
+      upper: inf
+  interaction_radius:
+    type: Uniform
+    lower_limit: 0.0
+    upper_limit: 30.0
+    width_modifier:
+      type: Relative
+      value: 0.2
+    limits:
+      lower: 0.0
+      upper: inf
