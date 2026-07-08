@@ -355,12 +355,22 @@ class LightProfileLinearObjFuncList(aa.AbstractLinearObjFuncList):
 
         blurred_image_2d_list = []
 
+        from autogalaxy.operate.image import OperateImage
+
         for pixel, light_profile in enumerate(self.light_profile_list):
             image_2d = light_profile.image_2d_from(grid=evaluation_grid, xp=self._xp)
 
             blurring_image_2d = light_profile.image_2d_from(
                 grid=evaluation_blurring_grid, xp=self._xp
             )
+
+            if convolution_mask is not None:
+                image_2d = OperateImage._binned_for_convolution(
+                    image_2d, self.grid, self.psf, xp=self._xp
+                )
+                blurring_image_2d = OperateImage._binned_for_convolution(
+                    blurring_image_2d, self.blurring_grid, self.psf, xp=self._xp
+                )
 
             blurred_image_2d = self.psf.convolved_image_from(
                 image=image_2d,
