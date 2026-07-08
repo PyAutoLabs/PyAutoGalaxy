@@ -194,6 +194,70 @@ class OperateImage:
 
         return self.image_2d_from(grid=padded_grid, xp=xp)
 
+    def convolved_padded_image_2d_from(self, grid, psf: aa.Convolver, xp=np):
+        """
+        Evaluate the light object's 2D image on a padded grid and convolve it with an
+        oversampled PSF at the fine resolution, returning the convolved padded image
+        at image resolution (still requiring trimming, as with
+        `padded_image_2d_from` + external convolution).
+
+        This is the simulation path for `convolve_over_sample_size > 1`: the padded
+        frame is sized by the kernel's image-resolution footprint and carries a
+        *uniform* over-sample size equal to the PSF's (the regular padded grid pads
+        its border with size-1 entries, which oversampled convolution correctly
+        rejects). The image is evaluated unbinned on the padded grid's over-sampled
+        coordinates and convolved by the oversampled Convolver, which bins back to
+        image resolution. No blurring image is needed — the padding guarantees all
+        flux that blurs into the frame is evaluated, exactly as in the existing
+        padded flow.
+
+        Parameters
+        ----------
+        grid
+            The 2D (y,x) coordinates of the grid the simulation is performed on, in
+            its original geometric reference frame.
+        psf
+            The oversampled PSF (`convolve_over_sample_size > 1`) the padded image
+            is convolved with.
+        """
+        s = psf.convolve_over_sample_size
+
+        kernel_shape_2d = psf.kernel_shape_image_resolution
+
+        padded_shape = (
+            grid.mask.shape_native[0] + kernel_shape_2d[0] - 1,
+            grid.mask.shape_native[1] + kernel_shape_2d[1] - 1,
+        )
+
+        padded_mask = aa.Mask2D.all_false(
+            shape_native=padded_shape,
+            pixel_scales=grid.mask.pixel_scales,
+            origin=grid.origin,
+        )
+
+        padded_grid = aa.Grid2D.from_mask(mask=padded_mask, over_sample_size=s)
+
+        image_over_sampled = self.image_2d_from(
+            grid=padded_grid.over_sampled, xp=xp, operated_only=False
+        )
+
+        convolved = psf.convolved_image_from(
+            image=image_over_sampled,
+            blurring_image=None,
+            mask=padded_mask,
+            xp=xp,
+        )
+
+        from autogalaxy.profiles.light.operated import LightProfileOperated
+
+        if self.has(cls=LightProfileOperated):
+            image_2d_operated = self.image_2d_from(
+                grid=padded_grid, xp=xp, operated_only=True
+            )
+            return convolved + image_2d_operated
+
+        return convolved
+
     def unmasked_blurred_image_2d_from(self, grid, psf):
         """
         Evaluate the light object's 2D image from a input 2D grid of coordinates and convolve it with a PSF, using a

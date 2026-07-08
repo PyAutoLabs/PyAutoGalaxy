@@ -460,3 +460,44 @@ def test__blurred_image_2d_list_and_dict__oversampled_psf__match_scalar_path():
         assert np.array(blurred_dict[galaxy]) == pytest.approx(
             np.array(blurred_scalar), abs=1.0e-14
         )
+
+
+def test__convolved_padded_image_2d_from__delta_kernel__equals_binned_padded_image():
+    # With a delta fine kernel the fine convolution is the identity, so the
+    # convolved padded image must equal the binned padded evaluation — testing
+    # the padded-frame geometry and bin-down independently of PSF numerics.
+    import autoarray as aa
+
+    s = 2
+    pixel_scales = 1.0
+
+    grid = aa.Grid2D.uniform(
+        shape_native=(7, 7), pixel_scales=pixel_scales, over_sample_size=s
+    )
+
+    delta = np.zeros((5, 5))
+    delta[2, 2] = 1.0
+    psf = aa.Convolver(
+        kernel=aa.Array2D.no_mask(values=delta, pixel_scales=pixel_scales / s),
+        convolve_over_sample_size=s,
+    )
+
+    galaxy = ag.Galaxy(
+        redshift=0.5,
+        light=ag.lp.Sersic(centre=(0.2, -0.1), intensity=1.0, effective_radius=0.8),
+    )
+    galaxies = ag.Galaxies(galaxies=[galaxy])
+
+    convolved_padded = galaxies.convolved_padded_image_2d_from(grid=grid, psf=psf)
+
+    kernel_shape = psf.kernel_shape_image_resolution
+    padded_shape = (7 + kernel_shape[0] - 1, 7 + kernel_shape[1] - 1)
+    padded_mask = aa.Mask2D.all_false(
+        shape_native=padded_shape, pixel_scales=pixel_scales, origin=grid.origin
+    )
+    padded_grid = aa.Grid2D.from_mask(mask=padded_mask, over_sample_size=s)
+
+    image_sub = galaxy.image_2d_from(grid=padded_grid.over_sampled)
+    binned = np.array(image_sub).reshape(-1, s**2).mean(axis=1)
+
+    assert np.array(convolved_padded) == pytest.approx(binned, abs=1.0e-14)
