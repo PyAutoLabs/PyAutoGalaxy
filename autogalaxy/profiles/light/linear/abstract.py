@@ -340,19 +340,33 @@ class LightProfileLinearObjFuncList(aa.AbstractLinearObjFuncList):
         if isinstance(self.light_profile_list[0], LightProfileOperated):
             return self.mapping_matrix
 
+        if self.psf.convolve_over_sample_size > 1:
+            # Evaluate each profile on the over-sampled coordinates (per-pixel
+            # sub-block order, unbinned — the oversampled Convolver's input format)
+            # so convolution runs at the fine resolution, mirroring
+            # OperateImage.blurred_image_2d_from.
+            evaluation_grid = self.grid.over_sampled
+            evaluation_blurring_grid = self.blurring_grid.over_sampled
+            convolution_mask = self.grid.mask
+        else:
+            evaluation_grid = self.grid
+            evaluation_blurring_grid = self.blurring_grid
+            convolution_mask = None
+
         blurred_image_2d_list = []
 
         for pixel, light_profile in enumerate(self.light_profile_list):
-            image_2d = light_profile.image_2d_from(grid=self.grid, xp=self._xp)
+            image_2d = light_profile.image_2d_from(grid=evaluation_grid, xp=self._xp)
 
             blurring_image_2d = light_profile.image_2d_from(
-                grid=self.blurring_grid, xp=self._xp
+                grid=evaluation_blurring_grid, xp=self._xp
             )
 
             blurred_image_2d = self.psf.convolved_image_from(
                 image=image_2d,
                 blurring_image=blurring_image_2d,
                 use_mixed_precision=self.settings.use_mixed_precision,
+                mask=convolution_mask,
                 xp=self._xp,
             )
 
