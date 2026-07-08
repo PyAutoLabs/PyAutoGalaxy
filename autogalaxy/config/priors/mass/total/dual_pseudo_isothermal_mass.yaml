@@ -124,3 +124,165 @@ dPIEMassSph:
     limits:
       lower: 0.0
       upper: inf
+dPIEMassLenstool:
+  centre_0:
+    type: Gaussian
+    mean: 0.0
+    sigma: 0.1
+    width_modifier:
+      type: Absolute
+      value: 0.05
+    limits:
+      lower: -inf
+      upper: inf
+  centre_1:
+    type: Gaussian
+    mean: 0.0
+    sigma: 0.1
+    width_modifier:
+      type: Absolute
+      value: 0.05
+    limits:
+      lower: -inf
+      upper: inf
+  ellipticity:
+    type: Uniform
+    lower_limit: 0.0
+    upper_limit: 0.9
+    width_modifier:
+      type: Absolute
+      value: 0.2
+    limits:
+      lower: 0.0
+      upper: 1.0
+  angle_pos:
+    type: Uniform
+    lower_limit: 0.0
+    upper_limit: 180.0
+    width_modifier:
+      type: Absolute
+      value: 30.0
+    limits:
+      lower: -inf
+      upper: inf
+  sigma:
+    type: Uniform
+    lower_limit: 0.0
+    upper_limit: 1000.0
+    width_modifier:
+      type: Relative
+      value: 0.25
+    limits:
+      lower: 0.0
+      upper: inf
+  r_core:
+    type: Uniform
+    lower_limit: 0.0
+    upper_limit: 10.0
+    width_modifier:
+      type: Relative
+      value: 0.25
+    limits:
+      lower: 0.0
+      upper: inf
+  r_cut:
+    type: Uniform
+    lower_limit: 0.0
+    upper_limit: 100.0
+    width_modifier:
+      type: Relative
+      value: 0.25
+    limits:
+      lower: 0.0
+      upper: inf
+  redshift_object:
+    type: Uniform
+    lower_limit: 0.0
+    upper_limit: 1.0
+    width_modifier:
+      type: Relative
+      value: 0.5
+    limits:
+      lower: 0.0
+      upper: inf
+  redshift_source:
+    type: Uniform
+    lower_limit: 0.0
+    upper_limit: 1.0
+    width_modifier:
+      type: Relative
+      value: 0.5
+    limits:
+      lower: 0.0
+      upper: inf
+dPIEMassLenstoolSph:
+  centre_0:
+    type: Gaussian
+    mean: 0.0
+    sigma: 0.1
+    width_modifier:
+      type: Absolute
+      value: 0.05
+    limits:
+      lower: -inf
+      upper: inf
+  centre_1:
+    type: Gaussian
+    mean: 0.0
+    sigma: 0.1
+    width_modifier:
+      type: Absolute
+      value: 0.05
+    limits:
+      lower: -inf
+      upper: inf
+  sigma:
+    type: Uniform
+    lower_limit: 0.0
+    upper_limit: 1000.0
+    width_modifier:
+      type: Relative
+      value: 0.25
+    limits:
+      lower: 0.0
+      upper: inf
+  r_core:
+    type: Uniform
+    lower_limit: 0.0
+    upper_limit: 10.0
+    width_modifier:
+      type: Relative
+      value: 0.25
+    limits:
+      lower: 0.0
+      upper: inf
+  r_cut:
+    type: Uniform
+    lower_limit: 0.0
+    upper_limit: 100.0
+    width_modifier:
+      type: Relative
+      value: 0.25
+    limits:
+      lower: 0.0
+      upper: inf
+  redshift_object:
+    type: Uniform
+    lower_limit: 0.0
+    upper_limit: 1.0
+    width_modifier:
+      type: Relative
+      value: 0.5
+    limits:
+      lower: 0.0
+      upper: inf
+  redshift_source:
+    type: Uniform
+    lower_limit: 0.0
+    upper_limit: 1.0
+    width_modifier:
+      type: Relative
+      value: 0.5
+    limits:
+      lower: 0.0
+      upper: inf

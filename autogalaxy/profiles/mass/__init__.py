@@ -4,6 +4,8 @@ from .point import PointMass, SMBH, SMBHBinary
 from .total import (
     dPIEMass,
     dPIEMassSph,
+    dPIEMassLenstool,
+    dPIEMassLenstoolSph,
     PIEMass,
     dPIEPotential,
     dPIEPotentialSph,
