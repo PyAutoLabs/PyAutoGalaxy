@@ -19,6 +19,8 @@ from typing import Optional
 import autofit as af
 import autoarray as aa
 
+from autoconf.fitsable import hdu_list_for_output_from
+
 from autogalaxy.analysis.adapt_images.adapt_images import AdaptImages
 from autogalaxy.analysis.analysis.dataset import AnalysisDataset
 from autogalaxy.cosmology.model import LensingCosmology
@@ -252,3 +254,35 @@ class AnalysisImaging(AnalysisDataset):
             visualization, and the pickled objects used by the aggregator output by this function.
         """
         super().save_attributes(paths=paths)
+
+        # Output `dataset.fits` to the `files` folder so the aggregator loaders
+        # (e.g. `ImagingAgg`, `agg_util.mask_header_from`) can always reload the
+        # dataset via `fit.value(name="dataset")`, independently of whether the
+        # visualization `fits_dataset` output ran. The plotter interface also
+        # writes this file to the `image` folder for inspection, but that write
+        # is gated on visualization settings and is not guaranteed for every fit.
+        image_list = [
+            self.dataset.data.native_for_fits,
+            self.dataset.noise_map.native_for_fits,
+            self.dataset.psf.kernel.native_for_fits,
+            self.dataset.grids.lp.over_sample_size.native_for_fits.astype("float"),
+            self.dataset.grids.pixelization.over_sample_size.native_for_fits.astype(
+                "float"
+            ),
+        ]
+
+        paths.save_fits(
+            name="dataset",
+            fits=hdu_list_for_output_from(
+                values_list=[image_list[0].mask.astype("float")] + image_list,
+                ext_name_list=[
+                    "mask",
+                    "data",
+                    "noise_map",
+                    "psf",
+                    "over_sample_size_lp",
+                    "over_sample_size_pixelization",
+                ],
+                header_dict=self.dataset.mask.header_dict,
+            ),
+        )
