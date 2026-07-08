@@ -112,6 +112,10 @@ class OperateImage:
         The grid and blurring_grid must be a `Grid2D` objects so the evaluated image can be mapped to a uniform 2D
         array and binned up for convolution. They therefore cannot be `Grid2DIrregular` objects.
 
+        If the PSF is oversampled (`convolve_over_sample_size > 1`), the images are instead evaluated on the
+        grids' over-sampled coordinates (in per-pixel sub-block order, without binning) and convolved at the
+        fine resolution, with the Convolver binning the result back to image resolution.
+
         Parameters
         ----------
         grid
@@ -125,19 +129,40 @@ class OperateImage:
             LightProfileOperated,
         )
 
-        image_2d_not_operated = self.image_2d_from(
-            grid=grid, xp=xp, operated_only=False
-        )
-        blurring_image_2d_not_operated = self.image_2d_from(
-            grid=blurring_grid, xp=xp, operated_only=False
-        )
+        if psf.convolve_over_sample_size > 1:
 
-        blurred_image_2d = self._blurred_image_2d_from(
-            image_2d=image_2d_not_operated,
-            blurring_image_2d=blurring_image_2d_not_operated,
-            psf=psf,
-            xp=xp,
-        )
+            # grid.over_sampled is a Grid2DIrregular in per-pixel sub-block order, which the
+            # over_sample decorator passes through unbinned — the oversampled Convolver's
+            # input format.
+            image_2d_not_operated = self.image_2d_from(
+                grid=grid.over_sampled, xp=xp, operated_only=False
+            )
+            blurring_image_2d_not_operated = self.image_2d_from(
+                grid=blurring_grid.over_sampled, xp=xp, operated_only=False
+            )
+
+            blurred_image_2d = psf.convolved_image_from(
+                image=image_2d_not_operated,
+                blurring_image=blurring_image_2d_not_operated,
+                mask=grid.mask,
+                xp=xp,
+            )
+
+        else:
+
+            image_2d_not_operated = self.image_2d_from(
+                grid=grid, xp=xp, operated_only=False
+            )
+            blurring_image_2d_not_operated = self.image_2d_from(
+                grid=blurring_grid, xp=xp, operated_only=False
+            )
+
+            blurred_image_2d = self._blurred_image_2d_from(
+                image_2d=image_2d_not_operated,
+                blurring_image_2d=blurring_image_2d_not_operated,
+                psf=psf,
+                xp=xp,
+            )
 
         if self.has(cls=LightProfileOperated):
             image_2d_operated = self.image_2d_from(grid=grid, xp=xp, operated_only=True)
@@ -294,11 +319,18 @@ class OperateImageList(OperateImage):
 
         image_2d_operated_list = self.image_2d_list_from(grid=grid, operated_only=True)
 
+        if psf.convolve_over_sample_size > 1:
+            evaluation_grid = grid.over_sampled
+            evaluation_blurring_grid = blurring_grid.over_sampled
+        else:
+            evaluation_grid = grid
+            evaluation_blurring_grid = blurring_grid
+
         image_2d_not_operated_list = self.image_2d_list_from(
-            grid=grid, operated_only=False
+            grid=evaluation_grid, operated_only=False
         )
         blurring_image_2d_not_operated_list = self.image_2d_list_from(
-            grid=blurring_grid, operated_only=False
+            grid=evaluation_blurring_grid, operated_only=False
         )
 
         blurred_image_2d_list = []
@@ -307,11 +339,18 @@ class OperateImageList(OperateImage):
             image_2d_not_operated = image_2d_not_operated_list[i]
             blurring_image_2d_not_operated = blurring_image_2d_not_operated_list[i]
 
-            blurred_image_2d = self._blurred_image_2d_from(
-                image_2d=image_2d_not_operated,
-                blurring_image_2d=blurring_image_2d_not_operated,
-                psf=psf,
-            )
+            if psf.convolve_over_sample_size > 1:
+                blurred_image_2d = psf.convolved_image_from(
+                    image=image_2d_not_operated,
+                    blurring_image=blurring_image_2d_not_operated,
+                    mask=grid.mask,
+                )
+            else:
+                blurred_image_2d = self._blurred_image_2d_from(
+                    image_2d=image_2d_not_operated,
+                    blurring_image_2d=blurring_image_2d_not_operated,
+                    psf=psf,
+                )
 
             image_2d_operated = image_2d_operated_list[i]
 
@@ -444,12 +483,19 @@ class OperateImageGalaxies(OperateImageList):
             The 2D (y,x) coordinates neighboring the (masked) grid whose light is blurred into the image.
         """
 
+        if psf.convolve_over_sample_size > 1:
+            evaluation_grid = grid.over_sampled
+            evaluation_blurring_grid = blurring_grid.over_sampled
+        else:
+            evaluation_grid = grid
+            evaluation_blurring_grid = blurring_grid
+
         galaxy_image_2d_not_operated_dict = self.galaxy_image_2d_dict_from(
-            grid=grid, operated_only=False, xp=xp
+            grid=evaluation_grid, operated_only=False, xp=xp
         )
 
         galaxy_blurring_image_2d_not_operated_dict = self.galaxy_image_2d_dict_from(
-            grid=blurring_grid, operated_only=False, xp=xp
+            grid=evaluation_blurring_grid, operated_only=False, xp=xp
         )
 
         galaxy_image_2d_operated_dict = self.galaxy_image_2d_dict_from(
@@ -467,6 +513,7 @@ class OperateImageGalaxies(OperateImageList):
             blurred_image_2d = psf.convolved_image_from(
                 image=image_2d_not_operated,
                 blurring_image=blurring_image_2d_not_operated,
+                mask=grid.mask if psf.convolve_over_sample_size > 1 else None,
                 xp=xp,
             )
 
