@@ -40,8 +40,6 @@ Markov Chain Monte Carlo (MCMC) and Maximum Likelihood Estimaotrs (MLE).
    BFGS
    DynestyDynamic
    Emcee
-   PySwarmsLocal
-   PySwarmsGlobal
 
 Priors
 ------
@@ -67,4 +65,3 @@ Adapt
    :toctree: generated/
 
    AdaptImages
-   AdaptImageMaker
