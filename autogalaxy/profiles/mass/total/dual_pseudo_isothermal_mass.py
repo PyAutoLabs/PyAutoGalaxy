@@ -2,7 +2,43 @@ from typing import Tuple
 import numpy as np
 
 import autoarray as aa
+from autogalaxy import convert
+from autogalaxy.cosmology.model import LensingCosmology
 from autogalaxy.profiles.mass.abstract.abstract import MassProfile
+
+
+def _b0_from_lenstool_sigma(
+    sigma: float,
+    redshift_object: float,
+    redshift_source: float,
+    cosmology: LensingCosmology,
+) -> float:
+    """
+    Convert Lenstool's fiducial velocity dispersion ``v_disp`` (sigma_LT, in km/s) to the
+    dPIE lens strength ``b0`` in arcseconds.
+
+    Lenstool stores ``b0 = 6 * pia_c2 * sigma_LT^2`` with ``pia_c2 = 648000 / c^2``
+    (``constant.h``; c in km/s) and applies the distance ratio D_LS / D_S separately when
+    computing deflections (``e_grad.c``). PyAutoGalaxy's ``b0`` is fully normalized, so the
+    ratio is folded in here:
+
+        b0 [arcsec] = 6 * 648000 * (sigma_LT / c)^2 * (D_LS / D_S)
+
+    This is identical to ``4 * pi * (sigma_0 / c)^2 * D_LS / D_S`` (in radians) for the
+    central velocity dispersion ``sigma_0 = sqrt(3/2) * sigma_LT`` — the fiducial-vs-central
+    distinction of Eliasdottir et al. (2007) App. A / Bergamini et al. (2019).
+    """
+    c_km_s = 299792.458
+
+    d_s = cosmology.angular_diameter_distance_to_earth_in_kpc_from(
+        redshift=redshift_source
+    )
+    d_ls = cosmology.angular_diameter_distance_between_redshifts_in_kpc_from(
+        redshift_0=redshift_object, redshift_1=redshift_source
+    )
+
+    return 6.0 * 648000.0 * (sigma / c_km_s) ** 2 * (d_ls / d_s)
+
 
 # Within this profile family, PIEMass, dPIEMass, and dPIEMassSph are directly ported from Lenstool's C code, and have been thoroughly annotated and adapted for PyAutoLens.
 # The dPIEPotential and dPIEPotentialSph profiles are modified from the original `dPIEPotential` and `dPIEPotentialSph`, which were implemented to PyAutoLens by Jackson O'Donnell.
@@ -215,6 +251,45 @@ def _mdci05(x, y, eps, rcore, b0, xp=np):
     return a, b, c, d
 
 
+def _pi05(x, y, eps, rcore, xp=np):
+    """
+    Returns the lensing potential psi / b0 of the single-core PIEMass (Kassiola &
+    Kovner 1993 I0.5c model) at positions (x, y), ported from Lenstool's ``pi05``
+    (``e_pcpx.c``). Note b0 is outside ``_pi05``, mirroring ``_ci05``.
+
+    The dPIE potential is the two-component difference (Lenstool ``e_pot.c`` case 81):
+    psi = b0 * rs / (rs - ra) * (_pi05(rcore=ra) - _pi05(rcore=rs)).
+
+    Parameters
+    ----------
+    eps
+        The ellipticity of the corresponding profiles.
+    rcore
+        The core radius of the corresponding profiles.
+    """
+    sqe = xp.sqrt(eps)
+    ci = 0.5 * (1.0 - eps**2) / sqe
+    cxro = (1.0 + eps) ** 2
+    cyro = (1.0 - eps) ** 2
+    rem2 = x**2 / cxro + y**2 / cyro
+    e1 = 2.0 * sqe / (1.0 - eps)
+    e2 = 2.0 * sqe / (1.0 + eps)
+    z = xp.sqrt(x**2 + y**2)
+
+    eta = -0.5 * xp.arcsinh(e1 * y / z) + 0.5j * xp.arcsin(e2 * x / z)
+    zeta = 0.5 * xp.log((xp.sqrt(rem2) + xp.sqrt(rcore**2 + rem2)) / rcore) + 0.0j
+
+    b1 = xp.cosh(eta + zeta)
+    b2 = xp.cosh(eta - zeta)
+    a1 = xp.log(xp.cosh(eta) ** 2 / (b1 * b2))
+    a2 = xp.log(b1 / b2)
+    c1 = xp.sinh(2.0 * eta) * a1
+    c2 = xp.sinh(2.0 * zeta) * a2
+    ckk = c1 + c2
+
+    return ci * rcore / xp.sqrt(rem2) * (ckk.imag * x - ckk.real * y)
+
+
 class PIEMass(MassProfile):
     def __init__(
         self,
@@ -259,8 +334,11 @@ class PIEMass(MassProfile):
 
     def _ellip(self, xp=np):
         ellip = xp.sqrt(self.ell_comps[0] ** 2 + self.ell_comps[1] ** 2)
+        # The ci05 deflection integral is degenerate (NaN) at exactly zero ellipticity;
+        # Lenstool clamps to 1e-5 at setup for the same reason (set_lens.c).
+        MIN_ELLIP = 0.00001
         MAX_ELLIP = 0.99999
-        return xp.min(xp.array([ellip, MAX_ELLIP]))
+        return xp.clip(ellip, MIN_ELLIP, MAX_ELLIP)
 
     @aa.decorators.to_vector_yx
     @aa.decorators.transform(rotate_back=True)
@@ -455,10 +533,102 @@ class dPIEMass(MassProfile):
         self.rs = rs
         self.b0 = b0
 
+    @classmethod
+    def from_lenstool(
+        cls,
+        centre: Tuple[float, float] = (0.0, 0.0),
+        ellipticity: float = 0.0,
+        angle_pos: float = 0.0,
+        sigma: float = 200.0,
+        r_core: float = 0.1,
+        r_cut: float = 20.0,
+        redshift_object: float = 0.5,
+        redshift_source: float = 1.0,
+        cosmology: LensingCosmology = None,
+    ) -> "dPIEMass":
+        """
+        Construct a ``dPIEMass`` from Lenstool's native dPIE / PIEMD parameterization, as
+        read directly out of a Lenstool ``.par`` file (``potentiel`` profil 81) or the
+        parameter tables of Lenstool-based papers.
+
+        Three Lenstool conventions are converted (each verified against the Lenstool C
+        source):
+
+        - ``sigma`` is Lenstool's **fiducial** velocity dispersion ``v_disp`` (sigma_LT),
+          *not* the central velocity dispersion sigma_0 of the dPIE profile. They differ
+          by sigma_0 = sqrt(3/2) * sigma_LT (Eliasdottir et al. 2007, App. A; Bergamini
+          et al. 2019, Eq. 5) — quoting a measured central/aperture dispersion here
+          overestimates the mass by 50%. The lens strength is
+          b0 = 6 * 648000 * (sigma_LT / c)^2 * (D_LS / D_S) arcsec, where Lenstool's
+          stored ``b0 = 6 * pia_c2 * sigma^2`` (``set_potfile.c``) carries no distance
+          ratio — Lenstool applies D_LS / D_S separately at deflection time
+          (``e_grad.c``), whereas PyAutoGalaxy's ``b0`` is fully normalized.
+        - ``ellipticity`` is Lenstool's ``ellipticite`` for mass-type profiles,
+          emass = (a^2 - b^2) / (a^2 + b^2). Lenstool converts it internally
+          (``set_lens.c``) to epot = (1 - q) / (1 + q) before evaluating deflections;
+          that epot is exactly the magnitude of PyAutoGalaxy's ``ell_comps``, so the
+          conversion here is emass -> q = sqrt((1 - e) / (1 + e)) -> ``ell_comps``.
+        - ``r_core`` / ``r_cut`` (Lenstool ``core_radius`` / ``cut_radius``, arcsec) map
+          one-to-one onto ``ra`` / ``rs``. For ``.par`` files using the kpc variants
+          (``core_radius_kpc`` / ``cut_radius_kpc``), pre-convert with
+          ``r_core = r_core_kpc / cosmology.kpc_per_arcsec_from(redshift=redshift_object)``.
+
+        Parameters
+        ----------
+        centre
+            The (y,x) arc-second coordinates of the profile centre.
+        ellipticity
+            Lenstool mass ellipticity, (a^2 - b^2) / (a^2 + b^2).
+        angle_pos
+            Position angle in degrees, counter-clockwise from the positive x-axis
+            (Lenstool ``angle_pos`` in its tangent plane; axis flips from WCS
+            conventions must be handled when ingesting real-data catalogues).
+        sigma
+            Lenstool fiducial velocity dispersion ``v_disp`` (sigma_LT) in km/s.
+        r_core
+            Lenstool ``core_radius`` in arcseconds (becomes ``ra``).
+        r_cut
+            Lenstool ``cut_radius`` in arcseconds (becomes ``rs``).
+        redshift_object
+            The redshift of the lens, used for the D_LS / D_S normalization of ``b0``.
+        redshift_source
+            The redshift of the source used to normalize ``b0``. For multi-plane cluster
+            models this is the reference source plane the Lenstool model was normalized
+            to.
+        cosmology
+            The cosmology used to compute the distance ratio (default ``Planck15``; pass
+            the cosmology of the Lenstool run for exact comparisons).
+        """
+        if cosmology is None:
+            from autogalaxy.cosmology.model import Planck15
+
+            cosmology = Planck15()
+
+        axis_ratio = np.sqrt((1.0 - ellipticity) / (1.0 + ellipticity))
+        ell_comps = convert.ell_comps_from(axis_ratio=axis_ratio, angle=angle_pos)
+
+        b0 = _b0_from_lenstool_sigma(
+            sigma=sigma,
+            redshift_object=redshift_object,
+            redshift_source=redshift_source,
+            cosmology=cosmology,
+        )
+
+        return cls(
+            centre=centre,
+            ell_comps=ell_comps,
+            ra=r_core,
+            rs=r_cut,
+            b0=b0,
+        )
+
     def _ellip(self, xp=np):
         ellip = xp.sqrt(self.ell_comps[0] ** 2 + self.ell_comps[1] ** 2)
+        # The ci05 deflection integral is degenerate (NaN) at exactly zero ellipticity;
+        # Lenstool clamps to 1e-5 at setup for the same reason (set_lens.c).
+        MIN_ELLIP = 0.00001
         MAX_ELLIP = 0.99999
-        return xp.min(xp.array([ellip, MAX_ELLIP]))
+        return xp.clip(ellip, MIN_ELLIP, MAX_ELLIP)
 
     @aa.decorators.to_vector_yx
     @aa.decorators.transform(rotate_back=True)
@@ -583,17 +753,43 @@ class dPIEMass(MassProfile):
     @aa.over_sample
     @aa.decorators.to_array
     @aa.decorators.transform
+    @aa.decorators.to_array
+    @aa.decorators.transform
     def potential_2d_from(self, grid: aa.type.Grid2DLike, xp=np, **kwargs):
-        from autogalaxy.profiles.mass.abstract.mge import MGEDecomposer
+        """
+        Returns the two dimensional projected lensing potential on a grid of (y,x) arc-second
+        coordinates.
 
-        radii_min = max(self.ra, 0.001) / 10.0
-        radii_max = self.rs * 20.0
-        sigmas = xp.exp(xp.linspace(xp.log(radii_min), xp.log(radii_max), 30))
-        mge_decomp = MGEDecomposer(mass_profile=self)
-        return mge_decomp.potential_2d_via_mge_from(
-            grid=grid, xp=xp, sigma_log_list=sigmas,
-            ellipticity_convention="major", three_D=False,
+        The analytic Kassiola & Kovner (1993) I0.5 potential of the dPIE is the same
+        two-component difference as the deflections, ported from Lenstool's C code
+        (``e_pot.c`` case 81, ``pi05`` in ``e_pcpx.c``):
+
+            psi = b0 * rs / (rs - ra) * (pi05(ra) - pi05(rs))
+
+        Parameters
+        ----------
+        grid
+            The grid of (y,x) arc-second coordinates the potential is computed on.
+        """
+        ellip = self._ellip(xp)
+        factor = self.b0 * self.rs / (self.rs - self.ra)
+
+        pot_core = _pi05(
+            x=grid.array[:, 1],
+            y=grid.array[:, 0],
+            eps=ellip,
+            rcore=self.ra,
+            xp=xp,
         )
+        pot_cut = _pi05(
+            x=grid.array[:, 1],
+            y=grid.array[:, 0],
+            eps=ellip,
+            rcore=self.rs,
+            xp=xp,
+        )
+
+        return factor * (pot_core - pot_cut)
 
 
 class dPIEMassSph(dPIEMass):
@@ -680,6 +876,59 @@ class dPIEMassSph(dPIEMass):
         self.ra = ra
         self.rs = rs
         self.b0 = b0
+
+    @classmethod
+    def from_lenstool(
+        cls,
+        centre: Tuple[float, float] = (0.0, 0.0),
+        sigma: float = 200.0,
+        r_core: float = 0.1,
+        r_cut: float = 20.0,
+        redshift_object: float = 0.5,
+        redshift_source: float = 1.0,
+        cosmology: LensingCosmology = None,
+    ) -> "dPIEMassSph":
+        """
+        Construct a ``dPIEMassSph`` from Lenstool's native dPIE / PIEMD parameterization
+        (circular case). See ``dPIEMass.from_lenstool`` for the full conversion
+        conventions; the ellipticity and angle inputs are absent here.
+
+        Parameters
+        ----------
+        centre
+            The (y,x) arc-second coordinates of the profile centre.
+        sigma
+            Lenstool fiducial velocity dispersion ``v_disp`` (sigma_LT) in km/s — not the
+            central velocity dispersion sigma_0 = sqrt(3/2) * sigma_LT.
+        r_core
+            Lenstool ``core_radius`` in arcseconds (becomes ``ra``).
+        r_cut
+            Lenstool ``cut_radius`` in arcseconds (becomes ``rs``).
+        redshift_object
+            The redshift of the lens, used for the D_LS / D_S normalization of ``b0``.
+        redshift_source
+            The redshift of the source used to normalize ``b0``.
+        cosmology
+            The cosmology used to compute the distance ratio (default ``Planck15``).
+        """
+        if cosmology is None:
+            from autogalaxy.cosmology.model import Planck15
+
+            cosmology = Planck15()
+
+        b0 = _b0_from_lenstool_sigma(
+            sigma=sigma,
+            redshift_object=redshift_object,
+            redshift_source=redshift_source,
+            cosmology=cosmology,
+        )
+
+        return cls(
+            centre=centre,
+            ra=r_core,
+            rs=r_cut,
+            b0=b0,
+        )
 
     @aa.decorators.to_vector_yx
     @aa.decorators.transform(rotate_back=True)
@@ -805,3 +1054,138 @@ class dPIEMassSph(dPIEMass):
         hessian_yy = t05 * (p * Y + z * X / R2)
 
         return hessian_yy, hessian_xy, hessian_yx, hessian_xx
+
+
+class dPIEMassLenstool(dPIEMass):
+    """
+    The dPIE mass profile in Lenstool's native parameterization, supporting model-fitting
+    with priors placed directly on the Lenstool parameters.
+
+    This is a thin wrapper around :class:`dPIEMass` whose free parameters are
+    (``ellipticity``, ``angle_pos``, ``sigma``, ``r_core``, ``r_cut``) exactly as they appear
+    in a Lenstool ``.par`` file (``potentiel`` profil 81), rather than the internal
+    (``ell_comps``, ``ra``, ``rs``, ``b0``). Use it to fit a model whose posteriors read
+    like a Lenstool results table; see ``dPIEMass.from_lenstool`` for the full
+    conversion conventions (verified against the Lenstool C source).
+
+    The distance ratio D_LS / D_S entering ``b0`` uses the ``Planck15`` cosmology
+    (matching the ``NFWMCRLudlow`` convention); for a different cosmology construct via
+    ``dPIEMass.from_lenstool(..., cosmology=...)`` instead.
+
+    Parameters
+    ----------
+    centre : (float, float)
+        (y, x) arc-second coordinates of the profile centre.
+    ellipticity : float
+        Lenstool mass ellipticity ``ellipticite`` = (a^2 - b^2) / (a^2 + b^2).
+    angle_pos : float
+        Position angle in degrees, counter-clockwise from the positive x-axis.
+    sigma : float
+        Lenstool fiducial velocity dispersion ``v_disp`` (sigma_LT) in km/s — not the
+        central velocity dispersion sigma_0 = sqrt(3/2) * sigma_LT.
+    r_core : float
+        Lenstool ``core_radius`` in arcseconds (the dPIE ``ra``).
+    r_cut : float
+        Lenstool ``cut_radius`` in arcseconds (the dPIE ``rs``).
+    redshift_object : float
+        The redshift of the lens, used for the D_LS / D_S normalization of ``b0``.
+    redshift_source : float
+        The redshift of the source used to normalize ``b0``.
+    """
+
+    def __init__(
+        self,
+        centre: Tuple[float, float] = (0.0, 0.0),
+        ellipticity: float = 0.0,
+        angle_pos: float = 0.0,
+        sigma: float = 200.0,
+        r_core: float = 0.1,
+        r_cut: float = 20.0,
+        redshift_object: float = 0.5,
+        redshift_source: float = 1.0,
+    ):
+        from autogalaxy.cosmology.model import Planck15
+
+        cosmology = Planck15()
+
+        axis_ratio = np.sqrt((1.0 - ellipticity) / (1.0 + ellipticity))
+        ell_comps = convert.ell_comps_from(axis_ratio=axis_ratio, angle=angle_pos)
+
+        b0 = _b0_from_lenstool_sigma(
+            sigma=sigma,
+            redshift_object=redshift_object,
+            redshift_source=redshift_source,
+            cosmology=cosmology,
+        )
+
+        super().__init__(
+            centre=centre,
+            ell_comps=ell_comps,
+            ra=r_core,
+            rs=r_cut,
+            b0=b0,
+        )
+
+        self.ellipticity = ellipticity
+        self.angle_pos = angle_pos
+        self.sigma = sigma
+        self.r_core = r_core
+        self.r_cut = r_cut
+        self.redshift_object = redshift_object
+        self.redshift_source = redshift_source
+
+
+class dPIEMassLenstoolSph(dPIEMassSph):
+    """
+    The spherical dPIE mass profile in Lenstool's native parameterization, supporting
+    model-fitting with priors placed directly on the Lenstool parameters
+    (``sigma``, ``r_core``, ``r_cut``). See :class:`dPIEMassLenstool`.
+
+    Parameters
+    ----------
+    centre : (float, float)
+        (y, x) arc-second coordinates of the profile centre.
+    sigma : float
+        Lenstool fiducial velocity dispersion ``v_disp`` (sigma_LT) in km/s.
+    r_core : float
+        Lenstool ``core_radius`` in arcseconds (the dPIE ``ra``).
+    r_cut : float
+        Lenstool ``cut_radius`` in arcseconds (the dPIE ``rs``).
+    redshift_object : float
+        The redshift of the lens, used for the D_LS / D_S normalization of ``b0``.
+    redshift_source : float
+        The redshift of the source used to normalize ``b0``.
+    """
+
+    def __init__(
+        self,
+        centre: Tuple[float, float] = (0.0, 0.0),
+        sigma: float = 200.0,
+        r_core: float = 0.1,
+        r_cut: float = 20.0,
+        redshift_object: float = 0.5,
+        redshift_source: float = 1.0,
+    ):
+        from autogalaxy.cosmology.model import Planck15
+
+        cosmology = Planck15()
+
+        b0 = _b0_from_lenstool_sigma(
+            sigma=sigma,
+            redshift_object=redshift_object,
+            redshift_source=redshift_source,
+            cosmology=cosmology,
+        )
+
+        super().__init__(
+            centre=centre,
+            ra=r_core,
+            rs=r_cut,
+            b0=b0,
+        )
+
+        self.sigma = sigma
+        self.r_core = r_core
+        self.r_cut = r_cut
+        self.redshift_object = redshift_object
+        self.redshift_source = redshift_source
