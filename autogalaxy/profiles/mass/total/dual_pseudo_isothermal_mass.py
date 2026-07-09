@@ -1103,10 +1103,17 @@ class dPIEMassLenstool(dPIEMass):
         r_cut: float = 20.0,
         redshift_object: float = 0.5,
         redshift_source: float = 1.0,
+        H0: float = 67.66,
+        Om0: float = 0.30966,
     ):
-        from autogalaxy.cosmology.model import Planck15
+        from autogalaxy.cosmology.model import FlatLambdaCDM
 
-        cosmology = Planck15()
+        # H0 / Om0 are plain floats (Planck15 values by default) so the profile is
+        # fully constructable from flat inputs — CSV rows, prior configs — while a
+        # Lenstool run's own cosmology (typically H0=70, Om0=0.3) can be matched
+        # exactly. They are model *constants* in practice; the priors config carries
+        # them only so af.Model composition works.
+        cosmology = FlatLambdaCDM(H0=H0, Om0=Om0)
 
         axis_ratio = np.sqrt((1.0 - ellipticity) / (1.0 + ellipticity))
         ell_comps = convert.ell_comps_from(axis_ratio=axis_ratio, angle=angle_pos)
@@ -1133,6 +1140,8 @@ class dPIEMassLenstool(dPIEMass):
         self.r_cut = r_cut
         self.redshift_object = redshift_object
         self.redshift_source = redshift_source
+        self.H0 = H0
+        self.Om0 = Om0
 
 
 class dPIEMassLenstoolSph(dPIEMassSph):
@@ -1165,10 +1174,12 @@ class dPIEMassLenstoolSph(dPIEMassSph):
         r_cut: float = 20.0,
         redshift_object: float = 0.5,
         redshift_source: float = 1.0,
+        H0: float = 67.66,
+        Om0: float = 0.30966,
     ):
-        from autogalaxy.cosmology.model import Planck15
+        from autogalaxy.cosmology.model import FlatLambdaCDM
 
-        cosmology = Planck15()
+        cosmology = FlatLambdaCDM(H0=H0, Om0=Om0)
 
         b0 = _b0_from_lenstool_sigma(
             sigma=sigma,
@@ -1189,3 +1200,5 @@ class dPIEMassLenstoolSph(dPIEMassSph):
         self.r_cut = r_cut
         self.redshift_object = redshift_object
         self.redshift_source = redshift_source
+        self.H0 = H0
+        self.Om0 = Om0

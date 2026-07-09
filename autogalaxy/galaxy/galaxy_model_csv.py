@@ -22,6 +22,7 @@ Profile-class dispatch goes through three family namespaces inside
 The module stays inside :mod:`autogalaxy`; PyAutoLens re-exports the public
 helpers under ``al.*`` so workspace scripts can use the canonical namespace.
 """
+
 import inspect
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -32,6 +33,9 @@ from autoconf import csvable
 from autogalaxy.galaxy.galaxy import Galaxy
 from autogalaxy.profiles import mass as _mp_module
 from autogalaxy.profiles.light import standard as _lp_module
+from autogalaxy.profiles.light import linear as _lp_linear_module
+from autogalaxy.profiles.light import operated as _lp_operated_module
+from autogalaxy.profiles.light import linear_operated as _lp_linear_operated_module
 from autogalaxy.profiles import point_sources as _ps_module
 
 
@@ -40,6 +44,58 @@ _FAMILY_NAMESPACES = {
     "light": _lp_module,
     "point": _ps_module,
 }
+
+# The light family spans several sub-namespaces whose classes share names
+# (``lp.Sersic`` vs ``lp_linear.Sersic``). The ``profile_class`` cell therefore
+# carries a qualifier for the non-standard variants — ``linear.Sersic``,
+# ``operated.Gaussian``, ``linear_operated.Gaussian`` — while plain names
+# resolve against the standard namespace (and mass / point are unqualified).
+_LIGHT_VARIANT_NAMESPACES = {
+    "linear": _lp_linear_module,
+    "operated": _lp_operated_module,
+    "linear_operated": _lp_linear_operated_module,
+}
+
+
+def _class_name_for_family(
+    cls: type, family: str, galaxy_name: str, attr_name: str
+) -> str:
+    """The ``profile_class`` cell for *cls*, with a light-variant qualifier when needed."""
+    namespace = _FAMILY_NAMESPACES[family]
+    if getattr(namespace, cls.__name__, None) is cls:
+        return cls.__name__
+    if family == "light":
+        for qualifier, module in _LIGHT_VARIANT_NAMESPACES.items():
+            if getattr(module, cls.__name__, None) is cls:
+                return f"{qualifier}.{cls.__name__}"
+    raise ValueError(
+        f"Profile {galaxy_name!r}.{attr_name!r} has class "
+        f"{cls.__name__!r} which is not exposed in family "
+        f"namespace '{namespace.__name__}' (family '{family}'). "
+        f"Check that the profile belongs to the family declared "
+        f"on this CSV — mass profiles go in 'mass', light profiles "
+        f"in 'light' (linear/operated variants as 'linear.Name' etc.), "
+        f"point sources in 'point'."
+    )
+
+
+def _class_from_cell(cls_name: str, family: str) -> type:
+    """Resolve a ``profile_class`` cell, honouring light-variant qualifiers."""
+    namespace = _FAMILY_NAMESPACES[family]
+    if "." in cls_name:
+        qualifier, bare_name = cls_name.split(".", 1)
+        module = _LIGHT_VARIANT_NAMESPACES.get(qualifier) if family == "light" else None
+        cls = getattr(module, bare_name, None) if module is not None else None
+    else:
+        cls = getattr(namespace, cls_name, None)
+    if cls is None:
+        raise ValueError(
+            f"profile_class '{cls_name}' not found in namespace "
+            f"'{namespace.__name__}' (family '{family}'). Verify the class "
+            f"name is spelled correctly and exposed in that namespace "
+            f"(light variants use qualified names, e.g. 'linear.Sersic')."
+        )
+    return cls
 
 
 _TUPLE_PARAM_COL_NAMES = {
@@ -160,19 +216,12 @@ def galaxy_models_to_csv(
     for galaxy_name, attr_dict in profiles_by_galaxy.items():
         for attr_name, profile in attr_dict.items():
             cls = type(profile)
-            if getattr(namespace, cls.__name__, None) is not cls:
-                raise ValueError(
-                    f"Profile {galaxy_name!r}.{attr_name!r} has class "
-                    f"{cls.__name__!r} which is not exposed in family "
-                    f"namespace '{namespace.__name__}' (family '{family}'). "
-                    f"Check that the profile belongs to the family declared "
-                    f"on this CSV — mass profiles go in 'mass', light profiles "
-                    f"in 'light', point sources in 'point'."
-                )
             row: Dict[str, Any] = {
                 "galaxy": galaxy_name,
                 "attr_name": attr_name,
-                "profile_class": cls.__name__,
+                "profile_class": _class_name_for_family(
+                    cls, family=family, galaxy_name=galaxy_name, attr_name=attr_name
+                ),
             }
             for param_name, default in _profile_init_params(cls):
                 value = getattr(profile, param_name, None)
@@ -183,7 +232,9 @@ def galaxy_models_to_csv(
                     row[col0] = float(value[0])
                     row[col1] = float(value[1])
                 else:
-                    row[param_name] = float(value) if isinstance(value, (int, float)) else value
+                    row[param_name] = (
+                        float(value) if isinstance(value, (int, float)) else value
+                    )
             if redshifts is not None and galaxy_name in redshifts:
                 row[_REDSHIFT_HEADER] = float(redshifts[galaxy_name])
             rows.append(row)
@@ -232,24 +283,21 @@ def galaxy_models_from_csv(
     raw_rows = csvable.list_from_csv(file_path)
 
     parsed: List[GalaxyModelRow] = []
+    consumed_columns = set(_FIXED_HEADERS) | {_REDSHIFT_HEADER}
     for raw in raw_rows:
         cls_name = raw["profile_class"]
-        cls = getattr(namespace, cls_name, None)
-        if cls is None:
-            raise ValueError(
-                f"profile_class '{cls_name}' not found in namespace "
-                f"'{namespace.__name__}' (family '{family}'). Verify the class "
-                f"name is spelled correctly and exposed in that namespace."
-            )
+        cls = _class_from_cell(cls_name, family=family)
 
         params: Dict[str, Any] = {}
         for param_name, default in _profile_init_params(cls):
             if _is_tuple_param(default):
                 col0, col1 = _tuple_col_names(param_name)
+                consumed_columns.update((col0, col1))
                 v0, v1 = raw.get(col0), raw.get(col1)
                 if v0 not in ("", None) and v1 not in ("", None):
                     params[param_name] = (float(v0), float(v1))
             else:
+                consumed_columns.add(param_name)
                 v = raw.get(param_name)
                 if v not in ("", None):
                     params[param_name] = _coerce_scalar(v)
@@ -267,13 +315,33 @@ def galaxy_models_from_csv(
             )
         )
 
+    if raw_rows:
+        unknown = [c for c in raw_rows[0] if c not in consumed_columns]
+        if unknown:
+            raise ValueError(
+                f"CSV at '{file_path}' has column(s) {unknown} which no row's "
+                f"profile_class consumes — most likely a typo'd parameter name. "
+                f"A silently ignored column would leave the profile at its "
+                f"default value, so this is rejected loudly instead."
+            )
+
     return GalaxyModelTable(rows=parsed, family=family)
 
 
 def _group_rows_by_galaxy(*tables: GalaxyModelTable) -> Dict[str, List[GalaxyModelRow]]:
     by_galaxy: Dict[str, List[GalaxyModelRow]] = {}
+    seen_attrs = set()
     for table in tables:
         for row in table.rows:
+            key = (row.galaxy, row.attr_name)
+            if key in seen_attrs:
+                raise ValueError(
+                    f"Duplicate CSV rows for galaxy '{row.galaxy}' attribute "
+                    f"'{row.attr_name}' — each (galaxy, attr_name) pair must be "
+                    f"unique across the input tables (a duplicate would silently "
+                    f"overwrite the earlier profile)."
+                )
+            seen_attrs.add(key)
             by_galaxy.setdefault(row.galaxy, []).append(row)
     return by_galaxy
 

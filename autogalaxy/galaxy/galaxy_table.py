@@ -11,10 +11,12 @@ lists hardcoded in the modeling script.
 This module provides the typed schema layer for that file format. The expected CSV columns
 are:
 
-    y, x, luminosity, redshift?
+    y, x, luminosity, redshift?, <property>...
 
-The ``redshift`` column is optional. Extra columns are silently ignored. Row order is
-preserved on read and on write.
+The ``redshift`` column is optional. Any further numeric columns (e.g. ``ellipticity``,
+``angle_pos``, ``mag`` for a Lenstool-style member catalogue) are loaded into
+``GalaxyTable.properties`` keyed by column name — nothing is silently dropped. Row order
+is preserved on read and on write.
 
 The actual CSV I/O is delegated to :mod:`autoconf.csvable`; this module only owns the
 column-name conventions and the typed return value.
@@ -23,9 +25,10 @@ The mirror schema for point-source datasets lives in :mod:`autolens.point.datase
 ``output_to_csv`` / ``list_from_csv`` functions). The two formats deliberately do not share
 infrastructure — the column conventions differ, and coupling them would be premature.
 """
+
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Optional, Sequence, Tuple, Union
+from typing import Dict, List, Optional, Sequence, Tuple, Union
 
 from autoconf import csvable
 
@@ -46,11 +49,16 @@ class GalaxyTable:
     redshifts
         Per-galaxy redshifts in the same order, or ``None`` if the input did not carry a
         ``redshift`` column.
+    properties
+        Any additional numeric columns, keyed by column name (e.g.
+        ``properties["ellipticity"]``), each a per-galaxy list in row order. Empty dict
+        when the CSV has no extra columns.
     """
 
     centres: Grid2DIrregular
     luminosities: List[float]
     redshifts: Optional[List[float]] = field(default=None)
+    properties: Dict[str, List[float]] = field(default_factory=dict)
 
 
 def galaxy_table_from_csv(file_path: Union[str, Path]) -> GalaxyTable:
@@ -63,7 +71,9 @@ def galaxy_table_from_csv(file_path: Union[str, Path]) -> GalaxyTable:
     redshift, others do not) is rejected with ``ValueError`` — the partial-population
     convention mirrors :func:`autolens.point.dataset.list_from_csv`.
 
-    Extra columns are silently ignored. Row order is preserved.
+    Additional columns are loaded into ``GalaxyTable.properties`` keyed by column name —
+    numeric columns as per-galaxy floats, non-numeric ones (names, notes) as strings.
+    Nothing is silently dropped. Row order is preserved.
 
     Parameters
     ----------
@@ -91,10 +101,22 @@ def galaxy_table_from_csv(file_path: Union[str, Path]) -> GalaxyTable:
     else:
         redshifts = None
 
+    reserved = {"y", "x", "luminosity", "redshift"}
+    properties: Dict[str, List] = {}
+    for column in rows[0]:
+        if column in reserved:
+            continue
+        try:
+            properties[column] = [float(r[column]) for r in rows]
+        except (TypeError, ValueError):
+            # Non-numeric catalogue columns (names, notes, flags) ride along as strings.
+            properties[column] = [r[column] for r in rows]
+
     return GalaxyTable(
         centres=Grid2DIrregular(centres),
         luminosities=luminosities,
         redshifts=redshifts,
+        properties=properties,
     )
 
 
@@ -103,6 +125,7 @@ def galaxy_table_to_csv(
     luminosities: Sequence[float],
     file_path: Union[str, Path],
     redshifts: Optional[Sequence[float]] = None,
+    properties: Optional[Dict[str, Sequence[float]]] = None,
 ) -> None:
     """
     Write a galaxy population to ``file_path`` as a CSV with columns
@@ -122,6 +145,10 @@ def galaxy_table_to_csv(
         Destination CSV path. Parent directories are created if missing.
     redshifts
         Optional per-galaxy redshifts.
+    properties
+        Optional extra per-galaxy numeric columns, keyed by column name (each the same
+        length as ``centres``) — e.g. ``{"ellipticity": [...], "angle_pos": [...],
+        "mag": [...]}`` for a member catalogue carrying shape + magnitude.
     """
     if len(centres) != len(luminosities):
         raise ValueError(
@@ -134,9 +161,19 @@ def galaxy_table_to_csv(
             f"when provided."
         )
 
+    if properties is not None:
+        for name, values in properties.items():
+            if len(values) != len(centres):
+                raise ValueError(
+                    f"properties['{name}'] ({len(values)}) must match centres "
+                    f"({len(centres)}) length."
+                )
+
     headers = ["y", "x", "luminosity"]
     if redshifts is not None:
         headers.append("redshift")
+    if properties is not None:
+        headers.extend(properties.keys())
 
     rows = []
     for i, (yx, lum) in enumerate(zip(centres, luminosities)):
@@ -147,6 +184,9 @@ def galaxy_table_to_csv(
         }
         if redshifts is not None:
             row["redshift"] = float(redshifts[i])
+        if properties is not None:
+            for name, values in properties.items():
+                row[name] = float(values[i])
         rows.append(row)
 
     csvable.output_to_csv(rows, file_path, headers=headers)

@@ -43,11 +43,7 @@ def test__round_trip__with_redshift(tmp_path):
 
 def test__missing_redshift_column__redshifts_none(tmp_path):
     file_path = tmp_path / "galaxies.csv"
-    file_path.write_text(
-        "y,x,luminosity\n"
-        "3.5,2.5,0.9\n"
-        "-4.4,-5.0,0.45\n"
-    )
+    file_path.write_text("y,x,luminosity\n" "3.5,2.5,0.9\n" "-4.4,-5.0,0.45\n")
 
     table = ag.galaxy_table_from_csv(file_path)
 
@@ -59,16 +55,14 @@ def test__missing_redshift_column__redshifts_none(tmp_path):
 def test__partial_redshift__raises(tmp_path):
     file_path = tmp_path / "galaxies.csv"
     file_path.write_text(
-        "y,x,luminosity,redshift\n"
-        "3.5,2.5,0.9,0.5\n"
-        "-4.4,-5.0,0.45,\n"
+        "y,x,luminosity,redshift\n" "3.5,2.5,0.9,0.5\n" "-4.4,-5.0,0.45,\n"
     )
 
     with pytest.raises(ValueError, match="partially populated 'redshift'"):
         ag.galaxy_table_from_csv(file_path)
 
 
-def test__extra_columns_ignored(tmp_path):
+def test__extra_columns_loaded_as_properties(tmp_path):
     file_path = tmp_path / "galaxies.csv"
     file_path.write_text(
         "name,y,x,luminosity,notes\n"
@@ -80,6 +74,8 @@ def test__extra_columns_ignored(tmp_path):
 
     assert table.luminosities == [0.9, 0.45]
     assert table.redshifts is None
+    assert table.properties["name"] == ["g0", "g1"]
+    assert table.properties["notes"] == ["bright", "faint"]
 
 
 def test__row_order_preserved(tmp_path):
@@ -157,3 +153,40 @@ def test__to_csv__redshift_column_only_when_provided(tmp_path):
 
     rows = _read_raw_rows(file_path)
     assert rows[0]["redshift"] == "0.7"
+
+
+def test__extra_property_columns__loaded_and_round_tripped(tmp_path):
+    from autogalaxy.galaxy.galaxy_table import (
+        galaxy_table_from_csv,
+        galaxy_table_to_csv,
+    )
+
+    path = tmp_path / "members.csv"
+    galaxy_table_to_csv(
+        centres=[(1.0, 2.0), (3.0, 4.0)],
+        luminosities=[0.4, 0.2],
+        file_path=path,
+        properties={
+            "ellipticity": [0.3, 0.1],
+            "angle_pos": [45.0, -10.0],
+            "mag": [19.5, 21.0],
+        },
+    )
+
+    table = galaxy_table_from_csv(file_path=path)
+
+    assert table.properties["ellipticity"] == [0.3, 0.1]
+    assert table.properties["angle_pos"] == [45.0, -10.0]
+    assert table.properties["mag"] == [19.5, 21.0]
+    assert table.luminosities == [0.4, 0.2]
+
+
+def test__legacy_three_column_schema__properties_empty(tmp_path):
+    from autogalaxy.galaxy.galaxy_table import galaxy_table_from_csv
+
+    path = tmp_path / "legacy.csv"
+    path.write_text("y,x,luminosity\n1.0,2.0,0.4\n")
+
+    table = galaxy_table_from_csv(file_path=path)
+
+    assert table.properties == {}
