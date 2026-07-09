@@ -40,3 +40,8 @@ test_autogalaxy/unit/pipeline/files/plot/PlotterInterface/inversion/fits/reconst
 test_autogalaxy/unit/data_temp/simulate_and_fit/image.fits
 test_autogalaxy/unit/data_temp/simulate_and_fit/noise_map.fits
 test_autogalaxy/unit/data_temp/simulate_and_fit/psf.fits
+
+# Sphinx build artifacts (generated at docs build time, never committed)
+docs/_build
+docs/api/generated
+docs/api/_autosummary

@@ -122,13 +122,6 @@ html_show_copyright = True
 # pygments_dark_style = "monokai"
 add_function_parentheses = False
 
-html_context = {
-    "menu_links_name": "Repository",
-    "doc_path": "docs",
-    "github_project": "pyautogalaxy",
-    "github_repo": "pyautogalaxy",
-    "github_version": "master",
-}
 language = "en"
 
 from sphinx.builders.html import StandaloneHTMLBuilder
