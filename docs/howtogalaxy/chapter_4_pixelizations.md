@@ -16,5 +16,5 @@ The chapter contains the following tutorials:
 [Tutorial 4: Bayesian Regularization](https://colab.research.google.com/github/PyAutoLabs/HowToGalaxy/blob/2026.7.6.649/notebooks/chapter_4_pixelizations/tutorial_4_bayesian_regularization.ipynb)
 \- Smoothing the source within a Bayesian framework.
 
-[Tutorial 6: Model Fit](https://colab.research.google.com/github/PyAutoLabs/HowToGalaxy/blob/2026.7.6.649/notebooks/chapter_4_pixelizations/tutorial_6_model_fit.ipynb)
+[Tutorial 5: Model Fit](https://colab.research.google.com/github/PyAutoLabs/HowToGalaxy/blob/2026.7.6.649/notebooks/chapter_4_pixelizations/tutorial_5_model_fit.ipynb)
 \- An example modeling pipeline which uses an inversion.

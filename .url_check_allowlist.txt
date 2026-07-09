@@ -12,11 +12,6 @@ https://academic.oup.com/mnras/article/488/1/1387/5526256  # autogalaxy/profiles
 # Code of Conduct boilerplate
 http://geekfeminism.wikia.com/wiki/Conference_anti-harassment/Policy  # CODE_OF_CONDUCT.md:305
 
-# Colab refs to notebooks no longer in HowTo/workspace
-https://colab.research.google.com/github/PyAutoLabs/HowToGalaxy/blob/2026.5.14.2/notebooks/chapter_4_pixelizations/tutorial_6_model_fit.ipynb  # docs/howtogalaxy/chapter_4_pixelizations.md:19
-https://colab.research.google.com/github/PyAutoLabs/HowToGalaxy/blob/2026.5.14.2/notebooks/chapter_optional/tutorial_mass_profiles.ipynb  # docs/howtogalaxy/chapter_optional.md:7
-https://colab.research.google.com/github/PyAutoLabs/HowToGalaxy/blob/2026.5.14.2/notebooks/chapter_optional/tutorial_sub_grids.ipynb  # docs/howtogalaxy/chapter_optional.md:10
-
 # External dead / paywalled / departmental pages
 http://www.astro.uvic.ca/~simard/GIM2D/  # paper/paper.md:188
 https://bitbucket.org/bdiemer/colossus/src/main/  # files/citations.md:12
