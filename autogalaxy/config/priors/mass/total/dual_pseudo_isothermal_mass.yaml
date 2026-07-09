@@ -215,6 +215,26 @@ dPIEMassLenstool:
     limits:
       lower: 0.0
       upper: inf
+  H0:
+    type: Uniform
+    lower_limit: 50.0
+    upper_limit: 100.0
+    width_modifier:
+      type: Relative
+      value: 0.25
+    limits:
+      lower: 0.0
+      upper: inf
+  Om0:
+    type: Uniform
+    lower_limit: 0.1
+    upper_limit: 0.5
+    width_modifier:
+      type: Relative
+      value: 0.25
+    limits:
+      lower: 0.0
+      upper: 1.0
 dPIEMassLenstoolSph:
   centre_0:
     type: Gaussian
@@ -286,3 +306,23 @@ dPIEMassLenstoolSph:
     limits:
       lower: 0.0
       upper: inf
+  H0:
+    type: Uniform
+    lower_limit: 50.0
+    upper_limit: 100.0
+    width_modifier:
+      type: Relative
+      value: 0.25
+    limits:
+      lower: 0.0
+      upper: inf
+  Om0:
+    type: Uniform
+    lower_limit: 0.1
+    upper_limit: 0.5
+    width_modifier:
+      type: Relative
+      value: 0.25
+    limits:
+      lower: 0.0
+      upper: 1.0

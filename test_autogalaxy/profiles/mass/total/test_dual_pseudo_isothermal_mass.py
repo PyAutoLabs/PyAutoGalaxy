@@ -258,7 +258,12 @@ def test__lenstool_wrapper__matches_from_lenstool_constructor():
     )
 
     wrapper = ag.mp.dPIEMassLenstool(**kwargs)
-    constructed = ag.mp.dPIEMass.from_lenstool(**kwargs)
+    # The wrapper's flat-input cosmology (H0/Om0 floats -> FlatLambdaCDM) matches the
+    # classmethod when the classmethod is handed the same background cosmology; the
+    # Planck15 subclass differs at the massive-neutrino level.
+    constructed = ag.mp.dPIEMass.from_lenstool(
+        cosmology=ag.cosmo.FlatLambdaCDM(), **kwargs
+    )
 
     assert wrapper.b0 == pytest.approx(constructed.b0, rel=1e-10)
     assert wrapper.ra == constructed.ra
@@ -277,7 +282,9 @@ def test__lenstool_wrapper__matches_from_lenstool_constructor():
     }
 
     wrapper_sph = ag.mp.dPIEMassLenstoolSph(**sph_kwargs)
-    constructed_sph = ag.mp.dPIEMassSph.from_lenstool(**sph_kwargs)
+    constructed_sph = ag.mp.dPIEMassSph.from_lenstool(
+        cosmology=ag.cosmo.FlatLambdaCDM(), **sph_kwargs
+    )
 
     assert wrapper_sph.b0 == pytest.approx(constructed_sph.b0, rel=1e-10)
 
@@ -291,10 +298,12 @@ def test__lenstool_wrapper__supports_model_composition():
 
     model = af.Model(ag.mp.dPIEMassLenstool)
 
-    assert model.prior_count == 9
+    assert model.prior_count == 11
 
     model.redshift_object = 0.5
     model.redshift_source = 2.0
+    model.H0 = 70.0
+    model.Om0 = 0.3
 
     assert model.prior_count == 7
 
@@ -305,4 +314,4 @@ def test__lenstool_wrapper__supports_model_composition():
 
     model_sph = af.Model(ag.mp.dPIEMassLenstoolSph)
 
-    assert model_sph.prior_count == 7
+    assert model_sph.prior_count == 9
