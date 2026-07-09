@@ -87,6 +87,40 @@ class OperateImage:
             xp=xp,
         )
 
+    def _convolved_from_evaluations(
+        self,
+        image_2d,
+        blurring_image_2d,
+        grid,
+        blurring_grid,
+        psf,
+        convolution_mask,
+        xp=np,
+    ):
+        """
+        Convolve one pair of evaluated (image, blurring image) values: the shared
+        tail of every blurred-image variant. When the PSF is oversampled
+        (``convolution_mask`` is not None) the values are partially pre-binned to
+        the convolution resolution (the k x s coupling) and convolved at the fine
+        resolution; otherwise the regular image-resolution helper is delegated to.
+        """
+        if convolution_mask is not None:
+            return psf.convolved_image_from(
+                image=self._binned_for_convolution(image_2d, grid, psf, xp=xp),
+                blurring_image=self._binned_for_convolution(
+                    blurring_image_2d, blurring_grid, psf, xp=xp
+                ),
+                mask=convolution_mask,
+                xp=xp,
+            )
+
+        return self._blurred_image_2d_from(
+            image_2d=image_2d,
+            blurring_image_2d=blurring_image_2d,
+            psf=psf,
+            xp=xp,
+        )
+
     @staticmethod
     def _psf_evaluation_grids_from(grid, blurring_grid, psf):
         """
@@ -181,24 +215,15 @@ class OperateImage:
             grid=evaluation_blurring_grid, xp=xp, operated_only=False
         )
 
-        if convolution_mask is not None:
-            blurred_image_2d = psf.convolved_image_from(
-                image=self._binned_for_convolution(
-                    image_2d_not_operated, grid, psf, xp=xp
-                ),
-                blurring_image=self._binned_for_convolution(
-                    blurring_image_2d_not_operated, blurring_grid, psf, xp=xp
-                ),
-                mask=convolution_mask,
-                xp=xp,
-            )
-        else:
-            blurred_image_2d = self._blurred_image_2d_from(
-                image_2d=image_2d_not_operated,
-                blurring_image_2d=blurring_image_2d_not_operated,
-                psf=psf,
-                xp=xp,
-            )
+        blurred_image_2d = self._convolved_from_evaluations(
+            image_2d=image_2d_not_operated,
+            blurring_image_2d=blurring_image_2d_not_operated,
+            grid=grid,
+            blurring_grid=blurring_grid,
+            psf=psf,
+            convolution_mask=convolution_mask,
+            xp=xp,
+        )
 
         if self.has(cls=LightProfileOperated):
             image_2d_operated = self.image_2d_from(grid=grid, xp=xp, operated_only=True)
@@ -456,22 +481,14 @@ class OperateImageList(OperateImage):
             image_2d_not_operated = image_2d_not_operated_list[i]
             blurring_image_2d_not_operated = blurring_image_2d_not_operated_list[i]
 
-            if convolution_mask is not None:
-                blurred_image_2d = psf.convolved_image_from(
-                    image=self._binned_for_convolution(
-                        image_2d_not_operated, grid, psf
-                    ),
-                    blurring_image=self._binned_for_convolution(
-                        blurring_image_2d_not_operated, blurring_grid, psf
-                    ),
-                    mask=convolution_mask,
-                )
-            else:
-                blurred_image_2d = self._blurred_image_2d_from(
-                    image_2d=image_2d_not_operated,
-                    blurring_image_2d=blurring_image_2d_not_operated,
-                    psf=psf,
-                )
+            blurred_image_2d = self._convolved_from_evaluations(
+                image_2d=image_2d_not_operated,
+                blurring_image_2d=blurring_image_2d_not_operated,
+                grid=grid,
+                blurring_grid=blurring_grid,
+                psf=psf,
+                convolution_mask=convolution_mask,
+            )
 
             image_2d_operated = image_2d_operated_list[i]
 
@@ -630,18 +647,13 @@ class OperateImageGalaxies(OperateImageList):
                 galaxy_key
             ]
 
-            if convolution_mask is not None:
-                image_2d_not_operated = self._binned_for_convolution(
-                    image_2d_not_operated, grid, psf, xp=xp
-                )
-                blurring_image_2d_not_operated = self._binned_for_convolution(
-                    blurring_image_2d_not_operated, blurring_grid, psf, xp=xp
-                )
-
-            blurred_image_2d = psf.convolved_image_from(
-                image=image_2d_not_operated,
-                blurring_image=blurring_image_2d_not_operated,
-                mask=convolution_mask,
+            blurred_image_2d = self._convolved_from_evaluations(
+                image_2d=image_2d_not_operated,
+                blurring_image_2d=blurring_image_2d_not_operated,
+                grid=grid,
+                blurring_grid=blurring_grid,
+                psf=psf,
+                convolution_mask=convolution_mask,
                 xp=xp,
             )
 
