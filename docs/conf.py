@@ -124,6 +124,20 @@ add_function_parentheses = False
 
 language = "en"
 
+html_static_path = ["_static"]
+html_css_files = ["pyauto.css"]
+
+html_theme_options = {
+    "light_css_variables": {
+        "color-brand-primary": "#0f766e",
+        "color-brand-content": "#0f766e",
+    },
+    "dark_css_variables": {
+        "color-brand-primary": "#2dd4bf",
+        "color-brand-content": "#2dd4bf",
+    },
+}
+
 from sphinx.builders.html import StandaloneHTMLBuilder
 
 StandaloneHTMLBuilder.supported_image_types = ["image/gif", "image/png", "image/jpeg"]
