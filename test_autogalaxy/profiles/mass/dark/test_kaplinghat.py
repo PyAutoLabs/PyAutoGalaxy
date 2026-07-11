@@ -1,7 +1,17 @@
+import importlib.util
+
 import numpy as np
 import pytest
 
 import autogalaxy as ag
+
+# The `vmapped_deflections_from` path is jax-backed; these tests need jax
+# installed to run (it ships via the `[optional]` extras). The NumPy-only
+# Python-version matrix has no jax, so skip there rather than fail.
+requires_jax = pytest.mark.skipif(
+    importlib.util.find_spec("jax") is None,
+    reason="requires jax (installed via the [optional] extras; absent on the NumPy-only matrix env)",
+)
 
 
 def test__zero_interaction_limit_matches_nfw():
@@ -59,6 +69,7 @@ def test__lensing_quantities_are_finite_and_positive():
     assert deflections[0] == pytest.approx(np.array([0.0, 0.0]), abs=1.0e-8)
 
 
+@requires_jax
 def test__vmapped_deflections_match_instance_path_for_zero_interaction():
     profile = ag.mp.KaplinghatCoredNFWSph(
         centre=(0.1, -0.2),
@@ -97,6 +108,7 @@ def test__vmapped_deflections_match_instance_path_for_zero_interaction():
     )
 
 
+@requires_jax
 def test__vmapped_deflections_match_instance_path_for_sidm_core():
     profile = ag.mp.KaplinghatCoredNFWSph(
         centre=(0.1, -0.2),
