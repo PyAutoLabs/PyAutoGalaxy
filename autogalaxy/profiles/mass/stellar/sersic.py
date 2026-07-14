@@ -15,8 +15,26 @@ from autogalaxy.profiles.mass.stellar.abstract import StellarProfile
 
 
 def cse_settings_from(
-    effective_radius, sersic_index, sersic_constant, mass_to_light_gradient
+    effective_radius, sersic_index, sersic_constant, mass_to_light_gradient, xp=np
 ):
+    """
+    Return the radial fitting range (``upper_dex`` / ``lower_dex``) and the CSE
+    decomposition resolution (``total_cses`` / ``sample_points``) used to decompose
+    a Sersic convergence profile into cored steep ellipsoids.
+
+    The standard (``mass_to_light_gradient <= 0.5``) path is written branch-free
+    using ``xp`` (``jnp.where`` / ``jnp.log10`` under JAX) so it traces cleanly
+    inside ``jax.jit`` when ``sersic_index`` / ``effective_radius`` are tracers:
+    Python ``if`` statements cannot branch on a tracer value, and ``jax.jit``
+    requires static array shapes, so ``total_cses`` / ``sample_points`` are frozen
+    to the conservative maximum previously used (50 / 80) rather than tuned per
+    Sersic index. The per-index ``upper_dex`` / ``lower_dex`` *ranges* are preserved
+    exactly via ``xp.where`` so accuracy is unchanged (only the CSE count can rise).
+
+    The ``mass_to_light_gradient > 0.5`` path (radial-gradient Sersic profiles) is
+    left as the original NumPy branching — it is only reached with a concrete
+    gradient value and is not part of the standard JAX-traced Sersic path.
+    """
     if mass_to_light_gradient > 0.5:
         if effective_radius > 0.2:
             lower_dex = 6.0
@@ -53,31 +71,40 @@ def cse_settings_from(
                 total_cses = 30
                 sample_points = 50
     else:
-        upper_dex = np.min(
-            [
-                np.log10((23.0 / sersic_constant) ** sersic_index),
-                0.85 - np.log10(effective_radius),
-            ]
+        # Static shapes for jax.jit: frozen to the former per-index maximum.
+        total_cses = 50
+        sample_points = 80
+
+        log_effective_radius = xp.log10(effective_radius)
+        base_upper_dex = xp.minimum(
+            xp.log10((23.0 / sersic_constant) ** sersic_index),
+            0.85 - log_effective_radius,
         )
 
-        if (sersic_index <= 0.9) and (sersic_index > 0.8):
-            total_cses = 50
-            sample_points = 80
-            upper_dex = np.log10((18.0 / sersic_constant) ** sersic_index)
-            lower_dex = 4.3 + np.log10(effective_radius)
-        elif sersic_index <= 0.8:
-            total_cses = 50
-            sample_points = 80
-            upper_dex = np.log10((16.0 / sersic_constant) ** sersic_index)
-            lower_dex = 4.0 + np.log10(effective_radius)
-        elif sersic_index > 3.8:
-            total_cses = 40
-            sample_points = 50
-            lower_dex = 4.5 + np.log10(effective_radius)
-        else:
-            lower_dex = 3.5 + np.log10(effective_radius)
-            total_cses = 30
-            sample_points = 50
+        # upper_dex / lower_dex select the same per-index ranges as the original
+        # if/elif ladder, expressed branch-free so a tracer sersic_index traces.
+        upper_dex = xp.where(
+            sersic_index <= 0.8,
+            xp.log10((16.0 / sersic_constant) ** sersic_index),
+            xp.where(
+                sersic_index <= 0.9,
+                xp.log10((18.0 / sersic_constant) ** sersic_index),
+                base_upper_dex,
+            ),
+        )
+        lower_dex = xp.where(
+            sersic_index <= 0.8,
+            4.0 + log_effective_radius,
+            xp.where(
+                sersic_index <= 0.9,
+                4.3 + log_effective_radius,
+                xp.where(
+                    sersic_index > 3.8,
+                    4.5 + log_effective_radius,
+                    3.5 + log_effective_radius,
+                ),
+            ),
+        )
 
     return upper_dex, lower_dex, total_cses, sample_points
 
@@ -243,7 +270,7 @@ class AbstractSersic(MassProfile, MassProfileCSE, StellarProfile):
         )
 
     def decompose_convergence_via_cse(
-        self, grid_radii: np.ndarray
+        self, grid_radii: np.ndarray, xp=np
     ) -> Tuple[List, List]:
         """
         Decompose the convergence of the Sersic profile into cored steep elliptical (cse) profiles.
@@ -275,9 +302,12 @@ class AbstractSersic(MassProfile, MassProfileCSE, StellarProfile):
             sersic_index=self.sersic_index,
             sersic_constant=self.sersic_constant,
             mass_to_light_gradient=0.0,
+            xp=xp,
         )
 
-        scaled_effective_radius = self.effective_radius / np.sqrt(self.axis_ratio())
+        scaled_effective_radius = self.effective_radius / xp.sqrt(
+            self.axis_ratio(xp)
+        )
         radii_min = scaled_effective_radius / 10.0**lower_dex
         radii_max = scaled_effective_radius * 10.0**upper_dex
 
@@ -285,7 +315,7 @@ class AbstractSersic(MassProfile, MassProfileCSE, StellarProfile):
             return (
                 self.mass_to_light_ratio
                 * self.intensity
-                * np.exp(
+                * xp.exp(
                     -self.sersic_constant
                     * (
                         ((r / scaled_effective_radius) ** (1.0 / self.sersic_index))
@@ -300,6 +330,7 @@ class AbstractSersic(MassProfile, MassProfileCSE, StellarProfile):
             radii_max=radii_max,
             total_cses=total_cses,
             sample_points=sample_points,
+            xp=xp,
         )
 
     @property
