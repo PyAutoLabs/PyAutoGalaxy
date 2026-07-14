@@ -98,7 +98,7 @@ class SersicGradient(AbstractSersic):
         )
 
     def decompose_convergence_via_cse(
-        self, grid_radii: np.ndarray
+        self, grid_radii: np.ndarray, xp=np
     ) -> Tuple[List, List]:
         """
         Decompose the convergence of the Sersic profile into singular isothermal elliptical (sie) profiles.
@@ -130,9 +130,12 @@ class SersicGradient(AbstractSersic):
             sersic_index=self.sersic_index,
             sersic_constant=self.sersic_constant,
             mass_to_light_gradient=self.mass_to_light_gradient,
+            xp=xp,
         )
 
-        scaled_effective_radius = self.effective_radius / np.sqrt(self.axis_ratio())
+        scaled_effective_radius = self.effective_radius / xp.sqrt(
+            self.axis_ratio(xp)
+        )
         radii_min = scaled_effective_radius / 10.0**lower_dex
         radii_max = scaled_effective_radius * 10.0**upper_dex
 
@@ -141,10 +144,10 @@ class SersicGradient(AbstractSersic):
                 self.mass_to_light_ratio
                 * self.intensity
                 * (
-                    ((self.axis_ratio() * r) / scaled_effective_radius)
+                    ((self.axis_ratio(xp) * r) / scaled_effective_radius)
                     ** -self.mass_to_light_gradient
                 )
-                * np.exp(
+                * xp.exp(
                     -self.sersic_constant
                     * (
                         ((r / scaled_effective_radius) ** (1.0 / self.sersic_index))
@@ -159,6 +162,7 @@ class SersicGradient(AbstractSersic):
             radii_max=radii_max,
             total_cses=total_cses,
             sample_points=sample_points,
+            xp=xp,
         )
 
 

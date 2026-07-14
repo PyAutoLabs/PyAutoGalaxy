@@ -79,7 +79,7 @@ class MassProfileCSE(ABC):
         return xp.vstack((defl_y, defl_x))
 
     @abstractmethod
-    def decompose_convergence_via_cse(self, grid_radii: np.ndarray):
+    def decompose_convergence_via_cse(self, grid_radii: np.ndarray, xp=np):
         pass
 
     def _decompose_convergence_via_cse_from(
@@ -89,6 +89,7 @@ class MassProfileCSE(ABC):
         radii_max: float,
         total_cses: int = 25,
         sample_points: int = 100,
+        xp=np,
     ) -> Tuple[List, List]:
         """
         Decompose the convergence of a mass profile into cored steep elliptical (cse) profiles.
@@ -115,34 +116,40 @@ class MassProfileCSE(ABC):
             A list of amplitudes and core radii of every cored steep elliptical (cse) the mass profile is decomposed
             into.
         """
-        from scipy.linalg import lstsq
-
         error_sigma = 0.1  # error spread. Could be any value.
 
-        r_samples = np.logspace(np.log10(radii_min), np.log10(radii_max), sample_points)
-        y_samples = np.ones_like(r_samples) / error_sigma
+        r_samples = xp.logspace(
+            xp.log10(radii_min), xp.log10(radii_max), sample_points
+        )
+        y_samples = xp.ones_like(r_samples) / error_sigma
         y_samples_func = func(r_samples)
 
-        core_radius_list = np.logspace(
-            np.log10(radii_min), np.log10(radii_max), total_cses
+        core_radius_list = xp.logspace(
+            xp.log10(radii_min), xp.log10(radii_max), total_cses
         )
 
         # Different from Masamune's (2106.11464) method, I set S to a series fixed values. So that
         # the decomposition can be solved linearly.
+        #
+        # The coefficient matrix is built vectorised (rather than the original
+        # per-column / per-row Python loops that assigned into an ``np.zeros``
+        # buffer) so the decomposition traces cleanly under ``jax.jit`` when
+        # ``xp`` is ``jax.numpy`` — a Python loop writing into a NumPy array
+        # cannot hold tracers. Element ``[k, j]`` matches the original:
+        # ``convergence_cse_1d_from(r_samples[k], core_radius_list[j]) /
+        # (y_samples_func[k] * error_sigma)``. Shape ``(sample_points, total_cses)``.
+        coefficient_matrix = self.convergence_cse_1d_from(
+            r_samples[:, None], core_radius_list[None, :], xp=xp
+        ) / (y_samples_func[:, None] * error_sigma)
 
-        coefficient_matrix = np.zeros((sample_points, total_cses))
+        if xp is np:
+            from scipy.linalg import lstsq
 
-        for j in range(total_cses):
-            coefficient_matrix[:, j] = self.convergence_cse_1d_from(
-                r_samples, core_radius_list[j]
-            )
-
-        for k in range(sample_points):
-            coefficient_matrix[k] /= y_samples_func[k] * error_sigma
-
-        results = lstsq(coefficient_matrix, y_samples.T)
-
-        amplitude_list = results[0]
+            amplitude_list = lstsq(coefficient_matrix, y_samples.T)[0]
+        else:
+            amplitude_list = xp.linalg.lstsq(
+                coefficient_matrix, y_samples.T, rcond=None
+            )[0]
 
         return amplitude_list, core_radius_list
 
@@ -168,7 +175,7 @@ class MassProfileCSE(ABC):
         """
 
         amplitude_list, core_radius_list = self.decompose_convergence_via_cse(
-            grid_radii=grid_radii
+            grid_radii=grid_radii, xp=xp
         )
 
         return sum(
@@ -194,9 +201,9 @@ class MassProfileCSE(ABC):
         """
 
         amplitude_list, core_radius_list = self.decompose_convergence_via_cse(
-            grid_radii=self.radial_grid_from(grid=grid, **kwargs)
+            grid_radii=self.radial_grid_from(grid=grid, xp=xp, **kwargs), xp=xp
         )
-        q = self.axis_ratio()
+        q = self.axis_ratio(xp)
         q2 = q**2.0
         grid_y = grid.array[:, 0]
         grid_x = grid.array[:, 1]

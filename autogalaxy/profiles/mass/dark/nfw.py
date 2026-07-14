@@ -175,7 +175,7 @@ class NFW(gNFW, MassProfileCSE):
         )
 
     def decompose_convergence_via_cse(
-        self, grid_radii: np.ndarray, total_cses=30, sample_points=60
+        self, grid_radii: np.ndarray, total_cses=30, sample_points=60, xp=np
     ):
         """
         Decompose the convergence of the elliptical NFW mass profile into cored steep elliptical (cse) profiles.
@@ -203,12 +203,14 @@ class NFW(gNFW, MassProfileCSE):
             into.
         """
         radii_min = 0.005
-        radii_max = max(7.5, np.max(grid_radii))
+        radii_max = xp.maximum(7.5, xp.max(grid_radii))
 
         def nfw_2d(r):
             grid_radius = (1.0 / self.scale_radius) * r + 0j
-            return np.real(
-                2.0 * self.kappa_s * self.coord_func_g(grid_radius=grid_radius)
+            return xp.real(
+                2.0
+                * self.kappa_s
+                * self.coord_func_g(grid_radius=grid_radius, xp=xp)
             )
 
         return self._decompose_convergence_via_cse_from(
@@ -217,6 +219,7 @@ class NFW(gNFW, MassProfileCSE):
             radii_max=radii_max,
             total_cses=total_cses,
             sample_points=sample_points,
+            xp=xp,
         )
 
     @aa.decorators.to_vector_yx
