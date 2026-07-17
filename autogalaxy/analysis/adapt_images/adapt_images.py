@@ -76,29 +76,6 @@ def _galaxy_image_dict_from_cache(cache_path) -> Optional[Dict]:
     return galaxy_name_image_dict
 
 
-def _append_to_search_zip(paths, file_path):
-    """
-    Also add a cache file into the search's ``.zip`` archive.
-
-    A resumed search's ``paths.restore()`` deletes the output directory and
-    re-extracts the zip, so a cache written only to ``files/`` after the search
-    completed would be destroyed by the next resume. Appending it to the zip
-    makes it a permanent part of the completed output (each later resume
-    re-extracts and re-zips it with everything else).
-    """
-    import zipfile
-    from pathlib import Path
-
-    zip_path = getattr(paths, "_zip_path", None)
-    output_path = getattr(paths, "output_path", None)
-    if zip_path is None or output_path is None or not Path(zip_path).exists():
-        return
-    arcname = str(Path(file_path).relative_to(output_path))
-    with zipfile.ZipFile(zip_path, "a") as f:
-        if arcname not in f.namelist():
-            f.write(file_path, arcname)
-
-
 def _galaxy_image_dict_to_cache(cache_path, galaxy_name_image_dict: Dict, paths):
     """
     Persist the raw per-galaxy image dictionary to the result's cache file, in
@@ -117,7 +94,7 @@ def _galaxy_image_dict_to_cache(cache_path, galaxy_name_image_dict: Dict, paths)
         header_dict=next(iter(galaxy_name_image_dict.values())).mask.header_dict,
     )
     hdu_list.writeto(cache_path, overwrite=True)
-    _append_to_search_zip(paths, cache_path)
+    paths.preserve_in_zip(cache_path)
 
 
 def galaxy_name_image_dict_via_result_from(

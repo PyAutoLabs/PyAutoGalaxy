@@ -114,6 +114,9 @@ class _StubCachePaths:
     def __init__(self, files_path):
         self._files_path = files_path
 
+    def preserve_in_zip(self, file_path):
+        """No zip in the stub — mirrors AbstractPaths' no-zip no-op."""
+
 
 class _StubCacheResult:
     """Duck-typed result for `galaxy_name_image_dict_via_result_from`."""
