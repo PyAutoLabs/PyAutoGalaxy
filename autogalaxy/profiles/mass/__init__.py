@@ -17,6 +17,7 @@ from .total import (
     IsothermalCore,
     IsothermalCoreSph,
     PowerLaw,
+    PowerLawIntermediate,
     PowerLawSph,
     Isothermal,
     IsothermalSph,

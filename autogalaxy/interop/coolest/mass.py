@@ -46,6 +46,7 @@ from autogalaxy.profiles.mass.sheets.mass_sheet import MassSheet
 from autogalaxy.profiles.mass.total.isothermal import Isothermal
 from autogalaxy.profiles.mass.total.isothermal import IsothermalSph
 from autogalaxy.profiles.mass.total.power_law import PowerLaw
+from autogalaxy.profiles.mass.total.power_law import PowerLawIntermediate
 from autogalaxy.profiles.mass.total.power_law import PowerLawSph
 
 
@@ -174,6 +175,40 @@ def _power_law_from(parameters: Dict) -> PowerLaw:
     )
 
 
+def _pemd_dict_from_intermediate(profile, **kwargs) -> Dict:
+    """
+    The ``PowerLawIntermediate`` Einstein radius is already the COOLEST
+    intermediate-axis theta_E, so the mapping is an identity on all parameters
+    (only the ellipticity / angle / centre conventions change).
+    """
+    q, phi = conventions.q_phi_from_ell_comps(ell_comps=profile.ell_comps)
+    center_x, center_y = conventions.center_from_centre(centre=profile.centre)
+    return {
+        "type": "PEMD",
+        "parameters": {
+            "gamma": float(profile.slope),
+            "theta_E": float(profile.einstein_radius),
+            "q": q,
+            "phi": phi,
+            "center_x": center_x,
+            "center_y": center_y,
+        },
+    }
+
+
+def _power_law_intermediate_from(parameters: Dict) -> PowerLawIntermediate:
+    return PowerLawIntermediate(
+        centre=conventions.centre_from_center(
+            center_x=parameters["center_x"], center_y=parameters["center_y"]
+        ),
+        ell_comps=conventions.ell_comps_from_q_phi(
+            q=parameters["q"], phi=parameters["phi"]
+        ),
+        einstein_radius=float(parameters["theta_E"]),
+        slope=float(parameters["gamma"]),
+    )
+
+
 def _nfw_dict_from(profile, sigma_crit: Optional[float] = None, **kwargs) -> Dict:
     """
     The PyAutoGalaxy NFW convergence is ``kappa(xi) = 2 kappa_s g(xi / r_s)``
@@ -281,6 +316,7 @@ _TO_COOLEST: Dict[type, Callable] = {
     Isothermal: _sie_dict_from,
     IsothermalSph: _sie_dict_from,
     PowerLaw: _pemd_dict_from,
+    PowerLawIntermediate: _pemd_dict_from_intermediate,
     PowerLawSph: _pemd_dict_from,
     NFW: _nfw_dict_from,
     NFWSph: _nfw_dict_from,
@@ -325,7 +361,10 @@ def coolest_dict_from_mass(profile, sigma_crit: Optional[float] = None) -> Dict:
 
 
 def mass_profile_from(
-    profile_type: str, parameters: Dict, sigma_crit: Optional[float] = None
+    profile_type: str,
+    parameters: Dict,
+    sigma_crit: Optional[float] = None,
+    intermediate: bool = False,
 ):
     """
     Build a PyAutoGalaxy mass profile from a COOLEST profile type name and its
@@ -342,9 +381,16 @@ def mass_profile_from(
     sigma_crit
         The critical surface mass density of the lens configuration, required
         only for NFW profiles.
+    intermediate
+        If True, a PEMD profile is built as a ``PowerLawIntermediate`` (its
+        ``einstein_radius`` is the template's ``theta_E`` unchanged) instead of
+        the default ``PowerLaw`` (which converts theta_E to the PyAutoGalaxy
+        major-axis convention). Both give the identical mass distribution.
     """
     if profile_type == "NFW":
         return _nfw_from(parameters=parameters, sigma_crit=sigma_crit)
+    if profile_type == "PEMD" and intermediate:
+        return _power_law_intermediate_from(parameters=parameters)
     try:
         from_coolest = _FROM_COOLEST[profile_type]
     except KeyError:

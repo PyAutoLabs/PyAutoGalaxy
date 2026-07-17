@@ -103,7 +103,7 @@ class PowerLaw(PowerLawCore):
         slope = self.slope - 1.0
         einstein_radius = (
             2.0 / (self.axis_ratio(xp) ** -0.5 + self.axis_ratio(xp) ** 0.5)
-        ) * self.einstein_radius
+        ) * self.einstein_radius_major_from(xp)
 
         factor = xp.divide(1.0 - self.axis_ratio(xp), 1.0 + self.axis_ratio(xp))
         b = xp.multiply(einstein_radius, xp.sqrt(self.axis_ratio(xp)))
@@ -165,6 +165,61 @@ class PowerLaw(PowerLawCore):
             * ((3.0 - slope) * _eta_u) ** -1.0
             * _eta_u ** (3.0 - slope)
             / ((1 - (1 - axis_ratio**2) * u) ** 0.5)
+        )
+
+
+class PowerLawIntermediate(PowerLaw):
+    r"""Elliptical power-law mass profile with an intermediate-axis Einstein radius.
+
+    Identical mass distribution to :class:`PowerLaw`, but the ``einstein_radius``
+    parameter follows the *intermediate-axis* convention used by the COOLEST
+    standard, lenstronomy and herculens: radii are measured as
+    :math:`r = \sqrt{a b} = \sqrt{q} \, a` on the elliptical isodensity
+    contours, and the convergence is
+
+    .. math::
+
+        \kappa(r) = \frac{3 - \gamma}{2}
+                    \left(\frac{\theta_{\rm E}}{r}\right)^{\gamma - 1}.
+
+    The relation to the :class:`PowerLaw` ``einstein_radius`` (:math:`\theta_{\rm PL}`) is:
+
+    .. math::
+
+        \theta_{\rm E} = \sqrt{q} \left(\frac{2}{1 + q}\right)^{1 / (\gamma - 1)} \theta_{\rm PL},
+
+    which for the isothermal case (:math:`\gamma = 2`) reduces to
+    :math:`2 \sqrt{q} / (1 + q) \, \theta_{\rm PL}`.
+
+    Use this profile when parameter values must line up directly with other lens
+    modeling codes — its COOLEST ``PEMD`` mapping is an identity
+    (``autogalaxy.interop.coolest``) — at the cost of departing from the
+    Einstein-radius convention of the rest of **PyAutoGalaxy**.
+
+    Parameters
+    ----------
+    centre : (float, float)
+        (y, x) arc-second coordinates of the profile centre.
+    ell_comps : (float, float)
+        Ellipticity components (e1, e2) of the elliptical coordinate system.
+    einstein_radius : float
+        Einstein radius in arcseconds, in the intermediate-axis (COOLEST) convention.
+    slope : float
+        Logarithmic density slope :math:`\gamma`.
+    """
+
+    def einstein_radius_major_from(self, xp=np):
+        """
+        Convert the stored intermediate-axis ``einstein_radius`` to the major-axis
+        convention the power-law formulae are written in (the inverse of the
+        relation in the class docstring). Threaded through ``xp`` so the profile
+        is JAX-traceable like its parent.
+        """
+        axis_ratio = self.axis_ratio(xp)
+        return (
+            self.einstein_radius
+            / xp.sqrt(axis_ratio)
+            * ((1.0 + axis_ratio) / 2.0) ** (1.0 / (self.slope - 1.0))
         )
 
 
