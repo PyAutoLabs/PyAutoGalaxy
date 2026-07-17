@@ -11,6 +11,115 @@ if TYPE_CHECKING:
     from autogalaxy.galaxy.galaxy import Galaxy
 
 
+def _galaxy_images_cache_path(result, use_model_images: bool):
+    """
+    The on-disk cache file for the raw per-galaxy images of a result, inside the
+    result's own ``files/`` folder, or ``None`` when the result has no on-disk
+    output (e.g. ``NullPaths``) and therefore cannot cache.
+    """
+    from pathlib import Path
+
+    paths = getattr(result, "paths", None)
+    files_path = getattr(paths, "_files_path", None)
+    if files_path is None or not Path(files_path).is_dir():
+        return None
+    name = "galaxy_images_model" if use_model_images else "galaxy_images_snr"
+    return Path(files_path) / f"{name}.fits"
+
+
+def _galaxy_image_dict_from_cache(cache_path) -> Optional[Dict]:
+    """
+    Load the raw (pre minimum-percent clip) per-galaxy image dictionary from a
+    result's cache file, or ``None`` when the file does not exist (the first
+    arrival at this result computes and writes it).
+
+    The FITS layout mirrors the ``adapt_images.fits`` artifact the aggregator
+    reads (``agg_util.adapt_images_from``): HDU 0 is the mask (header carries
+    pixel scales and origin), HDU 1+ are one image per galaxy with the galaxy
+    path as ``EXTNAME``.
+    """
+    from astropy.io import fits as astropy_fits
+
+    from autoarray.mask.mask_2d import Mask2DKeys
+    from autoconf.fitsable import ndarray_via_hdu_from
+
+    if cache_path is None or not cache_path.exists():
+        return None
+
+    with astropy_fits.open(cache_path) as hdu_list:
+        header = hdu_list[0].header
+        pixel_scales = (
+            header[Mask2DKeys.PIXSCAY.value],
+            header[Mask2DKeys.PIXSCAX.value],
+        )
+        origin = (
+            header[Mask2DKeys.ORIGINY.value],
+            header[Mask2DKeys.ORIGINX.value],
+        )
+        mask = aa.Mask2D(
+            mask=ndarray_via_hdu_from(hdu_list[0]),
+            pixel_scales=pixel_scales,
+            origin=origin,
+        )
+
+        galaxy_name_image_dict = {}
+        for hdu in hdu_list[1:]:
+            image = aa.Array2D.no_mask(
+                values=ndarray_via_hdu_from(hdu),
+                pixel_scales=mask.pixel_scales,
+                origin=mask.origin,
+            )
+            galaxy_name_image_dict[hdu.header["EXTNAME"].lower()] = image.apply_mask(
+                mask=mask
+            )
+
+    return galaxy_name_image_dict
+
+
+def _append_to_search_zip(paths, file_path):
+    """
+    Also add a cache file into the search's ``.zip`` archive.
+
+    A resumed search's ``paths.restore()`` deletes the output directory and
+    re-extracts the zip, so a cache written only to ``files/`` after the search
+    completed would be destroyed by the next resume. Appending it to the zip
+    makes it a permanent part of the completed output (each later resume
+    re-extracts and re-zips it with everything else).
+    """
+    import zipfile
+    from pathlib import Path
+
+    zip_path = getattr(paths, "_zip_path", None)
+    output_path = getattr(paths, "output_path", None)
+    if zip_path is None or output_path is None or not Path(zip_path).exists():
+        return
+    arcname = str(Path(file_path).relative_to(output_path))
+    with zipfile.ZipFile(zip_path, "a") as f:
+        if arcname not in f.namelist():
+            f.write(file_path, arcname)
+
+
+def _galaxy_image_dict_to_cache(cache_path, galaxy_name_image_dict: Dict, paths):
+    """
+    Persist the raw per-galaxy image dictionary to the result's cache file, in
+    the same FITS layout ``_galaxy_image_dict_from_cache`` reads, and preserve
+    it in the search's zip archive so later resumes keep it.
+    """
+    from autoconf.fitsable import hdu_list_for_output_from
+
+    image_list = [
+        galaxy_name_image_dict[name].native_for_fits
+        for name in galaxy_name_image_dict
+    ]
+    hdu_list = hdu_list_for_output_from(
+        values_list=[image_list[0].mask.astype("float")] + image_list,
+        ext_name_list=["mask"] + list(galaxy_name_image_dict.keys()),
+        header_dict=next(iter(galaxy_name_image_dict.values())).mask.header_dict,
+    )
+    hdu_list.writeto(cache_path, overwrite=True)
+    _append_to_search_zip(paths, cache_path)
+
+
 def galaxy_name_image_dict_via_result_from(
     result, use_model_images: bool = False
 ) -> "AdaptImages":
@@ -34,6 +143,14 @@ def galaxy_name_image_dict_via_result_from(
     numerical issues with the adaptive schemes. To prevent this, we set a minimum flux value for each
     galaxy-image, which is a fraction of the maximum flux value of that image defined via a config file.
 
+    The raw per-galaxy images are cached to the result's own ``files/`` folder on first computation
+    (``galaxy_images_model.fits`` / ``galaxy_images_snr.fits``) and loaded from there on every later call —
+    computing them rebuilds the result's maximum log likelihood fit, which on a resumed pipeline pays a fresh
+    JIT compile plus (for pixelized fits) an inversion, and dominates SLaM resume overhead
+    (autolens_profiling#70). Staleness is structurally guarded: changing the upstream model or search
+    produces a new search identifier and therefore a fresh output directory with no cache file. Results with
+    no on-disk output (e.g. ``NullPaths``) always compute.
+
     Parameters
     ----------
     result
@@ -48,14 +165,26 @@ def galaxy_name_image_dict_via_result_from(
     """
     adapt_minimum_percent = conf.instance["general"]["adapt"]["adapt_minimum_percent"]
 
+    cache_path = _galaxy_images_cache_path(result, use_model_images=use_model_images)
+    raw_image_dict = _galaxy_image_dict_from_cache(cache_path)
+
+    if raw_image_dict is None:
+        raw_image_dict = {}
+
+        for path, galaxy in result.path_galaxy_tuples:
+            if use_model_images:
+                raw_image_dict[path] = result.model_image_galaxy_dict[path]
+            else:
+                raw_image_dict[path] = result.subtracted_signal_to_noise_map_galaxy_dict[
+                    path
+                ]
+
+        if cache_path is not None:
+            _galaxy_image_dict_to_cache(cache_path, raw_image_dict, paths=result.paths)
+
     galaxy_name_image_dict = {}
 
-    for path, galaxy in result.path_galaxy_tuples:
-        if use_model_images:
-            galaxy_image = result.model_image_galaxy_dict[path]
-        else:
-            galaxy_image = result.subtracted_signal_to_noise_map_galaxy_dict[path]
-
+    for path, galaxy_image in raw_image_dict.items():
         minimum_galaxy_value = adapt_minimum_percent * np.max(galaxy_image.array)
         galaxy_image[galaxy_image < minimum_galaxy_value] = minimum_galaxy_value
 
