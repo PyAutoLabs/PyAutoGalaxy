@@ -80,3 +80,49 @@ def test__operators_can_be_preloaded():
 
     deflections = np.asarray(profile.deflections_yx_2d_from(grid=grid))
     assert deflections[:, 0] == pytest.approx(1.0, abs=1.0e-8)
+
+
+def test__zero_extrapolation__deflections_vanish_outside_mesh():
+    mask, grid = masked_setup()
+    grid_arr = np.asarray(grid)
+    potential = 2.0 * grid_arr[:, 0] + 3.0 * grid_arr[:, 1]
+
+    profile_nearest = ag.mp.InputPotential(
+        lensing_potential=potential, image_plane_grid=grid_arr, mask=mask
+    )
+    profile_zero = ag.mp.InputPotential(
+        lensing_potential=potential,
+        image_plane_grid=grid_arr,
+        mask=mask,
+        extrapolate="zero",
+    )
+
+    far_outside = aa.Grid2DIrregular(values=[(6.0, 6.0), (-7.0, 5.0)])
+
+    deflections_nearest = np.asarray(
+        profile_nearest.deflections_yx_2d_from(grid=far_outside)
+    )
+    deflections_zero = np.asarray(profile_zero.deflections_yx_2d_from(grid=far_outside))
+
+    # nearest extrapolation smears constant non-zero deflections outward;
+    # zero extrapolation vanishes
+    assert not np.allclose(deflections_nearest, 0.0)
+    assert deflections_zero == pytest.approx(0.0, abs=1.0e-12)
+
+    # inside the mesh the two modes agree exactly
+    inside = aa.Grid2DIrregular(values=[(0.1, -0.2), (0.7, 0.4)])
+    assert np.asarray(profile_zero.deflections_yx_2d_from(grid=inside)) == pytest.approx(
+        np.asarray(profile_nearest.deflections_yx_2d_from(grid=inside)), abs=1.0e-12
+    )
+
+
+def test__invalid_extrapolate_raises():
+    mask, grid = masked_setup()
+    grid_arr = np.asarray(grid)
+    with pytest.raises(ValueError):
+        ag.mp.InputPotential(
+            lensing_potential=np.ones(grid_arr.shape[0]),
+            image_plane_grid=grid_arr,
+            mask=mask,
+            extrapolate="taper",
+        )

@@ -17,6 +17,7 @@ class InputPotential(MassProfile):
         lensing_potential: np.ndarray,
         image_plane_grid: aa.type.Grid2DLike,
         mask: aa.type.Mask2D,
+        extrapolate: str = "nearest",
         Hy: Optional[spmatrix] = None,
         Hx: Optional[spmatrix] = None,
         Hyy: Optional[spmatrix] = None,
@@ -54,6 +55,14 @@ class InputPotential(MassProfile):
             ``aa.util.derivative.cleaned_mask_from``); its ``pixel_scale``
             sets the finite-difference step of the derived deflections and
             convergence.
+        extrapolate
+            The extrapolation behaviour outside the unmasked pixels' convex
+            hull: ``"nearest"`` (default; the field continues beyond the
+            grid) or ``"zero"`` (the field vanishes outside it — required
+            when the profile represents a localized correction on a
+            sub-region of a larger grid, e.g. an arc-restricted dpsi mesh,
+            where nearest extrapolation would produce spurious constant
+            deflections everywhere else).
         Hy
             The sparse first-derivative operator along y of the mask; built
             from the mask if not input.
@@ -72,6 +81,7 @@ class InputPotential(MassProfile):
         self.lensing_potential = np.asarray(lensing_potential)
         self.image_plane_grid = np.asarray(image_plane_grid)
         self.mask = mask
+        self.extrapolate = extrapolate
         self.Hy = Hy
         self.Hx = Hx
         self.Hyy = Hyy
@@ -96,10 +106,10 @@ class InputPotential(MassProfile):
         ) * 0.5
 
         self.tri = Delaunay(np.fliplr(self.image_plane_grid))
-        self.interp_psi = LinearNDInterpolatorExt(self.tri, self.lensing_potential)
-        self.interp_defl_y = LinearNDInterpolatorExt(self.tri, self.deflections_y)
-        self.interp_defl_x = LinearNDInterpolatorExt(self.tri, self.deflections_x)
-        self.interp_kappa = LinearNDInterpolatorExt(self.tri, self.convergence_slim)
+        self.interp_psi = LinearNDInterpolatorExt(self.tri, fill=self.extrapolate, values=self.lensing_potential)
+        self.interp_defl_y = LinearNDInterpolatorExt(self.tri, fill=self.extrapolate, values=self.deflections_y)
+        self.interp_defl_x = LinearNDInterpolatorExt(self.tri, fill=self.extrapolate, values=self.deflections_x)
+        self.interp_kappa = LinearNDInterpolatorExt(self.tri, fill=self.extrapolate, values=self.convergence_slim)
 
     @aa.decorators.to_array
     def convergence_2d_from(self, grid: aa.type.Grid2DLike, xp=np, **kwargs):
