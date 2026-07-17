@@ -66,3 +66,9 @@ from .stellar import (
     ChameleonSph,
 )
 from .sheets import ExternalPotential, ExternalShear, MassSheet
+from .input import (
+    InputDeflections,
+    InputPotential,
+    GaussianRandomField,
+    LinearNDInterpolatorExt,
+)

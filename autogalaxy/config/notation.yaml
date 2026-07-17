@@ -69,6 +69,9 @@ label:
     zeroth_signal_scale: V
   superscript:
     ExternalShear: ext
+    GaussianRandomField: grf
+    InputDeflections: input
+    InputPotential: input
     Mesh: mesh
     Point: point
     SMBH: smbh
