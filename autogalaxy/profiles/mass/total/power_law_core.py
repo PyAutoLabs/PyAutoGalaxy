@@ -71,6 +71,17 @@ class PowerLawCore(MassProfile):
         self.slope = slope
         self.core_radius = core_radius
 
+    def einstein_radius_major_from(self, xp=np):
+        """
+        The Einstein radius in the convention the profile's convergence and deflection formulae are written in,
+        where the elliptical radius is the major-axis radius of the isodensity contour.
+
+        For this class and its standard subclasses this is the ``einstein_radius`` parameter itself; subclasses
+        which parameterise the Einstein radius in a different convention (e.g. ``PowerLawIntermediate``) override
+        this with the conversion, which every calculation then inherits.
+        """
+        return self.einstein_radius
+
     def einstein_radius_rescaled(self, xp=np):
         """
         Rescale the einstein radius by slope and axis_ratio, to reduce its degeneracy with other mass-profiles
@@ -78,7 +89,7 @@ class PowerLawCore(MassProfile):
         """
         return (
             (3 - self.slope) / (1 + self.axis_ratio(xp))
-        ) * self.einstein_radius ** (self.slope - 1)
+        ) * self.einstein_radius_major_from(xp) ** (self.slope - 1)
 
     @aa.over_sample
     @aa.decorators.to_array

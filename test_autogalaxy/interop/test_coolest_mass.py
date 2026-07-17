@@ -112,6 +112,51 @@ def test__power_law__round_trip_is_numerically_identical(axis_ratio, angle, slop
     )
 
 
+def test__power_law_intermediate__coolest_mapping_is_identity():
+    profile = ag.mp.PowerLawIntermediate(
+        centre=(0.1, -0.2),
+        ell_comps=ag.convert.ell_comps_from(axis_ratio=0.7, angle=45.0),
+        einstein_radius=1.2,
+        slope=2.1,
+    )
+
+    profile_dict = coolest.coolest_dict_from_mass(profile=profile)
+
+    assert profile_dict["type"] == "PEMD"
+    # No sqrt(q) factor — theta_E is the parameter itself.
+    assert profile_dict["parameters"]["theta_E"] == 1.2
+    assert profile_dict["parameters"]["gamma"] == pytest.approx(2.1)
+    assert profile_dict["parameters"]["q"] == pytest.approx(0.7)
+
+    # And the analytic COOLEST convergence with these parameters matches.
+    convergence = profile.convergence_2d_from(grid=aa.Grid2DIrregular(grid_yx()))
+    convergence_coolest = coolest_power_law_convergence(
+        parameters=profile_dict["parameters"], grid=grid_yx()
+    )
+    assert np.asarray(convergence) == pytest.approx(convergence_coolest, rel=1e-8)
+
+    profile_back = coolest.mass_profile_from(
+        profile_type="PEMD",
+        parameters=profile_dict["parameters"],
+        intermediate=True,
+    )
+
+    assert isinstance(profile_back, ag.mp.PowerLawIntermediate)
+    assert profile_back.einstein_radius == pytest.approx(1.2, rel=1e-12)
+
+    # Default import still builds the PyAutoGalaxy-convention PowerLaw, with
+    # the identical mass distribution.
+    profile_back_default = coolest.mass_profile_from(
+        profile_type="PEMD", parameters=profile_dict["parameters"]
+    )
+    assert type(profile_back_default) is ag.mp.PowerLaw
+
+    grid = aa.Grid2DIrregular(grid_yx())
+    assert np.asarray(
+        profile_back_default.convergence_2d_from(grid=grid)
+    ) == pytest.approx(np.asarray(profile.convergence_2d_from(grid=grid)), rel=1e-8)
+
+
 def test__isothermal_sph__round_trip():
     profile = ag.mp.IsothermalSph(centre=(0.1, 0.2), einstein_radius=0.8)
 
