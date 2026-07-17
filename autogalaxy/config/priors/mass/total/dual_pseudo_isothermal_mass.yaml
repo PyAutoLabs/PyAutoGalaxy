@@ -1,4 +1,4 @@
-dPIEMass:
+dPIEMassB0:
   centre_0:
     type: Gaussian
     mean: 0.0
@@ -73,7 +73,7 @@ dPIEMass:
     limits:
       lower: 0.0
       upper: inf
-dPIEMassSph:
+dPIEMassB0Sph:
   centre_0:
     type: Gaussian
     mean: 0.0
@@ -124,7 +124,7 @@ dPIEMassSph:
     limits:
       lower: 0.0
       upper: inf
-dPIEMassLenstool:
+dPIEMass:
   centre_0:
     type: Gaussian
     mean: 0.0
@@ -235,7 +235,7 @@ dPIEMassLenstool:
     limits:
       lower: 0.0
       upper: 1.0
-dPIEMassLenstoolSph:
+dPIEMassSph:
   centre_0:
     type: Gaussian
     mean: 0.0

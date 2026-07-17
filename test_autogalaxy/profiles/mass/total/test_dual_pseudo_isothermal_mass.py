@@ -6,7 +6,7 @@ grid = ag.Grid2DIrregular([[1.0, 1.0], [2.0, 2.0], [3.0, 3.0], [2.0, 4.0]])
 
 
 def test__deflections_yx_2d_from__sph_config_1():
-    mp = ag.mp.dPIEMassSph(centre=(-0.7, 0.5), b0=5.2, ra=2.0, rs=3.0)
+    mp = ag.mp.dPIEMassB0Sph(centre=(-0.7, 0.5), b0=5.2, ra=2.0, rs=3.0)
 
     deflections = mp.deflections_yx_2d_from(grid=ag.Grid2DIrregular([[0.1875, 0.1625]]))
 
@@ -15,7 +15,7 @@ def test__deflections_yx_2d_from__sph_config_1():
 
 
 def test__deflections_yx_2d_from__sph_config_2():
-    mp = ag.mp.dPIEMassSph(centre=(-0.1, 0.1), b0=20.0, ra=2.0, rs=3.0)
+    mp = ag.mp.dPIEMassB0Sph(centre=(-0.1, 0.1), b0=20.0, ra=2.0, rs=3.0)
 
     deflections = mp.deflections_yx_2d_from(grid=ag.Grid2DIrregular([[0.1875, 0.1625]]))
 
@@ -26,7 +26,7 @@ def test__deflections_yx_2d_from__sph_config_2():
 def test__deflections_yx_2d_from__elliptical():
     # First deviation from potential case due to ellipticity
 
-    mp = ag.mp.dPIEMass(
+    mp = ag.mp.dPIEMassB0(
         centre=(0, 0), ell_comps=(0.0, 0.333333), b0=4.0, ra=2.0, rs=3.0
     )
 
@@ -37,10 +37,10 @@ def test__deflections_yx_2d_from__elliptical():
 
 
 def test__deflections_yx_2d_from__elliptical_vs_spherical():
-    elliptical = ag.mp.dPIEMass(
+    elliptical = ag.mp.dPIEMassB0(
         centre=(1.1, 1.1), ell_comps=(0.000001, 0.0000001), b0=12.0, ra=2.0, rs=3.0
     )
-    spherical = ag.mp.dPIEMassSph(centre=(1.1, 1.1), b0=12.0, ra=2.0, rs=3.0)
+    spherical = ag.mp.dPIEMassB0Sph(centre=(1.1, 1.1), b0=12.0, ra=2.0, rs=3.0)
 
     assert elliptical.deflections_yx_2d_from(grid=grid).array == pytest.approx(
         spherical.deflections_yx_2d_from(grid=grid).array, 1e-1
@@ -48,7 +48,7 @@ def test__deflections_yx_2d_from__elliptical_vs_spherical():
 
 
 def test__convergence_func__matches_private_helper():
-    """Regression: dPIEMass must override the abstract `convergence_func`
+    """Regression: dPIEMassB0 must override the abstract `convergence_func`
     so MGEDecomposer.decompose_convergence_via_mge (which walks the
     convergence radially during MGE potential decomposition) doesn't
     fall through to the abstract NotImplementedError. The shim delegates
@@ -57,7 +57,7 @@ def test__convergence_func__matches_private_helper():
 
     import numpy as np
 
-    mp = ag.mp.dPIEMass(centre=(0.0, 0.0), b0=5.2, ra=2.0, rs=3.0)
+    mp = ag.mp.dPIEMassB0(centre=(0.0, 0.0), b0=5.2, ra=2.0, rs=3.0)
 
     # Scalar radius: equals the _convergence formula directly.
     assert mp.convergence_func(1.5) == pytest.approx(mp._convergence(1.5), 1e-12)
@@ -69,8 +69,8 @@ def test__convergence_func__matches_private_helper():
     assert actual.shape == radii.shape
     assert actual == pytest.approx(expected, 1e-12)
 
-    # dPIEMassSph inherits the override from dPIEMass.
-    sph = ag.mp.dPIEMassSph(centre=(0.0, 0.0), b0=5.2, ra=2.0, rs=3.0)
+    # dPIEMassB0Sph inherits the override from dPIEMassB0.
+    sph = ag.mp.dPIEMassB0Sph(centre=(0.0, 0.0), b0=5.2, ra=2.0, rs=3.0)
     assert sph.convergence_func(1.5) == pytest.approx(sph._convergence(1.5), 1e-12)
 
 
@@ -81,7 +81,7 @@ def test__from_lenstool__b0_conversion__matches_isothermal_relation():
 
     cosmology = ag.cosmo.Planck15()
 
-    mp = ag.mp.dPIEMassSph.from_lenstool(
+    mp = ag.mp.dPIEMassB0Sph.from_lenstool(
         sigma=1000.0,
         r_core=0.1,
         r_cut=20.0,
@@ -103,7 +103,7 @@ def test__from_lenstool__b0_explicit_value():
 
     cosmology = ag.cosmo.Planck15()
 
-    mp = ag.mp.dPIEMassSph.from_lenstool(
+    mp = ag.mp.dPIEMassB0Sph.from_lenstool(
         sigma=250.0,
         redshift_object=0.3,
         redshift_source=1.5,
@@ -126,7 +126,7 @@ def test__from_lenstool__ellipticity_conversion__matches_lenstool_internal():
 
     emass = 0.4
 
-    mp = ag.mp.dPIEMass.from_lenstool(ellipticity=emass, angle_pos=0.0)
+    mp = ag.mp.dPIEMassB0.from_lenstool(ellipticity=emass, angle_pos=0.0)
 
     epot_lenstool = (1.0 - (1.0 - emass**2) ** 0.5) / emass
 
@@ -140,7 +140,7 @@ def test__from_lenstool__ellipticity_conversion__matches_lenstool_internal():
 
 
 def test__from_lenstool__angle_and_radii_passthrough():
-    mp = ag.mp.dPIEMass.from_lenstool(
+    mp = ag.mp.dPIEMassB0.from_lenstool(
         centre=(0.1, -0.2),
         ellipticity=0.3,
         angle_pos=45.0,
@@ -165,8 +165,8 @@ def test__from_lenstool__sph_matches_elliptical_zero_ellipticity():
         sigma=300.0, r_core=0.2, r_cut=15.0, redshift_object=0.4, redshift_source=1.8
     )
 
-    sph = ag.mp.dPIEMassSph.from_lenstool(**kwargs)
-    ell = ag.mp.dPIEMass.from_lenstool(ellipticity=0.0, angle_pos=0.0, **kwargs)
+    sph = ag.mp.dPIEMassB0Sph.from_lenstool(**kwargs)
+    ell = ag.mp.dPIEMassB0.from_lenstool(ellipticity=0.0, angle_pos=0.0, **kwargs)
 
     grid_check = ag.Grid2DIrregular([[0.5, 0.8], [1.5, -0.3]])
 
@@ -181,7 +181,7 @@ def test__from_lenstool__isothermal_limit_deflection_equals_b0():
     # ra -> 0, rs -> inf, e = 0: the dPIE tends to a SIS whose deflection magnitude is b0
     # everywhere, so b0 is the Einstein radius in this limit.
 
-    mp = ag.mp.dPIEMassSph.from_lenstool(
+    mp = ag.mp.dPIEMassB0Sph.from_lenstool(
         sigma=800.0, r_core=1e-5, r_cut=1e6, redshift_object=0.5, redshift_source=2.0
     )
 
@@ -194,7 +194,7 @@ def test__potential_2d_from__gradient_matches_deflections():
     # The analytic potential (Lenstool pi05 port) must be exactly consistent with the
     # ci05f deflections: finite-difference grad(psi) = alpha, including rotation.
 
-    mp = ag.mp.dPIEMass(
+    mp = ag.mp.dPIEMassB0(
         centre=(0.1, -0.3), ell_comps=(0.15, 0.1), ra=1.5, rs=30.0, b0=10.0
     )
 
@@ -227,7 +227,7 @@ def test__potential_2d_from__spherical_limit_matches_quadrature():
 
     import numpy as np
 
-    mp = ag.mp.dPIEMassSph(centre=(0.0, 0.0), ra=2.0, rs=20.0, b0=5.0)
+    mp = ag.mp.dPIEMassB0Sph(centre=(0.0, 0.0), ra=2.0, rs=20.0, b0=5.0)
 
     eps_fd = 1e-6
     R = 4.0
@@ -242,9 +242,9 @@ def test__potential_2d_from__spherical_limit_matches_quadrature():
     assert alpha_fd == pytest.approx(alpha[0, 1], rel=1e-5)
 
 
-def test__lenstool_wrapper__matches_from_lenstool_constructor():
-    # The model-fittable wrapper class must produce the identical profile to the
-    # from_lenstool classmethod with the (fixed Planck15) cosmology.
+def test__default_class__matches_from_lenstool_classmethod():
+    # The default (Lenstool-native parameterized) class must produce the identical
+    # profile to the dPIEMassB0.from_lenstool classmethod converter.
 
     kwargs = dict(
         centre=(0.1, -0.2),
@@ -257,11 +257,11 @@ def test__lenstool_wrapper__matches_from_lenstool_constructor():
         redshift_source=1.8,
     )
 
-    wrapper = ag.mp.dPIEMassLenstool(**kwargs)
+    wrapper = ag.mp.dPIEMass(**kwargs)
     # The wrapper's flat-input cosmology (H0/Om0 floats -> FlatLambdaCDM) matches the
     # classmethod when the classmethod is handed the same background cosmology; the
     # Planck15 subclass differs at the massive-neutrino level.
-    constructed = ag.mp.dPIEMass.from_lenstool(
+    constructed = ag.mp.dPIEMassB0.from_lenstool(
         cosmology=ag.cosmo.FlatLambdaCDM(), **kwargs
     )
 
@@ -281,22 +281,22 @@ def test__lenstool_wrapper__matches_from_lenstool_constructor():
         k: v for k, v in kwargs.items() if k not in ("ellipticity", "angle_pos")
     }
 
-    wrapper_sph = ag.mp.dPIEMassLenstoolSph(**sph_kwargs)
-    constructed_sph = ag.mp.dPIEMassSph.from_lenstool(
+    wrapper_sph = ag.mp.dPIEMassSph(**sph_kwargs)
+    constructed_sph = ag.mp.dPIEMassB0Sph.from_lenstool(
         cosmology=ag.cosmo.FlatLambdaCDM(), **sph_kwargs
     )
 
     assert wrapper_sph.b0 == pytest.approx(constructed_sph.b0, rel=1e-10)
 
 
-def test__lenstool_wrapper__supports_model_composition():
+def test__default_class__supports_model_composition():
     # Fitting in Lenstool parameters: af.Model must resolve priors for every __init__
     # arg from the config, and fixing the redshifts must leave the Lenstool free
     # parameters (centre_0, centre_1, ellipticity, angle, sigma, r_core, r_cut).
 
     import autofit as af
 
-    model = af.Model(ag.mp.dPIEMassLenstool)
+    model = af.Model(ag.mp.dPIEMass)
 
     assert model.prior_count == 11
 
@@ -309,9 +309,29 @@ def test__lenstool_wrapper__supports_model_composition():
 
     instance = model.instance_from_unit_vector([0.5] * model.prior_count)
 
-    assert isinstance(instance, ag.mp.dPIEMassLenstool)
+    assert isinstance(instance, ag.mp.dPIEMass)
     assert instance.b0 > 0.0
 
-    model_sph = af.Model(ag.mp.dPIEMassLenstoolSph)
+    model_sph = af.Model(ag.mp.dPIEMassSph)
 
     assert model_sph.prior_count == 9
+
+
+def test__from_b0__returns_internal_parameterization():
+    # The non-standard construction path: dPIEMass.from_b0 / dPIEMassSph.from_b0
+    # return the internal (ra, rs, b0) classes with the inputs passed through.
+
+    mp = ag.mp.dPIEMass.from_b0(
+        centre=(0.1, -0.2), ell_comps=(0.1, 0.05), ra=0.5, rs=10.0, b0=1.3
+    )
+
+    assert isinstance(mp, ag.mp.dPIEMassB0)
+    assert mp.centre == (0.1, -0.2)
+    assert mp.ra == 0.5
+    assert mp.rs == 10.0
+    assert mp.b0 == 1.3
+
+    sph = ag.mp.dPIEMassSph.from_b0(centre=(0.0, 0.0), ra=0.5, rs=10.0, b0=1.3)
+
+    assert isinstance(sph, ag.mp.dPIEMassB0Sph)
+    assert sph.b0 == 1.3
