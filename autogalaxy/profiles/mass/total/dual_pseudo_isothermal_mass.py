@@ -40,7 +40,8 @@ def _b0_from_lenstool_sigma(
     return 6.0 * 648000.0 * (sigma / c_km_s) ** 2 * (d_ls / d_s)
 
 
-# Within this profile family, PIEMass, dPIEMass, and dPIEMassSph are directly ported from Lenstool's C code, and have been thoroughly annotated and adapted for PyAutoLens.
+# Within this profile family, PIEMass, dPIEMassB0, and dPIEMassB0Sph are directly ported from Lenstool's C code, and have been thoroughly annotated and adapted for PyAutoLens.
+# dPIEMass and dPIEMassSph (the default profiles) expose the same physics in Lenstool's native parameterization.
 # The dPIEPotential and dPIEPotentialSph profiles are modified from the original `dPIEPotential` and `dPIEPotentialSph`, which were implemented to PyAutoLens by Jackson O'Donnell.
 
 
@@ -434,8 +435,16 @@ class PIEMass(MassProfile):
         return aa.Array2D(values=1.0 / det_A, mask=grid.mask)
 
 
-class dPIEMass(MassProfile):
-    r"""Dual pseudo-isothermal elliptical mass distribution (dPIE, mass parameterisation).
+class dPIEMassB0(MassProfile):
+    r"""Dual pseudo-isothermal elliptical mass distribution in the internal
+    (``ra``, ``rs``, ``b0``) parameterisation.
+
+    **This is the non-standard parameterisation.** The default dPIE profile is
+    :class:`dPIEMass`, whose free parameters are Lenstool's native ones
+    (``ellipticity``, ``angle_pos``, ``sigma``, ``r_core``, ``r_cut``) as used
+    by essentially every published cluster- and group-scale analysis. Use this
+    class (or ``dPIEMass.from_b0``) only when composing a model directly on the
+    lens strength ``b0``.
 
     A two-component PIE profile with both a core radius :math:`r_a` and a
     truncation radius :math:`r_s`.  The three-dimensional density scales as
@@ -545,11 +554,17 @@ class dPIEMass(MassProfile):
         redshift_object: float = 0.5,
         redshift_source: float = 1.0,
         cosmology: LensingCosmology = None,
-    ) -> "dPIEMass":
+    ) -> "dPIEMassB0":
         """
-        Construct a ``dPIEMass`` from Lenstool's native dPIE / PIEMD parameterization, as
+        Construct a ``dPIEMassB0`` from Lenstool's native dPIE / PIEMD parameterization, as
         read directly out of a Lenstool ``.par`` file (``potentiel`` profil 81) or the
         parameter tables of Lenstool-based papers.
+
+        For *model-fitting* in the Lenstool parameters use :class:`dPIEMass`, whose
+        constructor takes the same inputs (with a flat H0/Om0 cosmology so priors can be
+        composed); this classmethod is the general converter accepting an arbitrary
+        ``cosmology`` object (e.g. ``Planck15``) and returning the internal
+        parameterization.
 
         Three Lenstool conventions are converted (each verified against the Lenstool C
         source):
@@ -792,10 +807,14 @@ class dPIEMass(MassProfile):
         return factor * (pot_core - pot_cut)
 
 
-class dPIEMassSph(dPIEMass):
-    r"""Spherical dual pseudo-isothermal mass distribution (dPIE, mass parameterisation).
+class dPIEMassB0Sph(dPIEMassB0):
+    r"""Spherical dual pseudo-isothermal mass distribution in the internal
+    (``ra``, ``rs``, ``b0``) parameterisation.
 
-    The spherical limit of :class:`dPIEMass`.  The projected convergence is:
+    **This is the non-standard parameterisation** — the default spherical dPIE is
+    :class:`dPIEMassSph` (Lenstool-native parameters); see :class:`dPIEMassB0`.
+
+    The spherical limit of :class:`dPIEMassB0`.  The projected convergence is:
 
     .. math::
 
@@ -887,11 +906,12 @@ class dPIEMassSph(dPIEMass):
         redshift_object: float = 0.5,
         redshift_source: float = 1.0,
         cosmology: LensingCosmology = None,
-    ) -> "dPIEMassSph":
+    ) -> "dPIEMassB0Sph":
         """
-        Construct a ``dPIEMassSph`` from Lenstool's native dPIE / PIEMD parameterization
-        (circular case). See ``dPIEMass.from_lenstool`` for the full conversion
-        conventions; the ellipticity and angle inputs are absent here.
+        Construct a ``dPIEMassB0Sph`` from Lenstool's native dPIE / PIEMD parameterization
+        (circular case). See ``dPIEMassB0.from_lenstool`` for the full conversion
+        conventions; the ellipticity and angle inputs are absent here. For model-fitting
+        in the Lenstool parameters use :class:`dPIEMassSph`.
 
         Parameters
         ----------
@@ -1056,21 +1076,45 @@ class dPIEMassSph(dPIEMass):
         return hessian_yy, hessian_xy, hessian_yx, hessian_xx
 
 
-class dPIEMassLenstool(dPIEMass):
-    """
-    The dPIE mass profile in Lenstool's native parameterization, supporting model-fitting
-    with priors placed directly on the Lenstool parameters.
+class dPIEMass(dPIEMassB0):
+    r"""Dual pseudo-isothermal elliptical mass distribution (dPIE) in Lenstool's
+    native parameterization — **the default dPIE profile**.
 
-    This is a thin wrapper around :class:`dPIEMass` whose free parameters are
-    (``ellipticity``, ``angle_pos``, ``sigma``, ``r_core``, ``r_cut``) exactly as they appear
-    in a Lenstool ``.par`` file (``potentiel`` profil 81), rather than the internal
-    (``ell_comps``, ``ra``, ``rs``, ``b0``). Use it to fit a model whose posteriors read
-    like a Lenstool results table; see ``dPIEMass.from_lenstool`` for the full
-    conversion conventions (verified against the Lenstool C source).
+    The dPIE (Elíasdóttir et al. 2007, App. A; also PIEMD, Kassiola & Kovner 1993)
+    is the standard profile of published cluster- and group-scale strong-lensing
+    analyses (Limousin et al. 2005; Bergamini et al. 2019; and essentially every
+    Lenstool-based paper). Its free parameters here are exactly those of a Lenstool
+    ``.par`` file (``potentiel`` profil 81) / paper results table, so a fitted
+    posterior reads like a Lenstool results table:
 
-    The distance ratio D_LS / D_S entering ``b0`` uses the ``Planck15`` cosmology
-    (matching the ``NFWMCRLudlow`` convention); for a different cosmology construct via
-    ``dPIEMass.from_lenstool(..., cosmology=...)`` instead.
+    - ``ellipticity`` — Lenstool ``ellipticite``, emass = (a^2 - b^2) / (a^2 + b^2)
+      (Elíasdóttir et al. 2007, Eq. A26). Converted internally to
+      epot = (1 - q) / (1 + q) exactly as Lenstool's ``set_lens.c`` does.
+    - ``angle_pos`` — position angle in degrees, counter-clockwise from the
+      positive x-axis (Lenstool's tangent plane; axis flips from WCS conventions
+      must be handled when ingesting real-data catalogues).
+    - ``sigma`` — Lenstool's **fiducial** velocity dispersion ``v_disp``
+      (sigma_LT, km/s), *not* the central dispersion:
+      sigma_0 = sqrt(3/2) * sigma_LT (Elíasdóttir et al. 2007, App. A;
+      Bergamini et al. 2019, Eq. 5). Quoting a measured stellar dispersion here
+      overestimates the mass by 50%.
+    - ``r_core`` / ``r_cut`` — Lenstool ``core_radius`` / ``cut_radius`` in
+      arcseconds (the internal ``ra`` / ``rs``). For ``.par`` files using the kpc
+      variants, pre-convert with
+      ``r_core = r_core_kpc / cosmology.kpc_per_arcsec_from(redshift=redshift_object)``.
+
+    The lens strength is fully normalized internally:
+    b0 = 6 * 648000 * (sigma_LT / c)^2 * (D_LS / D_S) arcsec — equivalently
+    E_0 = 6 pi (D_LS / D_S) (sigma_LT / c)^2 in radians (Elíasdóttir et al. 2007,
+    Eq. A24) with the E_0-to-b0 prefactor folded in. Lenstool stores its ``b0``
+    without the distance ratio and applies D_LS / D_S at deflection time
+    (``e_grad.c``); the two conventions are verified equivalent against the
+    Lenstool C source and reference deflections
+    (``autolens_workspace_test/scripts/cluster/lenstool_parity.py``).
+
+    The internal (``ell_comps``, ``ra``, ``rs``, ``b0``) parameterization — the
+    non-standard variant — remains available via :class:`dPIEMassB0` (for models
+    with priors on ``b0``) and :meth:`from_b0`.
 
     Parameters
     ----------
@@ -1090,7 +1134,21 @@ class dPIEMassLenstool(dPIEMass):
     redshift_object : float
         The redshift of the lens, used for the D_LS / D_S normalization of ``b0``.
     redshift_source : float
-        The redshift of the source used to normalize ``b0``.
+        The redshift of the source used to normalize ``b0``. For multi-plane cluster
+        models this is the reference source plane the Lenstool model was normalized to.
+    H0, Om0 : float
+        Flat-input cosmology (defaults are Planck15 values) so the profile is fully
+        constructable from flat inputs — priors configs, CSV rows — while a Lenstool
+        run's own cosmology (typically H0=70, Om0=0.3) can be matched exactly. Model
+        *constants* in practice. For an arbitrary cosmology object (e.g. ``Planck15``
+        with massive neutrinos) use ``dPIEMassB0.from_lenstool(..., cosmology=...)``.
+
+    References
+    ----------
+    Kassiola & Kovner (1993), ApJ, 417, 450.
+    Elíasdóttir et al. (2007), arXiv:0710.5636 (App. A).
+    Limousin et al. (2005), MNRAS, 356, 309.
+    Bergamini et al. (2019), A&A, 631, A130.
     """
 
     def __init__(
@@ -1143,12 +1201,48 @@ class dPIEMassLenstool(dPIEMass):
         self.H0 = H0
         self.Om0 = Om0
 
+    @classmethod
+    def from_b0(
+        cls,
+        centre: Tuple[float, float] = (0.0, 0.0),
+        ell_comps: Tuple[float, float] = (0.0, 0.0),
+        ra: float = 0.0,
+        rs: float = 2.0,
+        b0: float = 0.1,
+    ) -> "dPIEMassB0":
+        """
+        Construct a dPIE in the internal, non-standard (``ell_comps``, ``ra``, ``rs``,
+        ``b0``) parameterization — returns a :class:`dPIEMassB0` instance.
 
-class dPIEMassLenstoolSph(dPIEMassSph):
+        This is the pre-2026-07 default parameterization of the profile, kept for
+        direct control of the lens strength ``b0`` (e.g. scaling relations composed
+        on ``b0``). Published Lenstool-based analyses parameterize in
+        (``ellipticity``, ``angle_pos``, ``sigma``, ``r_core``, ``r_cut``) — the
+        default :class:`dPIEMass` constructor.
+
+        Parameters
+        ----------
+        centre
+            The (y,x) arc-second coordinates of the profile centre.
+        ell_comps
+            Ellipticity components (e1, e2) of the elliptical coordinate system.
+        ra
+            The inner core radius in arcseconds.
+        rs
+            The outer truncation radius in arcseconds.
+        b0
+            The lens strength in arcseconds.
+        """
+        return dPIEMassB0(centre=centre, ell_comps=ell_comps, ra=ra, rs=rs, b0=b0)
+
+
+class dPIEMassSph(dPIEMassB0Sph):
     """
-    The spherical dPIE mass profile in Lenstool's native parameterization, supporting
-    model-fitting with priors placed directly on the Lenstool parameters
-    (``sigma``, ``r_core``, ``r_cut``). See :class:`dPIEMassLenstool`.
+    The spherical dPIE mass profile in Lenstool's native parameterization — **the
+    default spherical dPIE profile** — supporting model-fitting with priors placed
+    directly on the Lenstool parameters (``sigma``, ``r_core``, ``r_cut``). See
+    :class:`dPIEMass` for the full conventions; the internal non-standard variant
+    is :class:`dPIEMassB0Sph` / :meth:`from_b0`.
 
     Parameters
     ----------
@@ -1202,3 +1296,29 @@ class dPIEMassLenstoolSph(dPIEMassSph):
         self.redshift_source = redshift_source
         self.H0 = H0
         self.Om0 = Om0
+
+    @classmethod
+    def from_b0(
+        cls,
+        centre: Tuple[float, float] = (0.0, 0.0),
+        ra: float = 0.1,
+        rs: float = 2.0,
+        b0: float = 1.0,
+    ) -> "dPIEMassB0Sph":
+        """
+        Construct a spherical dPIE in the internal, non-standard (``ra``, ``rs``,
+        ``b0``) parameterization — returns a :class:`dPIEMassB0Sph` instance. See
+        ``dPIEMass.from_b0``.
+
+        Parameters
+        ----------
+        centre
+            The (y,x) arc-second coordinates of the profile centre.
+        ra
+            The inner core radius in arcseconds.
+        rs
+            The outer truncation radius in arcseconds.
+        b0
+            The lens strength in arcseconds.
+        """
+        return dPIEMassB0Sph(centre=centre, ra=ra, rs=rs, b0=b0)

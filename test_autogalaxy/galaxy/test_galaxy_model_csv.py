@@ -16,10 +16,10 @@ def test__mass_single_class__round_trip(tmp_path):
 
     profiles_by_galaxy = {
         "lens_0": {
-            "mass": ag.mp.dPIEMassSph(centre=(0.0, 0.0), ra=8.0, rs=20.0, b0=3.0)
+            "mass": ag.mp.dPIEMassB0Sph(centre=(0.0, 0.0), ra=8.0, rs=20.0, b0=3.0)
         },
         "lens_1": {
-            "mass": ag.mp.dPIEMassSph(centre=(10.0, 8.0), ra=5.0, rs=12.0, b0=1.2)
+            "mass": ag.mp.dPIEMassB0Sph(centre=(10.0, 8.0), ra=5.0, rs=12.0, b0=1.2)
         },
     }
 
@@ -35,7 +35,7 @@ def test__mass_single_class__round_trip(tmp_path):
     assert table.family == "mass"
     assert [r.galaxy for r in table.rows] == ["lens_0", "lens_1"]
     assert [r.attr_name for r in table.rows] == ["mass", "mass"]
-    assert all(r.profile_class is ag.mp.dPIEMassSph for r in table.rows)
+    assert all(r.profile_class is ag.mp.dPIEMassB0Sph for r in table.rows)
     assert table.rows[0].params == {
         "centre": (0.0, 0.0),
         "ra": 8.0,
@@ -50,7 +50,7 @@ def test__mass_sparse_columns__dpie_plus_nfw__round_trip(tmp_path):
 
     profiles_by_galaxy = {
         "lens_0": {
-            "mass": ag.mp.dPIEMassSph(centre=(0.0, 0.0), ra=8.0, rs=20.0, b0=3.0)
+            "mass": ag.mp.dPIEMassB0Sph(centre=(0.0, 0.0), ra=8.0, rs=20.0, b0=3.0)
         },
         "host_halo": {
             "dark": ag.mp.NFWMCRLudlowSph(
@@ -96,7 +96,7 @@ def test__mass_sparse_columns__dpie_plus_nfw__round_trip(tmp_path):
     assert raw_rows[1]["b0"] == ""
 
     table = ag.galaxy_models_from_csv(file_path, family="mass")
-    assert table.rows[0].profile_class is ag.mp.dPIEMassSph
+    assert table.rows[0].profile_class is ag.mp.dPIEMassB0Sph
     assert table.rows[0].params == {
         "centre": (0.0, 0.0),
         "ra": 8.0,
@@ -176,7 +176,7 @@ def test__cross_family_join__builds_named_galaxies(tmp_path):
     ag.galaxy_models_to_csv(
         profiles_by_galaxy={
             "lens_0": {
-                "mass": ag.mp.dPIEMassSph(centre=(0.0, 0.0), ra=8.0, rs=20.0, b0=3.0)
+                "mass": ag.mp.dPIEMassB0Sph(centre=(0.0, 0.0), ra=8.0, rs=20.0, b0=3.0)
             },
         },
         file_path=mass_csv,
@@ -224,7 +224,7 @@ def test__cross_family_join__builds_named_galaxies(tmp_path):
 
     assert set(galaxies.keys()) == {"lens_0", "source_0"}
     assert galaxies["lens_0"].redshift == 0.5
-    assert isinstance(galaxies["lens_0"].mass, ag.mp.dPIEMassSph)
+    assert isinstance(galaxies["lens_0"].mass, ag.mp.dPIEMassB0Sph)
     assert isinstance(galaxies["lens_0"].bulge, ag.lp.SersicSph)
     assert galaxies["source_0"].redshift == 1.0
     assert isinstance(galaxies["source_0"].bulge, ag.lp.SersicCore)
@@ -237,7 +237,7 @@ def test__af_models_round_trip(tmp_path):
     ag.galaxy_models_to_csv(
         profiles_by_galaxy={
             "lens_0": {
-                "mass": ag.mp.dPIEMassSph(centre=(0.0, 0.0), ra=8.0, rs=20.0, b0=3.0)
+                "mass": ag.mp.dPIEMassB0Sph(centre=(0.0, 0.0), ra=8.0, rs=20.0, b0=3.0)
             },
         },
         file_path=mass_csv,
@@ -254,7 +254,7 @@ def test__af_models_round_trip(tmp_path):
     assert isinstance(galaxy_model, af.Model)
     assert galaxy_model.cls is ag.Galaxy
     assert galaxy_model.redshift == 0.5
-    assert galaxy_model.mass.cls is ag.mp.dPIEMassSph
+    assert galaxy_model.mass.cls is ag.mp.dPIEMassB0Sph
     assert galaxy_model.mass.ra == 8.0
     assert galaxy_model.mass.rs == 20.0
     assert galaxy_model.mass.b0 == 3.0
@@ -291,7 +291,7 @@ def test__redshift_consistency_check__raises(tmp_path):
     ag.galaxy_models_to_csv(
         profiles_by_galaxy={
             "lens_0": {
-                "mass": ag.mp.dPIEMassSph(centre=(0.0, 0.0), ra=8.0, rs=20.0, b0=3.0)
+                "mass": ag.mp.dPIEMassB0Sph(centre=(0.0, 0.0), ra=8.0, rs=20.0, b0=3.0)
             }
         },
         file_path=mass_csv,
@@ -390,7 +390,7 @@ def test__lenstool_parameterized_mass_row__round_trips(tmp_path):
         galaxies_from_csv_tables,
     )
 
-    profile = ag.mp.dPIEMassLenstool(
+    profile = ag.mp.dPIEMass(
         centre=(1.5, -3.0),
         ellipticity=0.68,
         angle_pos=8.97,

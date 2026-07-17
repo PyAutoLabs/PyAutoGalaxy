@@ -3,8 +3,8 @@ from .dual_pseudo_isothermal_mass import (
     PIEMass,
     dPIEMass,
     dPIEMassSph,
-    dPIEMassLenstool,
-    dPIEMassLenstoolSph,
+    dPIEMassB0,
+    dPIEMassB0Sph,
 )
 from .isothermal import Isothermal, IsothermalSph
 from .isothermal_core import IsothermalCore, IsothermalCoreSph
