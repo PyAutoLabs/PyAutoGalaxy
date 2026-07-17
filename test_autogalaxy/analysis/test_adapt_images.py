@@ -106,3 +106,100 @@ def test__image_plane_mesh_grid_for_galaxy__resolves_after_galaxy_identity_chang
     assert adapt_images.image_plane_mesh_grid_for_galaxy(
         fresh_galaxies[1], fresh_galaxies
     ) == pytest.approx(4.0 * np.ones((2, 2)), 1.0e-4)
+
+
+class _StubCachePaths:
+    """Duck-typed paths: only what the galaxy-image cache helpers touch."""
+
+    def __init__(self, files_path):
+        self._files_path = files_path
+
+
+class _StubCacheResult:
+    """Duck-typed result for `galaxy_name_image_dict_via_result_from`."""
+
+    def __init__(self, files_path, image_dict, poisoned=False):
+        self.paths = _StubCachePaths(files_path)
+        self._image_dict = image_dict
+        self._poisoned = poisoned
+
+    @property
+    def path_galaxy_tuples(self):
+        return [(name, None) for name in self._image_dict]
+
+    @property
+    def subtracted_signal_to_noise_map_galaxy_dict(self):
+        if self._poisoned:
+            raise AssertionError(
+                "recompute path taken — the cache should have been loaded"
+            )
+        return self._image_dict
+
+
+def _cache_test_image_dict():
+    mask = ag.Mask2D.circular(shape_native=(7, 7), pixel_scales=0.1, radius=0.3)
+    image_0 = ag.Array2D.ones(shape_native=(7, 7), pixel_scales=0.1).apply_mask(
+        mask=mask
+    )
+    image_1 = ag.Array2D.full(
+        fill_value=2.0, shape_native=(7, 7), pixel_scales=0.1
+    ).apply_mask(mask=mask)
+    return {
+        "('galaxies', 'lens')": image_0,
+        "('galaxies', 'source')": image_1,
+    }
+
+
+def test__galaxy_image_dict_cache__round_trip(tmp_path):
+    from autogalaxy.analysis.adapt_images.adapt_images import (
+        _galaxy_image_dict_from_cache,
+        _galaxy_image_dict_to_cache,
+    )
+
+    image_dict = _cache_test_image_dict()
+    cache_path = tmp_path / "galaxy_images_snr.fits"
+
+    _galaxy_image_dict_to_cache(cache_path, image_dict, paths=_StubCachePaths(tmp_path))
+    loaded = _galaxy_image_dict_from_cache(cache_path)
+
+    assert set(loaded.keys()) == set(image_dict.keys())
+    for name in image_dict:
+        assert loaded[name].array == pytest.approx(image_dict[name].array, 1.0e-8)
+        assert (loaded[name].mask == image_dict[name].mask).all()
+
+
+def test__galaxy_name_image_dict_via_result_from__loads_cache_on_second_call(tmp_path):
+    from autogalaxy.analysis.adapt_images.adapt_images import (
+        galaxy_name_image_dict_via_result_from,
+    )
+
+    image_dict = _cache_test_image_dict()
+
+    result = _StubCacheResult(tmp_path, image_dict)
+    first = galaxy_name_image_dict_via_result_from(result=result)
+
+    assert (tmp_path / "galaxy_images_snr.fits").exists()
+
+    # A poisoned result raises if the compute path is taken — the second call
+    # must come entirely from the cache written by the first.
+    poisoned = _StubCacheResult(tmp_path, image_dict, poisoned=True)
+    second = galaxy_name_image_dict_via_result_from(result=poisoned)
+
+    assert set(second.keys()) == set(first.keys())
+    for name in first:
+        assert second[name].array == pytest.approx(first[name].array, 1.0e-8)
+
+
+def test__galaxy_name_image_dict_via_result_from__no_paths_always_computes():
+    from autogalaxy.analysis.adapt_images.adapt_images import (
+        galaxy_name_image_dict_via_result_from,
+    )
+
+    image_dict = _cache_test_image_dict()
+
+    result = _StubCacheResult(files_path=None, image_dict=image_dict)
+    result.paths = None
+
+    galaxy_name_image_dict = galaxy_name_image_dict_via_result_from(result=result)
+
+    assert set(galaxy_name_image_dict.keys()) == set(image_dict.keys())
