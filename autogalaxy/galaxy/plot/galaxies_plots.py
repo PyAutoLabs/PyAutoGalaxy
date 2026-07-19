@@ -242,7 +242,7 @@ def fits_galaxy_images(
         Directory in which to write ``galaxy_images.fits``.
     """
     from pathlib import Path
-    from autoconf.fitsable import hdu_list_for_output_from
+    from autonerves.fitsable import hdu_list_for_output_from
 
     image_list = [galaxy.image_2d_from(grid=grid).native_for_fits for galaxy in galaxies]
     hdu_list = hdu_list_for_output_from(

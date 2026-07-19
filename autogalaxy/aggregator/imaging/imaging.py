@@ -16,7 +16,7 @@ Two public objects are provided:
 from functools import partial
 from typing import List
 
-from autoconf.fitsable import ndarray_via_hdu_from
+from autonerves.fitsable import ndarray_via_hdu_from
 
 import autofit as af
 import autoarray as aa

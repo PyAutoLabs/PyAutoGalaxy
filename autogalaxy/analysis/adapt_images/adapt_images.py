@@ -2,8 +2,8 @@ from __future__ import annotations
 import numpy as np
 from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
-from autoconf import conf
-from autoconf import cached_property
+from autonerves import conf
+from autonerves import cached_property
 
 import autoarray as aa
 
@@ -41,7 +41,7 @@ def _galaxy_image_dict_from_cache(cache_path) -> Optional[Dict]:
     from astropy.io import fits as astropy_fits
 
     from autoarray.mask.mask_2d import Mask2DKeys
-    from autoconf.fitsable import ndarray_via_hdu_from
+    from autonerves.fitsable import ndarray_via_hdu_from
 
     if cache_path is None or not cache_path.exists():
         return None
@@ -82,7 +82,7 @@ def _galaxy_image_dict_to_cache(cache_path, galaxy_name_image_dict: Dict, paths)
     the same FITS layout ``_galaxy_image_dict_from_cache`` reads, and preserve
     it in the search's zip archive so later resumes keep it.
     """
-    from autoconf.fitsable import hdu_list_for_output_from
+    from autonerves.fitsable import hdu_list_for_output_from
 
     image_list = [
         galaxy_name_image_dict[name].native_for_fits

@@ -15,7 +15,7 @@ from __future__ import annotations
 import numpy as np
 from typing import Dict, List, Optional, Type, Union
 
-from autoconf import cached_property
+from autonerves import cached_property
 
 import autoarray as aa
 

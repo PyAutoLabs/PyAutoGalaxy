@@ -23,7 +23,7 @@ from __future__ import annotations
 import numpy as np
 from typing import List, Optional
 
-from autoconf.fitsable import ndarray_via_hdu_from
+from autonerves.fitsable import ndarray_via_hdu_from
 
 import autofit as af
 import autoarray as aa

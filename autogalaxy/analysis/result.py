@@ -19,7 +19,7 @@ from typing import Dict, List, Optional, Tuple, Type, Union
 
 from typing import TYPE_CHECKING
 
-from autoconf import cached_property
+from autonerves import cached_property
 
 import autofit as af
 import autoarray as aa

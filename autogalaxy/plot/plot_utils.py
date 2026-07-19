@@ -263,7 +263,7 @@ def fits_array(array, file_path, overwrite=False, ext_name=None):
     ext_name : str or None
         FITS extension name.  Auto-detected for masks (``"mask"``).
     """
-    from autoconf.fitsable import output_to_fits
+    from autonerves.fitsable import output_to_fits
 
     values, header_dict, auto_ext_name = _fits_values_and_header(array)
     if ext_name is None:
@@ -337,7 +337,7 @@ def _critical_curves_method():
     If ``"zero_contour"`` is requested but ``jax_zero_contour`` is not installed
     (e.g. Python <3.11), falls back to ``"marching_squares"`` with a warning.
     """
-    from autoconf import conf
+    from autonerves import conf
 
     try:
         method = conf.instance["visualize"]["general"]["general"]["critical_curves_method"]

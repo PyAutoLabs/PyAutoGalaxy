@@ -19,7 +19,7 @@ type of `AnalysisEllipse.fit_from`, mirroring the single-object return of `Analy
 import numpy as np
 from typing import List, Optional
 
-from autoconf import cached_property
+from autonerves import cached_property
 
 import autoarray as aa
 

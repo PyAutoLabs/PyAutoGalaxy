@@ -18,7 +18,7 @@ The ``redshift`` column is optional. Any further numeric columns (e.g. ``ellipti
 ``GalaxyTable.properties`` keyed by column name — nothing is silently dropped. Row order
 is preserved on read and on write.
 
-The actual CSV I/O is delegated to :mod:`autoconf.csvable`; this module only owns the
+The actual CSV I/O is delegated to :mod:`autonerves.csvable`; this module only owns the
 column-name conventions and the typed return value.
 
 The mirror schema for point-source datasets lives in :mod:`autolens.point.dataset` (see its
@@ -30,7 +30,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple, Union
 
-from autoconf import csvable
+from autonerves import csvable
 
 from autoarray.structures.grids.irregular_2d import Grid2DIrregular
 

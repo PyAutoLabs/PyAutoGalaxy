@@ -12,7 +12,7 @@ inversions for linear profiles/pixelizations, and adapt-image multi-stage
 fitting.
 
 Dependency direction: autogalaxy may import **autoarray** (data structures),
-**autofit** (model-fitting), and **autoconf** (config). It must **never**
+**autofit** (model-fitting), and **autonerves** (config). It must **never**
 import `autolens` — lensing lives one layer up.
 
 ## Related repos
@@ -52,7 +52,7 @@ is no black/ruff/flake8 gate — formatting is advisory. (`requires-python` in
 
 ## Configuration & defaults
 
-autoconf supplies the packaged defaults under `autogalaxy/config/`. Workspaces
+autonerves supplies the packaged defaults under `autogalaxy/config/`. Workspaces
 override them via their own `config/` directory; the test suite pushes a local
 config dir via `conf.instance.push(...)` in `test_autogalaxy/conftest.py`. When
 a change adds a new config key, mirror it into the packaged defaults so
@@ -91,7 +91,7 @@ Profiles are namespaced there (`ag.lp.*`, `ag.lp_linear.*`, `ag.mp.*`,
 
 ## Key rules / footguns
 
-- Import direction: autoarray / autofit / autoconf only — **never** `autolens`.
+- Import direction: autoarray / autofit / autonerves only — **never** `autolens`.
 - Operate mixins are `OperateImage` (`operate/image.py`) and `LensCalc`
   (`operate/lens_calc.py`). There is no `OperateDeflections` / `operate/
   deflections.py`.

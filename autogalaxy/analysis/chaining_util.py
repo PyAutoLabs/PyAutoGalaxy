@@ -2,8 +2,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Optional
 from pathlib import Path
 
-from autoconf import conf
-from autoconf.dictable import from_json, output_to_json
+from autonerves import conf
+from autonerves.dictable import from_json, output_to_json
 
 import autoarray as aa
 import autofit as af

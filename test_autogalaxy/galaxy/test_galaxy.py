@@ -2,7 +2,7 @@ import numpy as np
 from pathlib import Path
 import pytest
 
-from autoconf.dictable import from_json, output_to_json
+from autonerves.dictable import from_json, output_to_json
 import autogalaxy as ag
 
 from autogalaxy import exc

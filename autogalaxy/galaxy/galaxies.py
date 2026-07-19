@@ -13,7 +13,7 @@ then passed to a `Fit*` class (e.g. `FitImaging`) for comparison against the obs
 import numpy as np
 from typing import Dict, List, Optional, Tuple, Type, Union
 
-from autoconf import conf
+from autonerves import conf
 import autoarray as aa
 
 from autogalaxy.galaxy.galaxy import Galaxy

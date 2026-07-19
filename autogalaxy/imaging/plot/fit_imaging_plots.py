@@ -1,7 +1,7 @@
 from pathlib import Path
 
 import autoarray as aa
-from autoconf.fitsable import hdu_list_for_output_from
+from autonerves.fitsable import hdu_list_for_output_from
 from autoarray.plot.utils import subplots, conf_subplot_figsize, tight_layout
 
 from autogalaxy.imaging.fit_imaging import FitImaging
