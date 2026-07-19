@@ -22,7 +22,7 @@ our [building from source installation guide](https://pyautogalaxy.readthedocs.i
 
 **PyAutoGalaxy** has the following dependencies:
 
-**PyAutoConf** <https://github.com/PyAutoLabs/PyAutoConf>
+**PyAutoNerves** <https://github.com/PyAutoLabs/PyAutoNerves>
 
 **PyAutoFit** <https://github.com/PyAutoLabs/PyAutoFit>
 

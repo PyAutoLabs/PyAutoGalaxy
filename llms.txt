@@ -17,4 +17,4 @@
 
 ## Ecosystem
 
-- Built on PyAutoArray (data structures) + PyAutoFit (inference) + PyAutoConf (config); used by PyAutoLens, which builds multi-plane lensing on it.
+- Built on PyAutoArray (data structures) + PyAutoFit (inference) + PyAutoNerves (config); used by PyAutoLens, which builds multi-plane lensing on it.
