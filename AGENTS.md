@@ -17,7 +17,7 @@ import `autolens` — lensing lives one layer up.
 
 ## Related repos
 
-- **Source siblings:** PyAutoConf, PyAutoArray, PyAutoFit (upstream);
+- **Source siblings:** PyAutoNerves, PyAutoArray, PyAutoFit (upstream);
   PyAutoLens (downstream — builds multi-plane lensing on autogalaxy).
 - **autogalaxy_workspace** — runnable tutorials/examples (`../autogalaxy_workspace`).
 - **autogalaxy_workspace_test** — integration + JAX/likelihood parity scripts.

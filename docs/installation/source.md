@@ -93,7 +93,7 @@ git clone https://github.com/PyAutoLabs/PyAutoArray
 git clone https://github.com/PyAutoLabs/PyAutoGalaxy
 ```
 
-Next, install **PyAutoConf** via pip:
+Next, install **PyAutoNerves** via pip:
 
 ```bash
 pip install autonerves
