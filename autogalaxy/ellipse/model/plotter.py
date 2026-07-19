@@ -1,6 +1,6 @@
 from typing import List
 
-from autoconf.fitsable import hdu_list_for_output_from
+from autonerves.fitsable import hdu_list_for_output_from
 
 import autoarray as aa
 

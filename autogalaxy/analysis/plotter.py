@@ -6,7 +6,7 @@ if TYPE_CHECKING:
     from pathlib import Path
     from autoarray.plot.output import Output
 
-from autoconf import conf
+from autonerves import conf
 
 import autoarray as aa
 

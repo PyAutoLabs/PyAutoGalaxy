@@ -2,7 +2,7 @@ import autoarray as aa
 
 from autoarray.dataset.plot.interferometer_plots import subplot_interferometer_dataset
 
-from autoconf.fitsable import hdu_list_for_output_from
+from autonerves.fitsable import hdu_list_for_output_from
 
 from autogalaxy.interferometer.fit_interferometer import FitInterferometer
 from autogalaxy.interferometer.plot import fit_interferometer_plots

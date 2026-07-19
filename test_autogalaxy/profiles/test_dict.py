@@ -1,5 +1,5 @@
 import pytest
-from autoconf.dictable import to_dict, from_dict
+from autonerves.dictable import to_dict, from_dict
 
 import autogalaxy as ag
 from autogalaxy.profiles.geometry_profiles import GeometryProfile

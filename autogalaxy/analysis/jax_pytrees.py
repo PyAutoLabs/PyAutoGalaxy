@@ -20,7 +20,7 @@ def register_galaxies_pytree() -> None:
     calls (e.g. from each ``Analysis*.fit_from``) are cheap.
     """
     from autoarray.abstract_ndarray import _pytree_registered_classes
-    from autoconf.jax_wrapper import register_pytree_node
+    from autonerves.jax_wrapper import register_pytree_node
     from autogalaxy.galaxy.galaxies import Galaxies
 
     if Galaxies in _pytree_registered_classes:

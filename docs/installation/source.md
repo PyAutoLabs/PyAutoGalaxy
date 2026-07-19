@@ -32,7 +32,7 @@ git clone https://github.com/PyAutoLabs/PyAutoGalaxy
 Next, install the **PyAuto** parent projects via pip:
 
 ```bash
-pip install autoconf
+pip install autonerves
 pip install autofit
 pip install autoarray
 ```
@@ -96,7 +96,7 @@ git clone https://github.com/PyAutoLabs/PyAutoGalaxy
 Next, install **PyAutoConf** via pip:
 
 ```bash
-pip install autoconf
+pip install autonerves
 ```
 
 Next, install the source build dependencies of each project via pip:

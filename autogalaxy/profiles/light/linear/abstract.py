@@ -17,7 +17,7 @@ import itertools
 import numpy as np
 from typing import Dict, List, Optional
 
-from autoconf import cached_property
+from autonerves import cached_property
 import autoarray as aa
 
 from autogalaxy.profiles.light.operated.abstract import (

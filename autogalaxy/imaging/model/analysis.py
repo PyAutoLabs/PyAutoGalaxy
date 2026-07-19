@@ -19,7 +19,7 @@ from typing import Optional
 import autofit as af
 import autoarray as aa
 
-from autoconf.fitsable import hdu_list_for_output_from
+from autonerves.fitsable import hdu_list_for_output_from
 
 from autogalaxy.analysis.adapt_images.adapt_images import AdaptImages
 from autogalaxy.analysis.analysis.dataset import AnalysisDataset

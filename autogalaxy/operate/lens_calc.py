@@ -22,7 +22,7 @@ import logging
 import numpy as np
 from typing import List, Tuple, Union
 
-from autoconf import conf
+from autonerves import conf
 
 import autoarray as aa
 

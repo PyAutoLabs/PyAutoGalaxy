@@ -2,7 +2,7 @@ import logging
 import numpy as np
 from typing import Optional, Union
 
-from autoconf.dictable import to_dict, output_to_json
+from autonerves.dictable import to_dict, output_to_json
 
 import autofit as af
 import autoarray as aa

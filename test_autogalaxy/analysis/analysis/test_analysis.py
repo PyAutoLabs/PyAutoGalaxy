@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 
-from autoconf.dictable import from_json
+from autonerves.dictable import from_json
 
 import autofit as af
 import autogalaxy as ag

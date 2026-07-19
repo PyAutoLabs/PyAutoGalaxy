@@ -48,7 +48,7 @@ local_scheme = "no-local-version"
 
 [project.optional-dependencies]
 jax = [
-    "autoconf[jax]",
+    "autonerves[jax]",
     "jax_zero_contour>=2.0.0,<3.0.0; python_version >= '3.11'"
 ]
 optional = [

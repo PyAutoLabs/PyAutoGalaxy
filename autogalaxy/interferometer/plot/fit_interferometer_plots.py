@@ -2,7 +2,7 @@ import numpy as np
 from pathlib import Path
 
 import autoarray as aa
-from autoconf.fitsable import hdu_list_for_output_from
+from autonerves.fitsable import hdu_list_for_output_from
 from autoarray.plot import plot_visibilities_1d
 from autoarray.plot.utils import subplots, conf_subplot_figsize, tight_layout
 

@@ -5,7 +5,7 @@ import pytest
 from matplotlib import pyplot
 from unittest.mock import MagicMock
 
-from autoconf import conf
+from autonerves import conf
 from autogalaxy import fixtures
 
 import logging

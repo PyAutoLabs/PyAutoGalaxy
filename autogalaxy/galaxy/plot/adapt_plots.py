@@ -86,7 +86,7 @@ def fits_adapt_images(adapt_images, output_path) -> None:
     """
     import numpy as np
     from pathlib import Path
-    from autoconf.fitsable import hdu_list_for_output_from
+    from autonerves.fitsable import hdu_list_for_output_from
 
     output_path = Path(output_path)
 

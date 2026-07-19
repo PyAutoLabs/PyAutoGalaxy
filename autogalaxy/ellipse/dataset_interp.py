@@ -1,7 +1,7 @@
 import numpy as np
 from typing import Tuple
 
-from autoconf import cached_property
+from autonerves import cached_property
 
 import autoarray as aa
 

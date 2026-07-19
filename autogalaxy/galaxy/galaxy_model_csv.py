@@ -28,7 +28,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
-from autoconf import csvable
+from autonerves import csvable
 
 from autogalaxy.galaxy.galaxy import Galaxy
 from autogalaxy.profiles import mass as _mp_module
