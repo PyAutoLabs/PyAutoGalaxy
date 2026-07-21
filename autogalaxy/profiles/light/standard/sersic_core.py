@@ -64,9 +64,9 @@ class SersicCore(Sersic):
             * (2.0 ** (-self.gamma / self.alpha))
             * xp.exp(
                 self.sersic_constant
-                * (
-                    ((2.0 ** (1.0 / self.alpha)) * self.radius_break)
-                    / self.effective_radius
+                * xp.divide(
+                    (2.0 ** (1.0 / self.alpha)) * self.radius_break,
+                    self.effective_radius,
                 )
                 ** (1.0 / self.sersic_index)
             )
