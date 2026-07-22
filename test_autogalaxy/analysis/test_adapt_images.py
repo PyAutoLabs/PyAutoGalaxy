@@ -206,3 +206,81 @@ def test__galaxy_name_image_dict_via_result_from__no_paths_always_computes():
     galaxy_name_image_dict = galaxy_name_image_dict_via_result_from(result=result)
 
     assert set(galaxy_name_image_dict.keys()) == set(image_dict.keys())
+
+
+def test__galaxy_image_dict_cache__mask_mismatch_is_a_cache_miss(tmp_path):
+    """
+    The cache lives in a directory keyed by the search identifier, which encodes the model and the search
+    but not the dataset. A rerun whose mask changed while the model stayed identical therefore lands on the
+    previous run's cache, whose images are sized for the old mask (PyAutoGalaxy#516).
+    """
+    from autogalaxy.analysis.adapt_images.adapt_images import (
+        _galaxy_image_dict_from_cache,
+        _galaxy_image_dict_to_cache,
+    )
+
+    image_dict = _cache_test_image_dict()
+    cache_path = tmp_path / "galaxy_images_snr.fits"
+
+    _galaxy_image_dict_to_cache(cache_path, image_dict, paths=_StubCachePaths(tmp_path))
+
+    cached_mask = next(iter(image_dict.values())).mask
+
+    # The mask the cache was written under is a hit.
+
+    assert _galaxy_image_dict_from_cache(cache_path, mask=cached_mask) is not None
+
+    # A mask enclosing a different number of pixels is a miss, so the caller recomputes.
+
+    other_mask = ag.Mask2D.circular(
+        shape_native=(7, 7), pixel_scales=0.1, radius=0.2
+    )
+
+    assert other_mask.pixels_in_mask != cached_mask.pixels_in_mask
+    assert _galaxy_image_dict_from_cache(cache_path, mask=other_mask) is None
+
+    # So is a mask of the same shape and pixel count on a different geometry.
+
+    rescaled_mask = ag.Mask2D(
+        mask=np.asarray(cached_mask), pixel_scales=0.2, origin=cached_mask.origin
+    )
+
+    assert _galaxy_image_dict_from_cache(cache_path, mask=rescaled_mask) is None
+
+
+def test__galaxy_name_image_dict_via_result_from__stale_cache_is_recomputed(tmp_path):
+    """
+    End-to-end: a result whose mask differs from the one the cache was written under must recompute rather
+    than silently load adapt images sized for the old mask.
+    """
+    from autogalaxy.analysis.adapt_images.adapt_images import (
+        galaxy_name_image_dict_via_result_from,
+    )
+
+    image_dict = _cache_test_image_dict()
+    mask = next(iter(image_dict.values())).mask
+
+    result = _StubCacheResult(tmp_path, image_dict)
+    result.mask = mask
+
+    galaxy_name_image_dict_via_result_from(result=result)
+
+    assert (tmp_path / "galaxy_images_snr.fits").exists()
+
+    # Same output directory, same model — but a different mask. The poisoned stub raises if the cache is
+    # loaded instead of recomputed, so reaching the compute path is the assertion.
+
+    stale = _StubCacheResult(tmp_path, image_dict, poisoned=True)
+    stale.mask = ag.Mask2D.circular(
+        shape_native=(7, 7), pixel_scales=0.1, radius=0.2
+    )
+
+    with pytest.raises(AssertionError):
+        galaxy_name_image_dict_via_result_from(result=stale)
+
+    # The unchanged mask still hits the cache, so the fix does not cost the caching win.
+
+    unchanged = _StubCacheResult(tmp_path, image_dict, poisoned=True)
+    unchanged.mask = mask
+
+    assert galaxy_name_image_dict_via_result_from(result=unchanged) is not None

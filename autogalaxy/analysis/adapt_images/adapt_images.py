@@ -27,7 +27,24 @@ def _galaxy_images_cache_path(result, use_model_images: bool):
     return Path(files_path) / f"{name}.fits"
 
 
-def _galaxy_image_dict_from_cache(cache_path) -> Optional[Dict]:
+def _masks_are_equal(mask_0, mask_1) -> bool:
+    """
+    Returns whether two masks describe the same set of unmasked pixels on the same
+    geometry, comparing shape, pixel scales, origin and the mask array itself.
+
+    Used to decide whether an on-disk adapt-image cache was written under the mask
+    the caller is now fitting with.
+    """
+    if mask_0.shape_native != mask_1.shape_native:
+        return False
+    if not np.allclose(mask_0.pixel_scales, mask_1.pixel_scales):
+        return False
+    if not np.allclose(mask_0.origin, mask_1.origin):
+        return False
+    return bool(np.array_equal(np.asarray(mask_0), np.asarray(mask_1)))
+
+
+def _galaxy_image_dict_from_cache(cache_path, mask=None) -> Optional[Dict]:
     """
     Load the raw (pre minimum-percent clip) per-galaxy image dictionary from a
     result's cache file, or ``None`` when the file does not exist (the first
@@ -37,6 +54,24 @@ def _galaxy_image_dict_from_cache(cache_path) -> Optional[Dict]:
     reads (``agg_util.adapt_images_from``): HDU 0 is the mask (header carries
     pixel scales and origin), HDU 1+ are one image per galaxy with the galaxy
     path as ``EXTNAME``.
+
+    ``None`` is also returned when ``mask`` is supplied and does not match the
+    mask the cache was written under, which makes the mismatch a cache miss so
+    the caller recomputes and overwrites the stale file. The cache lives in a
+    directory keyed by the search identifier, which encodes the model and the
+    search but **not** the dataset — so a run whose dataset shaping changed while
+    the model stayed identical lands on the previous run's cache. Without this
+    check the stale images load silently and surface much later as an
+    ``IndexError`` deep in the inversion, when adapt data sized for the old mask
+    is indexed by the new mask's slim indexes (PyAutoGalaxy#516).
+
+    Parameters
+    ----------
+    cache_path
+        The cache file to load, or ``None`` when the result cannot cache.
+    mask
+        The mask the caller expects the cached images to be defined on. When
+        ``None`` no validation is performed.
     """
     from astropy.io import fits as astropy_fits
 
@@ -56,21 +91,24 @@ def _galaxy_image_dict_from_cache(cache_path) -> Optional[Dict]:
             header[Mask2DKeys.ORIGINY.value],
             header[Mask2DKeys.ORIGINX.value],
         )
-        mask = aa.Mask2D(
+        cached_mask = aa.Mask2D(
             mask=ndarray_via_hdu_from(hdu_list[0]),
             pixel_scales=pixel_scales,
             origin=origin,
         )
 
+        if mask is not None and not _masks_are_equal(cached_mask, mask):
+            return None
+
         galaxy_name_image_dict = {}
         for hdu in hdu_list[1:]:
             image = aa.Array2D.no_mask(
                 values=ndarray_via_hdu_from(hdu),
-                pixel_scales=mask.pixel_scales,
-                origin=mask.origin,
+                pixel_scales=cached_mask.pixel_scales,
+                origin=cached_mask.origin,
             )
             galaxy_name_image_dict[hdu.header["EXTNAME"].lower()] = image.apply_mask(
-                mask=mask
+                mask=cached_mask
             )
 
     return galaxy_name_image_dict
@@ -124,9 +162,22 @@ def galaxy_name_image_dict_via_result_from(
     (``galaxy_images_model.fits`` / ``galaxy_images_snr.fits``) and loaded from there on every later call —
     computing them rebuilds the result's maximum log likelihood fit, which on a resumed pipeline pays a fresh
     JIT compile plus (for pixelized fits) an inversion, and dominates SLaM resume overhead
-    (autolens_profiling#70). Staleness is structurally guarded: changing the upstream model or search
-    produces a new search identifier and therefore a fresh output directory with no cache file. Results with
-    no on-disk output (e.g. ``NullPaths``) always compute.
+    (autolens_profiling#70). Results with no on-disk output (e.g. ``NullPaths``) always compute.
+
+    Two things can make a cache file stale, and they are guarded differently. Changing the upstream model or
+    search is guarded structurally: it produces a new search identifier and therefore a fresh output directory
+    with no cache file. Changing the *dataset* is not, because the identifier does not encode it — a rerun
+    whose mask changed while the model stayed identical lands on the previous run's directory and its cache.
+    That case is caught by validating the cached mask against ``result.mask`` on load and treating a mismatch
+    as a cache miss, so the images are recomputed on the current mask. Reading ``result.mask`` resolves to
+    ``analysis.dataset.mask`` and does not rebuild the maximum log likelihood fit, so the check costs nothing
+    the cache was saving (PyAutoGalaxy#516).
+
+    Note that a stale cache is not *repaired* on disk: the recomputed images are written to the loose
+    ``files/`` folder, but ``Paths.preserve_in_zip`` only adds a member that is absent from the search's zip
+    and never replaces one, so the next ``restore()`` re-extracts the stale copy. Such a search therefore
+    misses the cache on every run rather than once — correct, but without the caching win until its output is
+    cleared (PyAutoFit#1414).
 
     Parameters
     ----------
@@ -143,7 +194,9 @@ def galaxy_name_image_dict_via_result_from(
     adapt_minimum_percent = conf.instance["general"]["adapt"]["adapt_minimum_percent"]
 
     cache_path = _galaxy_images_cache_path(result, use_model_images=use_model_images)
-    raw_image_dict = _galaxy_image_dict_from_cache(cache_path)
+    raw_image_dict = _galaxy_image_dict_from_cache(
+        cache_path, mask=getattr(result, "mask", None)
+    )
 
     if raw_image_dict is None:
         raw_image_dict = {}
