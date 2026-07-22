@@ -128,7 +128,7 @@ from autonerves.fitsable import header_obj_from
 from autonerves.fitsable import output_to_fits
 from autonerves.fitsable import hdu_list_for_output_from
 
-__version__ = "2026.7.9.1"
+__version__ = "2026.7.22.1"
 
 from autonerves import check_version
 

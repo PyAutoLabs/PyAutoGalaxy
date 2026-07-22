@@ -37,8 +37,14 @@ The latest version of **PyAutoGalaxy** is installed via pip as follows (the comm
 caching issues impacting the installation):
 
 ```bash
-pip install autogalaxy --no-cache-dir
+pip install autogalaxy[jax] --no-cache-dir
 ```
+
+The `[jax]` extra installs \[**JAX**\](<https://docs.jax.dev/en/latest/notebooks/thinking_in_jax.html>), which
+**PyAutoGalaxy** uses for just-in-time compilation and GPU acceleration. **JAX is not installed by default** — to
+install without it, use `pip install autogalaxy --no-cache-dir` instead. The extra installs CPU-only JAX; for GPU
+support, follow the official \[JAX installation guide\](<https://jax.readthedocs.io/en/latest/installation.html>)
+**before** installing.
 
 If pip prints warnings about dependency version conflicts, these can usually be ignored — the instructions below
 will identify clearly if the installation is a success.
