@@ -8,6 +8,5 @@ The `config` folder contains configuration files which customize default **PyAut
 # Files
 
 - `general.yaml`: Customizes general **PyAutoLens** settings.
-- `grids.yaml`: Customize default behaviour of grids when used for calculations.
 - `logging.yaml`: Customizes the logging behaviour.
 - `notation.yaml`: Configs defining labels and formatting of model parameters when used for visualization.
