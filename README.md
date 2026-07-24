@@ -27,7 +27,11 @@
 
 ## Getting Started
 
+### PyAutoGalaxy AI Assistant
+
 The [**PyAutoGalaxy AI Assistant**](https://github.com/PyAutoLabs/autogalaxy_assistant) supports conversation agents such as ChatGPT and coding agents such as Claude Code and Codex. You can get started simply by asking it a question about galaxy structure or describing the task you would like to perform with **PyAutoGalaxy**. See the assistant for its full scope and instructions.
+
+### Human-Readable Documentation and Examples
 
 The following human-readable documentation and examples are also useful for new starters:
 
