@@ -8,6 +8,12 @@ Depending on the data you use, the analysis you perform may differ significantly
 The autogalaxy_workspace contains a suite of example Jupyter Notebooks, organised by dataset type. To help you find
 the most appropriate starting point, answer one simple question:
 
+## AI Assistant
+
+The [**PyAutoGalaxy AI Assistant**](https://github.com/PyAutoLabs/autogalaxy_assistant) supports conversation agents such as ChatGPT and coding agents such as Claude Code and Codex. You can get started simply by asking it a question about galaxy structure or describing the task you would like to perform with **PyAutoGalaxy**. See the assistant for its full scope and instructions.
+
+The rest of this human-readable guide helps you find the most appropriate example notebook for your science case.
+
 ## What Dataset Type?
 
 You now need to decide what type of data you are interested in:
