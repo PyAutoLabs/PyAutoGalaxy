@@ -8,11 +8,31 @@ The [**PyAutoGalaxy AI Assistant**](https://github.com/PyAutoLabs/autogalaxy_ass
 
 ## Human-Readable Guide
 
-**PyAutoGalaxy** can analyse galaxies for different types of data (e.g. CCD imaging and interferometer observations).
-Depending on the data you use, the analysis you perform may differ significantly.
+**PyAutoGalaxy** can analyse galaxies for different types of data (e.g. CCD imaging and interferometer observations)
+and across a range of system scales (a single galaxy, blended multi-galaxy systems, and cluster fields).
+Depending on the data you use and the scale of your system, the analysis you perform may differ significantly.
 
-The autogalaxy_workspace contains a suite of example Jupyter Notebooks, organised by dataset type. To help you find
-the most appropriate starting point, answer one simple question:
+The autogalaxy_workspace contains a suite of example Jupyter Notebooks, organised by dataset type and system scale.
+To help you find the most appropriate starting point, answer two simple questions:
+
+## What Scale System?
+
+How many galaxies must be modeled together? There are three scales, which form a ladder (mirroring the lensing
+regime ladder of **PyAutoLens**'s `autolens_workspace`):
+
+- **Single Galaxy**: One galaxy dominates the image; any neighbours are contaminants to mask out. This is the
+  standard starting point — go to the question below called "What Dataset Type?".
+- **Multi Galaxy**: Two or more galaxies of comparable brightness whose light blends together (interacting pairs,
+  close projected pairs, compact multiples) — each gets its own free light model, fitted simultaneously. Go to the
+  [multi_galaxy/start_here.ipynb](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/multi_galaxy/start_here.ipynb) notebook.
+- **Cluster**: A brightest cluster galaxy plus tens-to-hundreds of member galaxies loaded from a CSV catalogue,
+  whose photometry pins the faint members while only shared normalizations stay free. Go to the
+  [cluster/start_here.ipynb](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/cluster/start_here.ipynb) notebook.
+
+A note for lensing users coming from **PyAutoLens**: the two doc trees mirror each other, with one deliberate
+divergence at the cluster rung — **PyAutoGalaxy's cluster workflow models the foreground galaxies' light (that is
+its entire subject), whereas PyAutoLens's cluster workflow does not model lens light at all** (it fits
+point-source multiple-image positions of the lensed background sources).
 
 ## What Dataset Type?
 
@@ -36,11 +56,15 @@ so you can check it is the right software for you before going through the insta
   Galaxy modeling with interferometer data (e.g. ALMA), fitting directly in the uv-plane.
 - [multi_band/start_here.ipynb](https://colab.research.google.com/github/PyAutoLabs/autogalaxy_workspace/blob/2026.7.25.2/notebooks/multi/start_here.ipynb):
   Multi-band galaxy modeling to study colour gradients and wavelength-dependent structure.
+- [multi_galaxy/start_here.ipynb](https://colab.research.google.com/github/PyAutoLabs/autogalaxy_workspace/blob/2026.7.25.2/notebooks/multi_galaxy/start_here.ipynb):
+  Blended multi-galaxy systems — one free light model per galaxy, fitted simultaneously.
+- [cluster/start_here.ipynb](https://colab.research.google.com/github/PyAutoLabs/autogalaxy_workspace/blob/2026.7.25.2/notebooks/cluster/start_here.ipynb):
+  Cluster fields — a BCG plus a catalogue-driven member population.
 
 ## Still Unsure?
 
 Each notebook is short and self-contained, and can be completed and adapted quickly to your particular task.
-Therefore, if you're unsure exactly which scale of lensing applies to you, or quite what data you want to use, you
+Therefore, if you're unsure exactly which system scale applies to you, or quite what data you want to use, you
 should just read through a few different notebooks and go from there.
 
 ## HowToGalaxy
