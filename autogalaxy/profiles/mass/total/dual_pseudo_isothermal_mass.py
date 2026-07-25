@@ -571,9 +571,10 @@ class dPIEMassB0(MassProfile):
 
         - ``sigma`` is Lenstool's **fiducial** velocity dispersion ``v_disp`` (sigma_LT),
           *not* the central velocity dispersion sigma_0 of the dPIE profile. They differ
-          by sigma_0 = sqrt(3/2) * sigma_LT (Eliasdottir et al. 2007, App. A; Bergamini
-          et al. 2019, Eq. 5) — quoting a measured central/aperture dispersion here
-          overestimates the mass by 50%. The lens strength is
+          by sigma_0 = sqrt(3/2) * sigma_LT — a Lenstool parameter convention (E07-style
+          b0 coefficient paired with the K93/L05 deflection amplitude; see the dPIEMass
+          class docstring), quoted by Bergamini et al. 2019, Eq. 5 — so a measured
+          central/aperture dispersion entered here overestimates the mass by 50%. The lens strength is
           b0 = 6 * 648000 * (sigma_LT / c)^2 * (D_LS / D_S) arcsec, where Lenstool's
           stored ``b0 = 6 * pia_c2 * sigma^2`` (``set_potfile.c``) carries no distance
           ratio — Lenstool applies D_LS / D_S separately at deflection time
@@ -1095,9 +1096,16 @@ class dPIEMass(dPIEMassB0):
       must be handled when ingesting real-data catalogues).
     - ``sigma`` — Lenstool's **fiducial** velocity dispersion ``v_disp``
       (sigma_LT, km/s), *not* the central dispersion:
-      sigma_0 = sqrt(3/2) * sigma_LT (Elíasdóttir et al. 2007, App. A;
-      Bergamini et al. 2019, Eq. 5). Quoting a measured stellar dispersion here
-      overestimates the mass by 50%.
+      sigma_0 = sqrt(3/2) * sigma_LT (the relation quoted by Bergamini et al.
+      2019, Eq. 5). The sqrt(3/2) is Lenstool's parameter convention, not a
+      physical definition from Elíasdóttir et al. (2007): it arises because
+      Lenstool computes ``b0 = 6 * pia_c2 * sigma^2`` (an E07-style
+      coefficient, ``set_potfile.c``) but evaluates deflections with the
+      Kassiola & Kovner (1993) / Limousin et al. (2005) amplitude, so the
+      input sigma must be read through the L05 parameterization (see the
+      contributed derivation note "On the definitions of b0 and velocity
+      dispersion in Lenstool / dPIE", H. Ding 2026). Quoting a measured
+      stellar dispersion here overestimates the mass by 50%.
     - ``r_core`` / ``r_cut`` — Lenstool ``core_radius`` / ``cut_radius`` in
       arcseconds (the internal ``ra`` / ``rs``). For ``.par`` files using the kpc
       variants, pre-convert with
@@ -1105,8 +1113,10 @@ class dPIEMass(dPIEMassB0):
 
     The lens strength is fully normalized internally:
     b0 = 6 * 648000 * (sigma_LT / c)^2 * (D_LS / D_S) arcsec — equivalently
-    E_0 = 6 pi (D_LS / D_S) (sigma_LT / c)^2 in radians (Elíasdóttir et al. 2007,
-    Eq. A24) with the E_0-to-b0 prefactor folded in. Lenstool stores its ``b0``
+    E_0 = 6 pi (D_LS / D_S) (sigma_LT / c)^2 in radians (the coefficient of
+    Elíasdóttir et al. 2007, Eq. A24) with the E_0-to-b0 prefactor folded in;
+    written in the central dispersion this is
+    b0 = 4 * 648000 * (sigma_0 / c)^2 * (D_LS / D_S). Lenstool stores its ``b0``
     without the distance ratio and applies D_LS / D_S at deflection time
     (``e_grad.c``); the two conventions are verified equivalent against the
     Lenstool C source and reference deflections
