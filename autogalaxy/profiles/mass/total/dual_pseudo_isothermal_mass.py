@@ -25,8 +25,9 @@ def _b0_from_lenstool_sigma(
         b0 [arcsec] = 6 * 648000 * (sigma_LT / c)^2 * (D_LS / D_S)
 
     This is identical to ``4 * pi * (sigma_0 / c)^2 * D_LS / D_S`` (in radians) for the
-    central velocity dispersion ``sigma_0 = sqrt(3/2) * sigma_LT`` — the fiducial-vs-central
-    distinction of Eliasdottir et al. (2007) App. A / Bergamini et al. (2019).
+    central velocity dispersion ``sigma_0 = sqrt(3/2) * sigma_LT`` — a Lenstool parameter
+    convention (an E07-style b0 coefficient paired with the K93/L05 deflection amplitude),
+    as quoted by Bergamini et al. (2019); see the :class:`dPIEMass` docstring.
     """
     c_km_s = 299792.458
 
@@ -1159,6 +1160,8 @@ class dPIEMass(dPIEMassB0):
     Elíasdóttir et al. (2007), arXiv:0710.5636 (App. A).
     Limousin et al. (2005), MNRAS, 356, 309.
     Bergamini et al. (2019), A&A, 631, A130.
+    Ding, H. (2026), "On the definitions of b0 and velocity dispersion in Lenstool / dPIE",
+    contributed derivation note (PyAutoLens Slack, 2026-07).
     """
 
     def __init__(
