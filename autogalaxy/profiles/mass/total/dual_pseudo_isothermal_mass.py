@@ -41,6 +41,26 @@ def _b0_from_lenstool_sigma(
     return 6.0 * 648000.0 * (sigma / c_km_s) ** 2 * (d_ls / d_s)
 
 
+def _xp_from(*values):
+    """
+    numpy, unless any input is a JAX array/tracer — constructor arguments carry no
+    ``xp`` threading, so when a free parameter arrives traced (model-fitting under
+    ``jax.jit``) the backend must be inferred from the values themselves.
+    """
+    try:
+        from jax import Array
+        from jax.core import Tracer
+    except Exception:
+        return np
+
+    if any(isinstance(value, (Array, Tracer)) for value in values):
+        import jax.numpy as jnp
+
+        return jnp
+
+    return np
+
+
 # Within this profile family, PIEMass, dPIEMassB0, and dPIEMassB0Sph are directly ported from Lenstool's C code, and have been thoroughly annotated and adapted for PyAutoLens.
 # dPIEMass and dPIEMassSph (the default profiles) expose the same physics in Lenstool's native parameterization.
 # The dPIEPotential and dPIEPotentialSph profiles are modified from the original `dPIEPotential` and `dPIEPotentialSph`, which were implemented to PyAutoLens by Jackson O'Donnell.
@@ -621,8 +641,9 @@ class dPIEMassB0(MassProfile):
 
             cosmology = Planck15()
 
-        axis_ratio = np.sqrt((1.0 - ellipticity) / (1.0 + ellipticity))
-        ell_comps = convert.ell_comps_from(axis_ratio=axis_ratio, angle=angle_pos)
+        xp = _xp_from(ellipticity, angle_pos)
+        axis_ratio = xp.sqrt((1.0 - ellipticity) / (1.0 + ellipticity))
+        ell_comps = convert.ell_comps_from(axis_ratio=axis_ratio, angle=angle_pos, xp=xp)
 
         b0 = _b0_from_lenstool_sigma(
             sigma=sigma,
@@ -1186,8 +1207,9 @@ class dPIEMass(dPIEMassB0):
         # them only so af.Model composition works.
         cosmology = FlatLambdaCDM(H0=H0, Om0=Om0)
 
-        axis_ratio = np.sqrt((1.0 - ellipticity) / (1.0 + ellipticity))
-        ell_comps = convert.ell_comps_from(axis_ratio=axis_ratio, angle=angle_pos)
+        xp = _xp_from(ellipticity, angle_pos)
+        axis_ratio = xp.sqrt((1.0 - ellipticity) / (1.0 + ellipticity))
+        ell_comps = convert.ell_comps_from(axis_ratio=axis_ratio, angle=angle_pos, xp=xp)
 
         b0 = _b0_from_lenstool_sigma(
             sigma=sigma,
