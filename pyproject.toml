@@ -53,7 +53,14 @@ jax = [
     # searches (MultiStartAdam / MultiStartProdigy) import. Without it the chain
     # autolens[jax] -> autogalaxy[jax] stopped at autonerves[jax], so `pip
     # install autolens[jax]` left those searches raising ImportError.
-    "autofit[jax]",
+    #
+    # Marked >= 3.11 so this entry matches every other member of the extra.
+    # autofit's own optax entry only gained that marker on main; any *released*
+    # autofit still expands autofit[jax] to an unmarked optax, and resolving
+    # that below 3.11 sends pip backtracking to `resolution-too-deep`. Gating
+    # here makes the chain correct whichever autofit version pip resolves,
+    # rather than only when autofit comes from a source checkout.
+    "autofit[jax]; python_version >= '3.11'",
     "jax_zero_contour>=2.0.0,<3.0.0; python_version >= '3.11'"
 ]
 optional = [
