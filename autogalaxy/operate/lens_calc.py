@@ -499,6 +499,14 @@ class LensCalc:
         It is computed from `hessian_from`, so it supports both uniform and irregular
         grids and accepts the same `xp` parameter for JAX acceleration.
 
+        **Row/column convention**: the returned 2x2 list is in **(x, y)** row/column order
+        (``a11``/``a22`` above are the xx/yy components), *not* the (y, x) order used by
+        every position/grid array elsewhere in this project (e.g. ``grid[:, 0]`` is y).
+        Callers that only use the scalar determinant (e.g. ``magnification_2d_via_hessian_from``)
+        are unaffected, since ``det`` is invariant under a simultaneous row/column swap. Callers
+        that use the individual components as a matrix alongside (y, x)-ordered vectors (e.g. a
+        precision/covariance transform) must re-index first: `A_yx = [[a22, a21], [a12, a11]]`.
+
         Parameters
         ----------
         grid
