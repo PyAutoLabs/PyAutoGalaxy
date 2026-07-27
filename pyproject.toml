@@ -48,7 +48,12 @@ local_scheme = "no-local-version"
 
 [project.optional-dependencies]
 jax = [
-    "autonerves[jax]",
+    # autofit[jax] rather than autonerves[jax] directly: it supplies everything
+    # autonerves[jax] does *plus* optax, which autofit's JAX-native gradient MAP
+    # searches (MultiStartAdam / MultiStartProdigy) import. Without it the chain
+    # autolens[jax] -> autogalaxy[jax] stopped at autonerves[jax], so `pip
+    # install autolens[jax]` left those searches raising ImportError.
+    "autofit[jax]",
     "jax_zero_contour>=2.0.0,<3.0.0; python_version >= '3.11'"
 ]
 optional = [
