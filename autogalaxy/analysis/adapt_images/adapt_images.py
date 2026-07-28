@@ -173,11 +173,10 @@ def galaxy_name_image_dict_via_result_from(
     ``analysis.dataset.mask`` and does not rebuild the maximum log likelihood fit, so the check costs nothing
     the cache was saving (PyAutoGalaxy#516).
 
-    Note that a stale cache is not *repaired* on disk: the recomputed images are written to the loose
-    ``files/`` folder, but ``Paths.preserve_in_zip`` only adds a member that is absent from the search's zip
-    and never replaces one, so the next ``restore()`` re-extracts the stale copy. Such a search therefore
-    misses the cache on every run rather than once — correct, but without the caching win until its output is
-    cleared (PyAutoFit#1414).
+    A stale cache is also *repaired* on disk: the recomputed images are written back to the loose ``files/``
+    folder and ``Paths.preserve_in_zip`` replaces the search's now-outdated zip member, so the next
+    ``restore()`` re-extracts the recomputed copy. A dataset change therefore costs one recompute rather than
+    one per run (PyAutoFit#1414).
 
     Parameters
     ----------
