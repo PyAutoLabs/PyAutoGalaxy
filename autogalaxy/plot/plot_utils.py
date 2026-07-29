@@ -334,8 +334,8 @@ def _critical_curves_method():
 
     Returns ``"marching_squares"`` (the default) or ``"zero_contour"``.
     Any unrecognised value falls back to ``"marching_squares"`` with a warning.
-    If ``"zero_contour"`` is requested but ``jax_zero_contour`` is not installed
-    (e.g. Python <3.11), falls back to ``"marching_squares"`` with a warning.
+    If ``"zero_contour"`` is requested but ``jax_zero_contour`` is not installed,
+    falls back to ``"marching_squares"`` with a warning.
     """
     from autonerves import conf
 
@@ -357,8 +357,8 @@ def _critical_curves_method():
         except ImportError:
             logger.warning(
                 "critical_curves_method='zero_contour' requested, but "
-                "jax_zero_contour is not installed (Python <3.11 ships without "
-                "the [jax] extra). Falling back to 'marching_squares'."
+                "jax_zero_contour is not installed. Install autogalaxy[jax] "
+                "to use this method. Falling back to 'marching_squares'."
             )
             return "marching_squares"
 
