@@ -40,7 +40,7 @@ You now need to decide what type of data you are interested in:
 
 - **CDD Imaging**: For image data from telescopes like Hubble and James Webb, go to [imaging/start_here.ipynb](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/imaging/start_here.ipynb).
 - **Interferometer**: For radio / sub-mm interferometer from instruments like ALMA, go to [interferometer/start_here.ipynb](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/interferometer/start_here.ipynb).
-- **Multi-Band Imaging**: For galaxies observed in multiple wavebands go to [multi/start_here.ipynb](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/multi/start_here.ipynb).
+- **Multi-Band Imaging**: For galaxies observed in multiple wavebands go to [multi_dataset/start_here.ipynb](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/multi_dataset/start_here.ipynb).
 
 ## Google Colab
 
@@ -54,7 +54,7 @@ so you can check it is the right software for you before going through the insta
   Galaxy modeling with CCD imaging (e.g. Hubble, James Webb, ground-based telescopes).
 - [interferometer/start_here.ipynb](https://colab.research.google.com/github/PyAutoLabs/autogalaxy_workspace/blob/2026.7.29.2/notebooks/interferometer/start_here.ipynb):
   Galaxy modeling with interferometer data (e.g. ALMA), fitting directly in the uv-plane.
-- [multi_band/start_here.ipynb](https://colab.research.google.com/github/PyAutoLabs/autogalaxy_workspace/blob/2026.7.29.2/notebooks/multi/start_here.ipynb):
+- [multi_band/start_here.ipynb](https://colab.research.google.com/github/PyAutoLabs/autogalaxy_workspace/blob/2026.7.29.2/notebooks/multi_dataset/start_here.ipynb):
   Multi-band galaxy modeling to study colour gradients and wavelength-dependent structure.
 - [multi_galaxy/start_here.ipynb](https://colab.research.google.com/github/PyAutoLabs/autogalaxy_workspace/blob/2026.7.29.2/notebooks/multi_galaxy/start_here.ipynb):
   Blended multi-galaxy systems — one free light model per galaxy, fitted simultaneously.
