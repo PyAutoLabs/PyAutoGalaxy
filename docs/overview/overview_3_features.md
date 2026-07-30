@@ -57,7 +57,7 @@ The appearance of the galaxy changes as a function of wavelength, therefore mult
 more about the different components in a galaxy (e.g a redder bulge and bluer disk) or when imaging and interferometer
 data are combined, we can compare the emission from stars and dust.
 
-Checkout the `autogalaxy_workspace/*/multi` package to get started, however combining datasets is a more advanced
+Checkout the `autogalaxy_workspace/*/multi_dataset` package to get started, however combining datasets is a more advanced
 feature and it is recommended you first get to grips with the core API.
 
 ## Ellipse Fitting
