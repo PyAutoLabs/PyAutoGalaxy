@@ -1,0 +1,1 @@
+from autogalaxy.jax.registration import register_galaxies_classes
