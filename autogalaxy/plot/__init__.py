@@ -37,6 +37,7 @@ from autogalaxy.galaxy.plot.adapt_plots import (
 
 from autogalaxy.imaging.plot.fit_imaging_plots import (
     subplot_fit as subplot_fit_imaging,
+    subplot_fit_imaging_list,
     subplot_of_galaxy as subplot_fit_imaging_of_galaxy,
 )
 
