@@ -17,6 +17,39 @@ You should also specify the non-linear search(es) you use in your analysis (e.g.
 the main body of text, and delete as appropriate any packages your analysis did not use. The citations.bib file includes
 the citation key for all of these projects.
 
+## JAX
+
+**PyAutoGalaxy** runs on a NumPy backend by default and an optional
+[JAX](https://github.com/jax-ml/jax) backend for just-in-time compilation, automatic
+differentiation, and GPU/TPU execution. If you run any analysis on the JAX path, please
+cite JAX under the citation key `jax`. JAX-specific components that are also cited under
+their own keys when used are `optax` (gradient-based optimizers, key `optax`), the
+interferometer non-uniform FFT (`nufftax` and its FINUFFT algorithm, keys `nufftax` and
+`finufft`, see below), and the critical-curve/caustic solver (`Jax-Zero-Contour`, key
+`jax_zero_contour`, see below).
+
+If you use the learning-rate-free `af.MultiStartProdigy` search, also cite the Prodigy
+method under the key `prodigy`. It is a published algorithm in its own right, run through
+Optax's implementation (`optax.contrib.prodigy`), so cite it alongside `optax` rather than
+in place of it:
+
+```bibtex
+@inproceedings{prodigy,
+author = {Mishchenko, Konstantin and Defazio, Aaron},
+title = {{Prodigy: An Expeditiously Adaptive Parameter-Free Learner}},
+booktitle = {Proceedings of the 41st International Conference on Machine Learning},
+series = {Proceedings of Machine Learning Research},
+volume = {235},
+pages = {35779--35804},
+publisher = {PMLR},
+url = {https://proceedings.mlr.press/v235/mishchenko24a.html},
+year = {2024}
+}
+```
+
+The reference implementation is at <https://github.com/konstmish/prodigy> and the preprint
+at <https://arxiv.org/abs/2306.06101>.
+
 ## Jax-Zero-Contour
 
 If you use the zero-contour method for critical curve and caustic computation (the default in
