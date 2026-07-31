@@ -153,7 +153,17 @@ captured using a rectangular mesh:
 Checkout `autogalaxy_workspace/notebooks/features/pixelizations.ipynb` to learn how to use a pixelization, however
 this is a more advanced feature and it is recommended you first get to grips with the core API.
 
-## Other
+## Graphical Models
 
-- Automated pipelines / database tools.
-- Graphical models.
+The examples above fit each galaxy dataset one-by-one. However, many galaxy properties are shared across a
+sample (e.g. the population's distribution of Sersic indices or sizes), and fitting galaxies independently does
+not exploit this shared structure.
+
+Graphical models fit multiple datasets simultaneously, explicitly defining which parameters are unique to each
+galaxy and which are shared across the sample. Hierarchical extensions assume parameters are drawn from a parent
+distribution, whose properties are inferred from the full sample, extracting significantly more information
+than one-by-one fitting. This is a powerful tool for galaxy evolution studies of large samples, for example
+measuring how the galaxy population's structural properties vary with mass or redshift.
+
+Checkout `autofit_workspace/*/features/graphical_models.py` to learn how to compose and fit a graphical model;
+the API applies directly to the galaxy fits shown throughout this workspace.
