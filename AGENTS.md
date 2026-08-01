@@ -23,10 +23,11 @@ import `autolens` — lensing lives one layer up.
 - **autogalaxy_workspace_test** — integration + JAX/likelihood parity scripts.
 - **HowToGalaxy** — the lecture-style tutorial series (`../HowToGalaxy`).
 - **docs/** — Sphinx source; published to ReadTheDocs.
-- **Science context:** the lensing-focused knowledge wiki at
-  `autolens_assistant/wiki/literature/` (concepts, entities, sources) covers
-  source reconstruction, regularization, bulge/halo decomposition, kinematics,
-  and multipoles useful to galaxy modelling.
+- **Science context:** the galaxy-structure knowledge wiki at
+  `autogalaxy_assistant/wiki/literature/` (concept pages, survey/instrument
+  entities, per-topic annotated bibliographies — every citation verified)
+  covers Sersic profiles, MGE, bulge/disk decomposition, isophotes and
+  multipoles, scaling relations, kinematics and high-z structure.
 
 ## Quick commands
 
