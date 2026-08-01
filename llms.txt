@@ -5,6 +5,7 @@
 ## Use it (examples & tutorials)
 
 - [autogalaxy_workspace navigator](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/llms.txt): end-to-end example scripts and notebooks per science case — the paste-friendly task router. Send any "how do I model / simulate / analyse X?" question here.
+- [autogalaxy_assistant](https://github.com/PyAutoLabs/autogalaxy_assistant): the PyAutoGalaxy AI assistant — task skills, a curated API reference and a bundled real JWST dataset in one repo you drive by conversation (browser chat via a GitHub connector, or a local coding agent); start from its `llms.txt` front door.
 - [HowToGalaxy](https://github.com/PyAutoLabs/HowToGalaxy): from-first-principles lecture series on galaxy morphology and Bayesian fitting.
 
 ## API reference & docs
