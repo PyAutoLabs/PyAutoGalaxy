@@ -105,6 +105,72 @@ def test__mge_model_from__total_gaussians_per_basis():
     assert len(instance.profile_list) == 10
 
 
+def test__mge_model_from__sigma_min_default_spans_1e4_to_mask_radius():
+    model = ag.model_util.mge_model_from(mask_radius=3.0, total_gaussians=5)
+
+    instance = model.instance_from_prior_medians()
+    sigma_list = [profile.sigma for profile in instance.profile_list]
+
+    assert sigma_list[0] == pytest.approx(1e-4, 1.0e-8)
+    assert sigma_list[-1] == pytest.approx(3.0, 1.0e-8)
+
+
+def test__mge_model_from__sigma_min_input_sets_smallest_gaussian():
+    model = ag.model_util.mge_model_from(
+        mask_radius=3.0, total_gaussians=5, sigma_min=0.01
+    )
+
+    instance = model.instance_from_prior_medians()
+    sigma_list = [profile.sigma for profile in instance.profile_list]
+
+    assert sigma_list[0] == pytest.approx(0.01, 1.0e-8)
+    assert sigma_list[-1] == pytest.approx(3.0, 1.0e-8)
+    assert sigma_list == pytest.approx(
+        list(10 ** np.linspace(np.log10(0.01), np.log10(3.0), 5)), 1.0e-8
+    )
+
+
+def test__mge_model_from__sigma_min_invalid_raises():
+    with pytest.raises(ValueError):
+        ag.model_util.mge_model_from(
+            mask_radius=3.0, total_gaussians=5, sigma_min=0.0
+        )
+
+    with pytest.raises(ValueError):
+        ag.model_util.mge_model_from(
+            mask_radius=3.0, total_gaussians=5, sigma_min=4.0
+        )
+
+
+def test__mge_model_from__default_sigma_list_is_bitwise_unchanged():
+    """
+    The default `sigma_min=1e-4` must reproduce the hardcoded `np.linspace(-4, ...)`
+    ladder that predates the `sigma_min` argument EXACTLY, not approximately.
+
+    Every fixed `sigma` feeds the PyAutoFit identifier of a run, so drift here gives
+    existing fits a new `unique_id`, orphaning their output directories and silently
+    restarting them from scratch. The identifier quantizes floats at
+    `RESOLUTION = 1e-8` (see `autofit.mapper.identifier`), so it does not in fact move
+    for drift below that -- but exact equality is the stronger guarantee and costs
+    nothing, catching drift ~8 orders of magnitude earlier than the identifier does.
+
+    `pytest.approx(rel=1e-8)` is deliberately NOT used: it only fails once the ladder
+    has moved by a relative ~1e-7, which is already past the point where the
+    identifier changes.
+    """
+    for mask_radius, total_gaussians in [(3.0, 20), (3.5, 30), (7.5, 10), (1.0, 5)]:
+        model = ag.model_util.mge_model_from(
+            mask_radius=mask_radius, total_gaussians=total_gaussians
+        )
+
+        instance = model.instance_from_prior_medians()
+        sigma_list = [profile.sigma for profile in instance.profile_list]
+
+        assert sigma_list == list(
+            10 ** np.linspace(-4, np.log10(mask_radius), total_gaussians)
+        )
+
+
 def test__mge_point_model_from__returns_basis_model_with_correct_gaussians():
     """
     mge_point_model_from should return an af.Model wrapping a Basis whose
@@ -134,6 +200,51 @@ def test__mge_point_model_from__sigma_values_span_correct_range():
 
     assert gaussian_list[0].sigma == pytest.approx(0.01, rel=1.0e-4)
     assert gaussian_list[-1].sigma == pytest.approx(pixel_scales * 2.0, rel=1.0e-4)
+
+
+def test__mge_point_model_from__default_sigma_list_is_bitwise_unchanged():
+    """
+    As for `mge_model_from`, the default `sigma_min=0.01` must reproduce the
+    hardcoded `min_log10_sigma = -2.0` ladder that predates the argument EXACTLY,
+    so the identifier of an existing point-source fit does not change.
+    """
+    for pixel_scales, total_gaussians in [(0.1, 10), (0.05, 5), (0.2, 3), (0.001, 4)]:
+        model = ag.model_util.mge_point_model_from(
+            pixel_scales=pixel_scales, total_gaussians=total_gaussians
+        )
+
+        sigma_list = [gaussian.sigma for gaussian in model.profile_list]
+
+        max_sigma = max(2.0 * pixel_scales, 10**-2.0)
+
+        assert sigma_list == list(
+            10 ** np.linspace(-2.0, np.log10(max_sigma), total_gaussians)
+        )
+
+
+def test__mge_point_model_from__sigma_min_input_sets_smallest_gaussian():
+    total_gaussians = 5
+
+    model = ag.model_util.mge_point_model_from(
+        pixel_scales=0.1, total_gaussians=total_gaussians, sigma_min=0.01 / 10.0
+    )
+
+    sigma_list = [gaussian.sigma for gaussian in model.profile_list]
+
+    assert sigma_list[0] == pytest.approx(0.001, 1.0e-8)
+    assert sigma_list[-1] == pytest.approx(0.2, 1.0e-8)
+    assert sigma_list == pytest.approx(
+        list(10 ** np.linspace(np.log10(0.001), np.log10(0.2), total_gaussians)),
+        1.0e-8,
+    )
+
+
+def test__mge_point_model_from__sigma_min_invalid_raises():
+    with pytest.raises(ValueError):
+        ag.model_util.mge_point_model_from(pixel_scales=0.1, sigma_min=0.0)
+
+    with pytest.raises(ValueError):
+        ag.model_util.mge_point_model_from(pixel_scales=0.1, sigma_min=-1.0)
 
 
 def test__mge_point_model_from__shared_centre_and_ell_comps():

@@ -17,6 +17,7 @@ def mge_model_from(
     ell_comps_uniform_width: float = 0.2,
     ell_comps_sigma : float = 0.3,
     use_spherical: bool = False,
+    sigma_min: float = 1e-4,
 ) -> af.Collection:
     """
     Construct a Multi-Gaussian Expansion (MGE) for the lens or source galaxy light.
@@ -81,6 +82,11 @@ def mge_model_from(
     use_spherical
         If True, use ``GaussianSph`` (no ell_comps). If False (default), use
         ``Gaussian`` with ellipticity.
+    sigma_min
+        The smallest Gaussian width (`sigma`) in arcseconds, which sets the lower end
+        of the log-spaced sigma values. Defaults to ``1e-4``. Increase it (e.g. to a
+        tenth of the pixel scale) to stop the basis wasting components on scales the
+        data cannot resolve.
 
     Returns
     -------
@@ -97,8 +103,22 @@ def mge_model_from(
     from autogalaxy.profiles.light.linear import Gaussian, GaussianSph
     from autogalaxy.profiles.basis import Basis
 
-    # The sigma values of the Gaussians will be fixed to values spanning 0.01 to the mask radius.
-    log10_sigma_list = np.linspace(-4, np.log10(mask_radius), total_gaussians)
+    if sigma_min <= 0.0:
+        raise ValueError(
+            f"mge_model_from requires sigma_min > 0.0, got {sigma_min}."
+        )
+
+    if sigma_min > mask_radius:
+        raise ValueError(
+            f"mge_model_from requires sigma_min <= mask_radius, got sigma_min="
+            f"{sigma_min} and mask_radius={mask_radius}."
+        )
+
+    # The sigma values of the Gaussians are fixed to log-spaced values spanning
+    # `sigma_min` (default 0.0001") to the mask radius.
+    log10_sigma_list = np.linspace(
+        np.log10(sigma_min), np.log10(mask_radius), total_gaussians
+    )
 
     if use_spherical:
         model_cls = GaussianSph
@@ -179,13 +199,14 @@ def mge_point_model_from(
     pixel_scales: float,
     total_gaussians: int = 10,
     centre: Tuple[float, float] = (0.0, 0.0),
+    sigma_min: float = 0.01,
 ) -> af.Model:
     """
     Construct a Multi-Gaussian Expansion (MGE) model for a compact or unresolved
     point-like component (e.g. a nuclear starburst, AGN, or unresolved bulge).
 
     The model is composed of ``total_gaussians`` linear Gaussians whose sigma values
-    are logarithmically spaced between 0.01 arcseconds and twice the pixel scale.
+    are logarithmically spaced between ``sigma_min`` and twice the pixel scale.
     All Gaussians share the same centre and ellipticity components, keeping the
     parameter count low while capturing a realistic PSF-convolved point source.
 
@@ -200,6 +221,11 @@ def mge_point_model_from(
     centre
         (y, x) centre of the point source in arc-seconds.  A ±0.1 arcsecond uniform
         prior is placed on each coordinate.
+    sigma_min
+        The smallest Gaussian width (`sigma`) in arcseconds, which sets the lower end
+        of the log-spaced sigma values. Defaults to ``0.01``. Increase it (e.g. to a
+        tenth of the pixel scale) to stop the basis wasting components on scales the
+        data cannot resolve.
 
     Returns
     -------
@@ -220,14 +246,19 @@ def mge_point_model_from(
             f"mge_point_model_from requires pixel_scales > 0, got {pixel_scales}."
         )
 
-    # Sigma values are logarithmically spaced between 0.01 arcsec (10**-2)
-    # and twice the pixel scale, with a floor to avoid taking log10 of
-    # very small or non-positive values.
-    min_log10_sigma = -2.0  # corresponds to 0.01 arcsec
-    max_sigma = max(2.0 * pixel_scales, 10**min_log10_sigma)
-    max_log10_sigma = np.log10(max_sigma)
+    if sigma_min <= 0.0:
+        raise ValueError(
+            f"mge_point_model_from requires sigma_min > 0.0, got {sigma_min}."
+        )
 
-    log10_sigma_list = np.linspace(min_log10_sigma, max_log10_sigma, total_gaussians)
+    # Sigma values are logarithmically spaced between `sigma_min` (default 0.01")
+    # and twice the pixel scale, with a floor to keep the upper end of the list
+    # at or above `sigma_min` when the pixel scale is very small.
+    max_sigma = max(2.0 * pixel_scales, sigma_min)
+
+    log10_sigma_list = np.linspace(
+        np.log10(sigma_min), np.log10(max_sigma), total_gaussians
+    )
     centre_0 = af.UniformPrior(lower_limit=centre[0] - 0.1, upper_limit=centre[0] + 0.1)
     centre_1 = af.UniformPrior(lower_limit=centre[1] - 0.1, upper_limit=centre[1] + 0.1)
 
