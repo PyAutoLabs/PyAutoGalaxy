@@ -17,6 +17,7 @@ def mge_model_from(
     ell_comps_uniform_width: float = 0.2,
     ell_comps_sigma : float = 0.3,
     use_spherical: bool = False,
+    sigma_min: float = 1e-4,
 ) -> af.Collection:
     """
     Construct a Multi-Gaussian Expansion (MGE) for the lens or source galaxy light.
@@ -50,6 +51,11 @@ def mge_model_from(
     mask_radius
         The outer radius (in arcseconds) of the circular mask applied to the data.
         This determines the maximum Gaussian width (`sigma`) used in the MGE.
+    sigma_min
+        The smallest Gaussian width (`sigma`) in arcseconds, which sets the lower end
+        of the log-spaced sigma values. Defaults to ``1e-4``. Increase it (e.g. to the
+        pixel scale or half the PSF FWHM) to stop the basis wasting components on
+        scales the data cannot resolve.
     total_gaussians
         Total number of Gaussian light profiles used in each basis.
     gaussian_per_basis
@@ -97,8 +103,22 @@ def mge_model_from(
     from autogalaxy.profiles.light.linear import Gaussian, GaussianSph
     from autogalaxy.profiles.basis import Basis
 
-    # The sigma values of the Gaussians will be fixed to values spanning 0.01 to the mask radius.
-    log10_sigma_list = np.linspace(-4, np.log10(mask_radius), total_gaussians)
+    if sigma_min <= 0.0:
+        raise ValueError(
+            f"mge_model_from requires sigma_min > 0.0, got {sigma_min}."
+        )
+
+    if sigma_min > mask_radius:
+        raise ValueError(
+            f"mge_model_from requires sigma_min <= mask_radius, got sigma_min="
+            f"{sigma_min} and mask_radius={mask_radius}."
+        )
+
+    # The sigma values of the Gaussians are fixed to log-spaced values spanning
+    # `sigma_min` (default 0.0001") to the mask radius.
+    log10_sigma_list = np.linspace(
+        np.log10(sigma_min), np.log10(mask_radius), total_gaussians
+    )
 
     if use_spherical:
         model_cls = GaussianSph

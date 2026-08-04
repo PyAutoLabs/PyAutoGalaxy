@@ -105,6 +105,43 @@ def test__mge_model_from__total_gaussians_per_basis():
     assert len(instance.profile_list) == 10
 
 
+def test__mge_model_from__sigma_min_default_spans_1e4_to_mask_radius():
+    model = ag.model_util.mge_model_from(mask_radius=3.0, total_gaussians=5)
+
+    instance = model.instance_from_prior_medians()
+    sigma_list = [profile.sigma for profile in instance.profile_list]
+
+    assert sigma_list[0] == pytest.approx(1e-4, 1.0e-8)
+    assert sigma_list[-1] == pytest.approx(3.0, 1.0e-8)
+
+
+def test__mge_model_from__sigma_min_input_sets_smallest_gaussian():
+    model = ag.model_util.mge_model_from(
+        mask_radius=3.0, total_gaussians=5, sigma_min=0.01
+    )
+
+    instance = model.instance_from_prior_medians()
+    sigma_list = [profile.sigma for profile in instance.profile_list]
+
+    assert sigma_list[0] == pytest.approx(0.01, 1.0e-8)
+    assert sigma_list[-1] == pytest.approx(3.0, 1.0e-8)
+    assert sigma_list == pytest.approx(
+        list(10 ** np.linspace(np.log10(0.01), np.log10(3.0), 5)), 1.0e-8
+    )
+
+
+def test__mge_model_from__sigma_min_invalid_raises():
+    with pytest.raises(ValueError):
+        ag.model_util.mge_model_from(
+            mask_radius=3.0, total_gaussians=5, sigma_min=0.0
+        )
+
+    with pytest.raises(ValueError):
+        ag.model_util.mge_model_from(
+            mask_radius=3.0, total_gaussians=5, sigma_min=4.0
+        )
+
+
 def test__mge_point_model_from__returns_basis_model_with_correct_gaussians():
     """
     mge_point_model_from should return an af.Model wrapping a Basis whose
