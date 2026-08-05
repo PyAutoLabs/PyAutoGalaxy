@@ -157,6 +157,14 @@ def test__mge_model_from__default_sigma_list_is_bitwise_unchanged():
     `pytest.approx(rel=1e-8)` is deliberately NOT used: it only fails once the ladder
     has moved by a relative ~1e-7, which is already past the point where the
     identifier changes.
+
+    PORTABILITY TRAP -- the expected ladder is built element by element, exactly as
+    `mge_model_from` builds it (`10 ** log10_sigma_list[i]`), and must stay that way.
+    A vectorised `10 ** np.linspace(...)` is a DIFFERENT numpy code path: numpy does
+    not guarantee its scalar and SIMD power loops agree bit for bit, and on AVX-512
+    hardware they differ by 1 ULP, so writing the expectation vectorised makes this
+    test pass on GitHub's runners and fail on an AVX-512 developer machine. Comparing
+    like for like keeps the assertion exact without measuring the host's CPU.
     """
     for mask_radius, total_gaussians in [(3.0, 20), (3.5, 30), (7.5, 10), (1.0, 5)]:
         model = ag.model_util.mge_model_from(
@@ -166,9 +174,11 @@ def test__mge_model_from__default_sigma_list_is_bitwise_unchanged():
         instance = model.instance_from_prior_medians()
         sigma_list = [profile.sigma for profile in instance.profile_list]
 
-        assert sigma_list == list(
-            10 ** np.linspace(-4, np.log10(mask_radius), total_gaussians)
-        )
+        log10_sigma_list = np.linspace(-4, np.log10(mask_radius), total_gaussians)
+
+        assert sigma_list == [
+            10 ** log10_sigma_list[i] for i in range(total_gaussians)
+        ]
 
 
 def test__mge_point_model_from__returns_basis_model_with_correct_gaussians():
@@ -207,6 +217,12 @@ def test__mge_point_model_from__default_sigma_list_is_bitwise_unchanged():
     As for `mge_model_from`, the default `sigma_min=0.01` must reproduce the
     hardcoded `min_log10_sigma = -2.0` ladder that predates the argument EXACTLY,
     so the identifier of an existing point-source fit does not change.
+
+    The same portability trap applies here: build the expected ladder element by
+    element, the way `mge_point_model_from` does, so both sides take numpy's scalar
+    power path. A vectorised `10 ** np.linspace(...)` disagrees with it by 1 ULP on
+    AVX-512 hardware -- see `test__mge_model_from__default_sigma_list_is_bitwise_unchanged`
+    for the full reasoning, including why `pytest.approx(rel=1e-8)` is not the fix.
     """
     for pixel_scales, total_gaussians in [(0.1, 10), (0.05, 5), (0.2, 3), (0.001, 4)]:
         model = ag.model_util.mge_point_model_from(
@@ -217,9 +233,11 @@ def test__mge_point_model_from__default_sigma_list_is_bitwise_unchanged():
 
         max_sigma = max(2.0 * pixel_scales, 10**-2.0)
 
-        assert sigma_list == list(
-            10 ** np.linspace(-2.0, np.log10(max_sigma), total_gaussians)
-        )
+        log10_sigma_list = np.linspace(-2.0, np.log10(max_sigma), total_gaussians)
+
+        assert sigma_list == [
+            10 ** log10_sigma_list[i] for i in range(total_gaussians)
+        ]
 
 
 def test__mge_point_model_from__sigma_min_input_sets_smallest_gaussian():
