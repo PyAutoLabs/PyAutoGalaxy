@@ -1,6 +1,7 @@
 from __future__ import division, print_function
 
 from pathlib import Path
+from unittest import mock
 
 import numpy as np
 import pytest
@@ -133,6 +134,36 @@ def test__spherical__transform_to_and_from_reference_frame__roundtrip_recovers_o
     )
 
     assert transformed_grid == pytest.approx(grid_original, 1e-5)
+
+
+def test__sph_named_profile__both_transforms_use_translation_only_path():
+    # Regression test: transformed_from_reference_frame_grid_from checked
+    # startswith("Sph") but spherical profiles are suffix-named (IsothermalSph),
+    # so the inverse transform silently took the elliptical rotation path.
+    profile = ag.mp.IsothermalSph(centre=(1.0, 2.0), einstein_radius=1.0)
+
+    grid = ag.Grid2DIrregular([[3.0, 5.0]])
+
+    transformed_grid = profile.transformed_to_reference_frame_grid_from(grid)
+
+    assert transformed_grid == pytest.approx(np.array([[2.0, 3.0]]), 1e-8)
+
+    recovered_grid = profile.transformed_from_reference_frame_grid_from(
+        transformed_grid
+    )
+
+    assert recovered_grid == pytest.approx(grid.array, 1e-8)
+
+    with mock.patch.object(
+        geometry_profiles.aa.util.geometry, "transform_grid_2d_to_reference_frame"
+    ) as rotation_to, mock.patch.object(
+        geometry_profiles.aa.util.geometry, "transform_grid_2d_from_reference_frame"
+    ) as rotation_from:
+        profile.transformed_to_reference_frame_grid_from(grid)
+        profile.transformed_from_reference_frame_grid_from(transformed_grid)
+
+    rotation_to.assert_not_called()
+    rotation_from.assert_not_called()
 
 
 def test__elliptical__transform_grid_to_reference_frame__zero_ell_comps__grid_unchanged():
