@@ -74,6 +74,19 @@ def test__mge_model_from__centre_fixed_with_two_bases():
     assert model.prior_count == 4
 
 
+def test__mge_model_from__centre_fixed_uses_the_fixed_value():
+    model = ag.model_util.mge_model_from(
+        mask_radius=1.0,
+        total_gaussians=5,
+        gaussian_per_basis=1,
+        centre_fixed=(1.5, -2.5),
+    )
+    assert model.prior_count == 2
+
+    instance = model.instance_from_prior_medians()
+    assert instance.profile_list[0].centre == (1.5, -2.5)
+
+
 def test__mge_model_from__centre_fixed_overrides_centre_per_basis():
     model = ag.model_util.mge_model_from(
         mask_radius=1.0,
