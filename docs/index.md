@@ -249,8 +249,8 @@ general/credits
 howtogalaxy/howtogalaxy
 howtogalaxy/chapter_1_introduction
 howtogalaxy/chapter_2_modeling
-howtogalaxy/chapter_3_search_chaining
-howtogalaxy/chapter_4_pixelizations
+howtogalaxy/chapter_3_pixelizations
+howtogalaxy/chapter_4_scaling_up_galaxies
 howtogalaxy/chapter_optional
 ```
 

@@ -6,12 +6,14 @@ The best way to learn **PyAutoGalaxy** is by going through the **HowToGalaxy** l
 repository at [PyAutoLabs/HowToGalaxy](https://github.com/PyAutoLabs/HowToGalaxy).
 
 The lectures are provided as Jupyter notebooks (and Python scripts), and they are linked to via this readthedocs. The
-lectures are composed of five chapters
+lectures are composed of four chapters
 
 - **Introduction** - An introduction to galaxy morphology and structure using **PyAutoGalaxy**.
-- **Lens Modeling** - How to model galaxies, including a primer on Bayesian non-linear analysis.
-- **Search Chaining** - How to fit complex lens models using non-linear search chaining.
-- **Pixelizations** - How to perform pixelized reconstructions of a galaxy.
+- **Modeling** - How to model galaxies, including a primer on Bayesian non-linear analysis and
+  non-linear search chaining.
+- **Pixelizations** - How to perform pixelized reconstructions of a galaxy, including the Bayesian
+  formalism behind them.
+- **Scaling Up Galaxies** - Extra galaxies, blended multi-galaxy systems, and cluster fields.
 
 ## How to Tackle HowToGalaxy
 
