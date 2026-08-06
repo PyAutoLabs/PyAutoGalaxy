@@ -60,7 +60,7 @@ class SMBH(PointMass):
             )
         )
         mass_angular = mass / critical_surface_density
-        einstein_radius = np.sqrt(mass_angular / np.pi)
+        einstein_radius = (mass_angular / np.pi) ** 0.5
 
         super().__init__(centre=centre, einstein_radius=einstein_radius)
 
