@@ -127,7 +127,7 @@ def mge_model_from(
 
     def _make_centre_priors():
         if centre_fixed is not None:
-            return centre[0], centre[1]
+            return centre_fixed[0], centre_fixed[1]
         elif centre_prior_is_uniform:
             return (
                 af.UniformPrior(
