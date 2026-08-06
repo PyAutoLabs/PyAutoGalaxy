@@ -123,7 +123,7 @@ class LensingCosmology:
         Weinberg, 1972, pp 421-424; Weedman, 1986, pp 65-67; Peebles, 1993, pp 325-327.
 
         For simplicity, **PyAutoLens** internally uses only certain units to perform lensing cosmology calculations.
-        This function therefore returns only the value of the astropy function it wraps, omitting the units instance.
+        This function therefore returns a plain value in kpc, with no units instance attached.
 
         Parameters
         ----------
@@ -139,7 +139,7 @@ class LensingCosmology:
         Angular diameter distance from an input `redshift_0` to another input `redshift_1`.
 
         For simplicity, **PyAutoLens** internally uses only certain units to perform lensing cosmology calculations.
-        This function therefore returns only the value of the astropy function it wraps, omitting the units instance.
+        This function therefore returns a plain value in kpc, with no units instance attached.
 
         Parameters
         ----------
@@ -212,13 +212,9 @@ class LensingCosmology:
         """
         Critical density of the Universe at redshift z, returned in Msun / kpc^3.
 
-        This is an xp (NumPy / JAX) drop-in for the Astropy method:
-            astropy.cosmology.FLRW.critical_density(z)
-
-        Astropy returns g/cm^3, but in AutoLens you were immediately converting to:
-            solMass / kpc^3
-
-        So this function returns Msun / kpc^3 directly.
+        A native xp (NumPy / JAX) implementation whose value matches the astropy method
+        astropy.cosmology.FLRW.critical_density(z) after converting its g / cm^3 result
+        to Msun / kpc^3 — the units lensing calculations use directly.
 
         Requires:
             self.H0  (km/s/Mpc)

@@ -31,7 +31,7 @@ dependencies = [
     # PyAutoLens#687.
     "autofit>=2026.7.29.2",
     "autoarray>=2026.7.29.2",
-    "astropy>=5.0,<=7.2.0",
+    "astropy>=5.0",
     "nautilus-sampler==1.0.5"
 ]
 
