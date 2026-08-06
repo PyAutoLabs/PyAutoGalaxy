@@ -14,3 +14,5 @@ from .cnfw_mcr import cNFWMCRLudlow, cNFWMCRLudlowSph
 from .cnfw_mcr_scatter import cNFWMCRScatterLudlow, cNFWMCRScatterLudlowSph
 from .kaplinghat import KaplinghatCoredNFWSph
 from .kaplinghat_mcr import KaplinghatCoredNFWMCRLudlowSph
+from .yang24 import YangSIDMSph
+from .yang24_mcr import YangSIDMMCRLudlowSph

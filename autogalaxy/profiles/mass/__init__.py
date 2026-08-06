@@ -48,6 +48,8 @@ from .dark import (
     cNFWMCRScatterLudlowSph,
     KaplinghatCoredNFWSph,
     KaplinghatCoredNFWMCRLudlowSph,
+    YangSIDMSph,
+    YangSIDMMCRLudlowSph,
 )
 from .stellar import (
     Gaussian,
