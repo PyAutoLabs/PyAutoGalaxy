@@ -31,6 +31,108 @@ def coord_func_m_from(grid_radius, tau, xp=np):
     )
 
 
+def potential_func_sph_from(grid_radius, tau, xp=np):
+    r"""Return the dimensionless analytic tNFW lensing potential.
+
+    This is equation (18) of Baltz, Marshall & Oguri (2009) for their
+    :math:`n=1` smoothly truncated NFW profile.  The returned function is the
+    paper's dimensionless radial term; ``NFWTruncatedSph.potential_2d_from``
+    supplies the PyAutoGalaxy normalization :math:`2\kappa_s r_s^2`.
+
+    The potential is defined only up to an additive constant.  We retain the
+    paper's convention, in which the central potential is zero, but use its
+    small-radius series through :math:`x=10^{-1}`.  Direct evaluation there
+    subtracts large, nearly equal terms and loses precision in JAX float32.
+    """
+    grid_radius = xp.real(grid_radius)
+    series_radius = xp.maximum(grid_radius, 1.0e-12)
+    use_small_radius_series = grid_radius <= 1.0e-1
+
+    # Keep every branch of the closed form finite when JAX traces ``where``.
+    # Values below the switch are replaced by the series before returning.
+    grid_radius = xp.where(use_small_radius_series, 1.0e-1, grid_radius)
+
+    u = xp.square(grid_radius)
+    tau_squared = xp.square(tau)
+    root = xp.sqrt(tau_squared + u)
+
+    radius_lt = xp.sqrt(xp.where(grid_radius < 1.0, 1.0 - u, 0.25))
+    radius_gt = xp.sqrt(xp.where(grid_radius > 1.0, u - 1.0, 0.25))
+    f_lt = xp.arctanh(radius_lt) / radius_lt
+    f_gt = xp.arctan(radius_gt) / radius_gt
+    f_r = xp.where(grid_radius < 1.0, f_lt, xp.where(grid_radius > 1.0, f_gt, 1.0))
+
+    l_r = coord_func_k_from(grid_radius=grid_radius, tau=tau, xp=xp)
+
+    inverse_radius = 1.0 / grid_radius
+    inverse_radius_lt = xp.where(grid_radius < 1.0, inverse_radius, 1.5)
+    inverse_radius_gt = xp.where(grid_radius > 1.0, inverse_radius, 0.5)
+    cos_lt = -xp.square(xp.arccosh(inverse_radius_lt))
+    cos_gt = xp.square(xp.arccos(inverse_radius_gt))
+    cos_term = xp.where(
+        grid_radius < 1.0,
+        cos_lt,
+        xp.where(grid_radius > 1.0, cos_gt, 0.0),
+    )
+
+    potential = (
+        2.0 * tau_squared * xp.pi * (tau - root + tau * xp.log(tau + root))
+        + 2.0 * (tau_squared - 1.0) * tau * root * l_r
+        + tau_squared * (tau_squared - 1.0) * xp.square(l_r)
+        + 4.0 * tau_squared * (u - 1.0) * f_r
+        + tau_squared * (tau_squared - 1.0) * cos_term
+        + tau_squared
+        * ((tau_squared - 1.0) * xp.log(tau) - tau_squared - 1.0)
+        * xp.log(u)
+        - tau_squared
+        * (
+            (tau_squared - 1.0) * xp.log(tau) * xp.log(4.0 * tau)
+            + 2.0 * xp.log(tau / 2.0)
+            - 2.0 * tau * (tau - xp.pi) * xp.log(2.0 * tau)
+        )
+    )
+
+    potential = potential / xp.square(tau_squared + 1.0)
+
+    small_radius_log = xp.log(2.0 / series_radius)
+    small_radius_coefficient_2 = (
+        small_radius_log * xp.square(tau_squared + 1.0)
+        - tau_squared * xp.log(tau)
+        + tau_squared
+        - xp.pi * tau
+        + xp.log(tau)
+        + 1.0
+    )
+    small_radius_coefficient_2 /= 2.0 * xp.square(tau_squared + 1.0)
+    small_radius_coefficient_4 = (
+        small_radius_log * (3.0 * tau**6.0 + 5.0 * tau**4.0 + tau_squared - 1.0)
+        - tau**6.0
+        - tau**4.0
+        + tau_squared * xp.log(tau)
+        + xp.pi * tau
+        - xp.log(tau)
+    )
+    small_radius_coefficient_4 /= 16.0 * tau_squared * xp.square(tau_squared + 1.0)
+    small_radius_coefficient_6 = (
+        small_radius_log * (20.0 * tau**8.0 + 28.0 * tau**6.0 - 4.0 * tau_squared + 4.0)
+        - 9.0 * tau**8.0
+        - 11.0 * tau**6.0
+        - 4.0 * tau_squared * xp.log(tau)
+        + tau_squared
+        - 4.0 * xp.pi * tau
+        + 4.0 * xp.log(tau)
+        - 1.0
+    )
+    small_radius_coefficient_6 /= 192.0 * tau**4.0 * xp.square(tau_squared + 1.0)
+    potential_small_radius = (
+        xp.square(series_radius) * small_radius_coefficient_2
+        + series_radius**4.0 * small_radius_coefficient_4
+        + series_radius**6.0 * small_radius_coefficient_6
+    )
+
+    return xp.where(use_small_radius_series, potential_small_radius, potential)
+
+
 class NFWTruncatedSph(AbstractgNFW):
     r"""
     Spherical truncated NFW (tNFW) dark matter halo profile (Baltz, Marshall & Oguri 2009).
@@ -59,7 +161,7 @@ class NFWTruncatedSph(AbstractgNFW):
 
     References
     ----------
-    - Baltz, Marshall & Oguri 2009, JCAP, 2009, 015  (arXiv:0705.0735)
+    - Baltz, Marshall & Oguri 2009, JCAP, 2009, 015  (arXiv:0705.0682)
     - Navarro, Frenk & White 1997, ApJ, 490, 493
     """
 
@@ -135,15 +237,21 @@ class NFWTruncatedSph(AbstractgNFW):
     @aa.decorators.to_array
     @aa.decorators.transform
     def potential_2d_from(self, grid: aa.type.Grid2DLike, xp=np, **kwargs):
-        from autogalaxy.profiles.mass.abstract.mge import MGEDecomposer
+        """Calculate the analytic lensing potential of the spherical tNFW profile."""
+        eta = xp.multiply(
+            1.0 / self.scale_radius,
+            self.radial_grid_from(grid=grid, xp=xp, **kwargs).array,
+        )
 
-        radii_min = self.scale_radius / 1000.0
-        radii_max = self.truncation_radius * 5.0
-        sigmas = xp.exp(xp.linspace(xp.log(radii_min), xp.log(radii_max), 30))
-        mge_decomp = MGEDecomposer(mass_profile=self)
-        return mge_decomp.potential_2d_via_mge_from(
-            grid=grid, xp=xp, sigma_log_list=sigmas,
-            ellipticity_convention="major", three_D=True,
+        return (
+            2.0
+            * self.kappa_s
+            * self.scale_radius**2.0
+            * potential_func_sph_from(
+                grid_radius=eta,
+                tau=self.tau,
+                xp=xp,
+            )
         )
 
     def coord_func_k(self, grid_radius, xp=np):
@@ -197,10 +305,7 @@ class NFWTruncatedSph(AbstractgNFW):
             / 3.0
             * (
                 concentration**3
-                / (
-                    np.log(1.0 + concentration)
-                    - concentration / (1.0 + concentration)
-                )
+                / (np.log(1.0 + concentration) - concentration / (1.0 + concentration))
             )
         )
 
@@ -374,12 +479,7 @@ class NFWTruncatedSph(AbstractgNFW):
         delta_c = rho_s / critical_density
 
         def equation(c):
-            return (
-                200.0
-                / 3.0
-                * (c**3 / (np.log(1.0 + c) - c / (1.0 + c)))
-                - delta_c
-            )
+            return 200.0 / 3.0 * (c**3 / (np.log(1.0 + c) - c / (1.0 + c))) - delta_c
 
         concentration = float(fsolve(equation, 10.0)[0])
         r200_kpc = concentration * rs_kpc

@@ -114,6 +114,116 @@ def test__convergence_2d_from__scale_radius_5():
     assert convergence == pytest.approx(1.51047026, abs=1.0e-4)
 
 
+def test__potential_2d_from__matches_independent_tnfw_implementation():
+    """Potential differences cross-checked against lenstronomy's analytic TNFW."""
+    mp = ag.mp.NFWTruncatedSph(
+        kappa_s=0.13,
+        scale_radius=1.7,
+        truncation_radius=3.4,
+    )
+
+    potential = mp.potential_2d_from(
+        grid=ag.Grid2DIrregular([[0.0, 0.085], [0.0, 0.51], [0.0, 5.1]])
+    )
+    potential -= potential[0]
+
+    assert potential == pytest.approx(
+        [0.0, 0.05804607, 0.88448954],
+        abs=1.0e-8,
+    )
+
+
+def test__potential_2d_from__centre_and_scale_radius_are_finite():
+    mp = ag.mp.NFWTruncatedSph(
+        kappa_s=0.13,
+        scale_radius=1.7,
+        truncation_radius=3.4,
+    )
+
+    potential = mp.potential_2d_from(grid=ag.Grid2DIrregular([[0.0, 0.0], [0.0, 1.7]]))
+
+    assert np.all(np.isfinite(potential))
+    assert potential[0] == pytest.approx(0.0, abs=1.0e-20)
+
+
+@pytest.mark.parametrize(
+    "tau,radius_over_scale",
+    [
+        (0.5, 0.3),
+        (0.5, 2.0),
+        (1.0, 0.3),
+        (1.0, 2.0),
+        (2.0, 0.3),
+        (2.0, 2.0),
+        (10.0, 0.3),
+        (10.0, 2.0),
+    ],
+)
+def test__potential_2d_from__gradient_matches_analytic_deflections(
+    tau, radius_over_scale
+):
+    scale_radius = 1.7
+    radius = radius_over_scale * scale_radius
+    step = 1.0e-4 * scale_radius
+
+    mp = ag.mp.NFWTruncatedSph(
+        kappa_s=0.13,
+        scale_radius=scale_radius,
+        truncation_radius=tau * scale_radius,
+    )
+
+    radial_grid = ag.Grid2DIrregular([[0.0, radius - step], [0.0, radius + step]])
+    potential = mp.potential_2d_from(grid=radial_grid)
+    potential_gradient = (potential[1] - potential[0]) / (2.0 * step)
+
+    deflection = mp.deflections_yx_2d_from(grid=ag.Grid2DIrregular([[0.0, radius]]))[
+        0, 1
+    ]
+
+    assert potential_gradient == pytest.approx(deflection, rel=1.0e-6)
+
+
+@pytest.mark.parametrize(
+    "tau,radius_over_scale",
+    [
+        (0.5, 0.3),
+        (0.5, 2.0),
+        (1.0, 0.3),
+        (1.0, 2.0),
+        (2.0, 0.3),
+        (2.0, 2.0),
+        (10.0, 0.3),
+        (10.0, 2.0),
+    ],
+)
+def test__potential_2d_from__laplacian_matches_analytic_convergence(
+    tau, radius_over_scale
+):
+    scale_radius = 1.7
+    radius = radius_over_scale * scale_radius
+    step = 1.0e-3 * scale_radius
+
+    mp = ag.mp.NFWTruncatedSph(
+        kappa_s=0.13,
+        scale_radius=scale_radius,
+        truncation_radius=tau * scale_radius,
+    )
+
+    radial_grid = ag.Grid2DIrregular(
+        [[0.0, radius - step], [0.0, radius], [0.0, radius + step]]
+    )
+    potential = mp.potential_2d_from(grid=radial_grid)
+    potential_gradient = (potential[2] - potential[0]) / (2.0 * step)
+    potential_second_derivative = (
+        potential[2] - 2.0 * potential[1] + potential[0]
+    ) / step**2.0
+    potential_laplacian = potential_second_derivative + potential_gradient / radius
+
+    convergence = mp.convergence_2d_from(grid=ag.Grid2DIrregular([[0.0, radius]]))[0]
+
+    assert potential_laplacian == pytest.approx(2.0 * convergence, rel=1.0e-5)
+
+
 def test__mass_at_truncation_radius():
     mp = ag.mp.NFWTruncatedSph(
         centre=(0.0, 0.0), kappa_s=1.0, scale_radius=1.0, truncation_radius=1.0
@@ -158,6 +268,19 @@ def test__compare_nfw_and_truncated_nfw_with_large_truncation_radius():
 
     assert truncated_nfw_deflections == pytest.approx(nfw_deflections.array, abs=1.0e-4)
 
+    truncated_nfw_potential = truncated_nfw.potential_2d_from(
+        grid=ag.Grid2DIrregular([[2.0, 2.0], [3.0, 1.0], [-1.0, -9.0]])
+    )
+    nfw_potential = nfw.potential_2d_from(
+        grid=ag.Grid2DIrregular([[2.0, 2.0], [3.0, 1.0], [-1.0, -9.0]])
+    )
+
+    # The lensing potential is defined only up to an additive constant.
+    truncated_nfw_potential -= truncated_nfw_potential[0]
+    nfw_potential -= nfw_potential[0]
+
+    assert truncated_nfw_potential == pytest.approx(nfw_potential, abs=1.0e-4)
+
 
 # ---------------------------------------------------------------------------
 # Helpers: reference implementation of the los_pipes unit-conversion formulas
@@ -165,6 +288,7 @@ def test__compare_nfw_and_truncated_nfw_with_large_truncation_radius():
 # the PyAutoGalaxy cosmology API.  These are used as ground-truth values in the
 # regression tests below.
 # ---------------------------------------------------------------------------
+
 
 def _los_pipes_reference_delta_c(concentration):
     """NFW characteristic overdensity as computed by los_pipes."""
@@ -197,8 +321,10 @@ def _los_pipes_reference_convert_to_lens_unit(
 
     critical_density = cosmo.critical_density(z_halo)
     kpc_per_arcsec = cosmo.kpc_per_arcsec_from(z_halo)
-    sigma_crit = cosmo.critical_surface_density_between_redshifts_solar_mass_per_kpc2_from(
-        z_halo, z_source
+    sigma_crit = (
+        cosmo.critical_surface_density_between_redshifts_solar_mass_per_kpc2_from(
+            z_halo, z_source
+        )
     )
 
     r200_kpc = (m200 / (200.0 * critical_density * (4.0 * np.pi / 3.0))) ** (1.0 / 3.0)
@@ -483,11 +609,15 @@ def test__mass_ratio_from_concentration_and_truncation_factor__matches_los_pipes
 def test__mass_ratio_from_concentration_and_truncation_factor__larger_for_smaller_factor():
     """A smaller truncation factor (larger truncation radius) gives a larger mass ratio."""
     c = 10.0
-    ratio_100 = ag.mp.NFWTruncatedSph.mass_ratio_from_concentration_and_truncation_factor(
-        c, 100.0
+    ratio_100 = (
+        ag.mp.NFWTruncatedSph.mass_ratio_from_concentration_and_truncation_factor(
+            c, 100.0
+        )
     )
-    ratio_50 = ag.mp.NFWTruncatedSph.mass_ratio_from_concentration_and_truncation_factor(
-        c, 50.0
+    ratio_50 = (
+        ag.mp.NFWTruncatedSph.mass_ratio_from_concentration_and_truncation_factor(
+            c, 50.0
+        )
     )
     assert ratio_50 > ratio_100
 
@@ -496,8 +626,10 @@ def test__mass_ratio_from_concentration_and_truncation_factor__various_concentra
     """Spot-check mass ratios at several concentrations against los_pipes reference."""
     for c in [5.0, 10.0, 20.0]:
         expected = _los_pipes_reference_mass_ratio(c, 100.0)
-        result = ag.mp.NFWTruncatedSph.mass_ratio_from_concentration_and_truncation_factor(
-            c, 100.0
+        result = (
+            ag.mp.NFWTruncatedSph.mass_ratio_from_concentration_and_truncation_factor(
+                c, 100.0
+            )
         )
         assert result == pytest.approx(expected, rel=1.0e-6), f"failed for c={c}"
 
