@@ -201,7 +201,7 @@ class Galaxies(List, OperateImageGalaxies):
         grid: aa.Grid2D,
         xp=np,
         operated_only: Optional[bool] = None,
-    ) -> {Galaxy: np.ndarray}:
+    ) -> Dict[Galaxy, np.ndarray]:
         image_2d_list = self.image_2d_list_unbinned_from(
             grid=grid, xp=xp, operated_only=operated_only
         )
