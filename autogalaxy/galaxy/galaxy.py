@@ -10,6 +10,7 @@ matching component types.
 The `Galaxies` class (in `galaxies.py`) wraps a list of `Galaxy` objects and provides the same aggregate
 interface over the whole ensemble.
 """
+
 from typing import Dict, List, Optional, Type, Union
 
 import numpy as np
@@ -209,6 +210,31 @@ class Galaxy(af.ModelObject, OperateImageList):
                 cls=LightProfile, cls_filtered=LightProfileLinear
             )
         ]
+
+    def image_2d_list_unbinned_from(
+        self, grid: aa.Grid2D, xp=np, operated_only: Optional[bool] = None
+    ) -> List[np.ndarray]:
+        """Return each non-linear profile image before over-sampling binning."""
+        return [
+            light_profile.image_2d_unbinned_from(
+                grid=grid, xp=xp, operated_only=operated_only
+            )
+            for light_profile in self.cls_list_from(
+                cls=LightProfile, cls_filtered=LightProfileLinear
+            )
+        ]
+
+    def image_2d_unbinned_from(
+        self, grid: aa.Grid2D, xp=np, operated_only: Optional[bool] = None
+    ) -> np.ndarray:
+        image_2d_list = self.image_2d_list_unbinned_from(
+            grid=grid, xp=xp, operated_only=operated_only
+        )
+
+        if image_2d_list:
+            return sum(image_2d_list)
+
+        return xp.zeros((grid.over_sampled.shape[0],))
 
     @aa.decorators.to_array
     def image_2d_from(

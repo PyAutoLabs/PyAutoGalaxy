@@ -8,6 +8,7 @@ an `intensity` normalisation that scales the overall brightness.
 The `LightProfile` class is the root of the light profile hierarchy. All concrete profiles (e.g. `Sersic`,
 `Exponential`, `Gaussian`) inherit from it and implement `image_2d_from` and `image_2d_via_radii_from`.
 """
+
 import numpy as np
 from typing import Optional, Tuple
 
@@ -83,6 +84,22 @@ class LightProfile(EllProfile, OperateImage):
             The image of the `LightProfile` evaluated at every (y,x) coordinate on the transformed grid.
         """
         raise NotImplementedError()
+
+    def image_2d_unbinned_from(
+        self,
+        grid: aa.Grid2D,
+        xp=np,
+        operated_only: Optional[bool] = None,
+    ) -> np.ndarray:
+        """Evaluate the profile on every over-sampled coordinate without binning.
+
+        Keeping the parent :class:`~autoarray.Grid2D` available is important for
+        discrete profiles, which need its mask and per-pixel over-sampling
+        metadata to normalize their image correctly.
+        """
+        return self.image_2d_from(
+            grid=grid, xp=xp, operated_only=operated_only, binned=False
+        )
 
     def image_2d_via_radii_from(self, grid_radii: np.ndarray, xp=np) -> np.ndarray:
         """

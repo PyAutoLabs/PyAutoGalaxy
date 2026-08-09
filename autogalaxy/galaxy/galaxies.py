@@ -10,6 +10,7 @@ handles a mix of standard and operated (PSF-already-applied) light profiles, req
 In a typical modeling workflow, a list of fitted galaxies is always wrapped in a `Galaxies` object, which is
 then passed to a `Fit*` class (e.g. `FitImaging`) for comparison against the observed data.
 """
+
 import numpy as np
 from typing import Dict, List, Optional, Tuple, Type, Union
 
@@ -109,6 +110,26 @@ class Galaxies(List, OperateImageGalaxies):
             for galaxy in self
         ]
 
+    def image_2d_list_unbinned_from(
+        self, grid: aa.Grid2D, xp=np, operated_only: Optional[bool] = None
+    ) -> List[np.ndarray]:
+        return [
+            galaxy.image_2d_unbinned_from(grid=grid, xp=xp, operated_only=operated_only)
+            for galaxy in self
+        ]
+
+    def image_2d_unbinned_from(
+        self, grid: aa.Grid2D, xp=np, operated_only: Optional[bool] = None
+    ) -> np.ndarray:
+        image_2d_list = self.image_2d_list_unbinned_from(
+            grid=grid, xp=xp, operated_only=operated_only
+        )
+
+        if image_2d_list:
+            return sum(image_2d_list)
+
+        return xp.zeros((grid.over_sampled.shape[0],))
+
     @aa.decorators.to_array
     def image_2d_from(
         self, grid: aa.type.Grid2DLike, xp=np, operated_only: Optional[bool] = None
@@ -141,7 +162,7 @@ class Galaxies(List, OperateImageGalaxies):
         grid: aa.type.Grid2DLike,
         xp=np,
         operated_only: Optional[bool] = None,
-    ) -> {Galaxy: np.ndarray}:
+    ) -> Dict[Galaxy, np.ndarray]:
         """
         Returns a dictionary associating every `Galaxy` object with its corresponding 2D image, using the instance
         of each galaxy as the dictionary keys.
@@ -174,6 +195,17 @@ class Galaxies(List, OperateImageGalaxies):
             galaxy_image_2d_dict[galaxy] = image_2d_list[galaxy_index]
 
         return galaxy_image_2d_dict
+
+    def galaxy_image_2d_dict_unbinned_from(
+        self,
+        grid: aa.Grid2D,
+        xp=np,
+        operated_only: Optional[bool] = None,
+    ) -> {Galaxy: np.ndarray}:
+        image_2d_list = self.image_2d_list_unbinned_from(
+            grid=grid, xp=xp, operated_only=operated_only
+        )
+        return {galaxy: image_2d_list[index] for index, galaxy in enumerate(self)}
 
     @aa.decorators.to_vector_yx
     def deflections_yx_2d_from(

@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
 
+import autoarray as aa
 import autogalaxy as ag
 
 from autogalaxy.profiles.light.linear import LightProfileLinear
@@ -98,6 +99,58 @@ def test__lp_instance_from__returns_instance_with_correct_intensity():
     )
 
     assert lp_non_linear.intensity == 3.0
+
+
+def test__point_source_lp_instance_from__returns_standard_point_source():
+    lp_linear = ag.lp_linear.PointSource(centre=(1.0, 2.0))
+
+    lp_non_linear = lp_linear.lp_instance_from(
+        linear_light_profile_intensity_dict={lp_linear: 3.0}
+    )
+
+    assert type(lp_non_linear) is ag.lp.PointSource
+    assert lp_non_linear.centre == (1.0, 2.0)
+    assert lp_non_linear.intensity == 3.0
+
+
+def test__point_source_operated_mapping_matrix__oversampled_psf_conserves_flux():
+    mask = ag.Mask2D.all_false(shape_native=(11, 11), pixel_scales=1.0)
+
+    over_sample_size = 2
+    kernel = aa.Array2D.no_mask(
+        values=np.array(
+            [
+                [0.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0],
+                [0.0, 0.0, 0.0],
+            ]
+        ),
+        pixel_scales=1.0 / over_sample_size,
+    )
+    psf = aa.Convolver(kernel=kernel, convolve_over_sample_size=over_sample_size)
+
+    grid = ag.Grid2D.from_mask(mask=mask, over_sample_size=over_sample_size)
+    blurring_mask = mask.derive_mask.blurring_from(
+        kernel_shape_native=psf.kernel_shape_image_resolution,
+        allow_padding=True,
+    )
+    blurring_grid = ag.Grid2D.from_mask(
+        mask=blurring_mask, over_sample_size=over_sample_size
+    )
+
+    lp = ag.lp_linear.PointSource(centre=(0.3, 0.3))
+    func_list = LightProfileLinearObjFuncList(
+        grid=grid,
+        blurring_grid=blurring_grid,
+        psf=psf,
+        light_profile_list=[lp],
+        regularization=None,
+    )
+
+    operated_mapping_matrix = func_list.operated_mapping_matrix_override
+
+    assert operated_mapping_matrix.shape == (mask.pixels_in_mask, 1)
+    assert np.sum(operated_mapping_matrix[:, 0]) == pytest.approx(1.0)
 
 
 def test__pytree_token_is_int_and_unique():

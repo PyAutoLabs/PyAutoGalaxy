@@ -9,6 +9,7 @@ When linear light profiles are used in a basis, their individual intensities are
 linear inversion (a single matrix solve), making the inference highly efficient regardless of how many basis
 components are included.
 """
+
 import numpy as np
 from typing import Dict, List, Optional, Union
 
@@ -114,11 +115,17 @@ class Basis(LightProfile, MassProfile):
         The image of the light profiles in the basis summed together.
         """
         return sum(
-            self.image_2d_list_from(grid=grid, xp=xp, operated_only=operated_only)
+            self.image_2d_list_from(
+                grid=grid, xp=xp, operated_only=operated_only, **kwargs
+            )
         )
 
     def image_2d_list_from(
-        self, grid: aa.type.Grid2DLike, xp=np, operated_only: Optional[bool] = None
+        self,
+        grid: aa.type.Grid2DLike,
+        xp=np,
+        operated_only: Optional[bool] = None,
+        **kwargs,
     ) -> List[aa.Array2D]:
         """
         Returns each image of each light profiles in the basis as a list, from a 2D grid of Cartesian (y,x) coordinates.
@@ -141,18 +148,23 @@ class Basis(LightProfile, MassProfile):
         -------
         The image of the light profiles in the basis summed together.
         """
-        return [
-            (
-                light_profile.image_2d_from(
-                    grid=grid, xp=xp, operated_only=operated_only
+        image_2d_list = []
+
+        for light_profile in self.light_profile_list:
+            if not isinstance(light_profile, lp_linear.LightProfileLinear):
+                image_2d_list.append(
+                    light_profile.image_2d_from(
+                        grid=grid, xp=xp, operated_only=operated_only, **kwargs
+                    )
                 )
-                if not isinstance(light_profile, lp_linear.LightProfileLinear)
-                else aa.Array2D(
-                    values=xp.zeros((grid.shape[0],)), mask=grid.mask
+            elif kwargs.get("binned", True) is False:
+                image_2d_list.append(xp.zeros((grid.over_sampled.shape[0],)))
+            else:
+                image_2d_list.append(
+                    aa.Array2D(values=xp.zeros((grid.shape[0],)), mask=grid.mask)
                 )
-            )
-            for light_profile in self.light_profile_list
-        ]
+
+        return image_2d_list
 
     def convergence_2d_from(
         self, grid: aa.type.Grid2DLike, xp=np, **kwargs

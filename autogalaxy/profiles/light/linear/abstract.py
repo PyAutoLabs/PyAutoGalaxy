@@ -12,6 +12,7 @@ The `LightProfileLinear` class is the abstract base from which all linear light 
 The `LightProfileLinearObjFuncList` subclass additionally supports regularization, allowing the solved
 intensities to be penalized by a smoothness prior.
 """
+
 import inspect
 import itertools
 import numpy as np
@@ -238,14 +239,12 @@ class LightProfileLinearObjFuncList(aa.AbstractLinearObjFuncList):
         """
         for light_profile in light_profile_list:
             if not isinstance(light_profile, LightProfileLinear):
-                raise exc.ProfileException(
-                    """
+                raise exc.ProfileException("""
                     A light profile that is not a LightProfileLinear object has been input into the
                     LightProfileLinearObjFuncList object.
 
                     Only children of the LightProfileLinear class can be used in a linear inversion.
-                    """
-                )
+                    """)
 
         super().__init__(
             grid=grid, regularization=regularization, settings=settings, xp=xp
@@ -341,12 +340,11 @@ class LightProfileLinearObjFuncList(aa.AbstractLinearObjFuncList):
             return self.mapping_matrix
 
         if self.psf.convolve_over_sample_size > 1:
-            # Evaluate each profile on the over-sampled coordinates (per-pixel
-            # sub-block order, unbinned — the oversampled Convolver's input format)
-            # so convolution runs at the fine resolution, mirroring
-            # OperateImage.blurred_image_2d_from.
-            evaluation_grid = self.grid.over_sampled
-            evaluation_blurring_grid = self.blurring_grid.over_sampled
+            # Retain the parent Grid2D while requesting unbinned values. A
+            # discrete profile needs the parent-pixel geometry to place its
+            # flux, whereas a bare Grid2DIrregular only contains coordinates.
+            evaluation_grid = self.grid
+            evaluation_blurring_grid = self.blurring_grid
             convolution_mask = self.grid.mask
         else:
             evaluation_grid = self.grid
@@ -358,11 +356,20 @@ class LightProfileLinearObjFuncList(aa.AbstractLinearObjFuncList):
         from autogalaxy.operate.image import OperateImage
 
         for pixel, light_profile in enumerate(self.light_profile_list):
-            image_2d = light_profile.image_2d_from(grid=evaluation_grid, xp=self._xp)
-
-            blurring_image_2d = light_profile.image_2d_from(
-                grid=evaluation_blurring_grid, xp=self._xp
-            )
+            if convolution_mask is not None:
+                image_2d = light_profile.image_2d_unbinned_from(
+                    grid=evaluation_grid, xp=self._xp
+                )
+                blurring_image_2d = light_profile.image_2d_unbinned_from(
+                    grid=evaluation_blurring_grid, xp=self._xp
+                )
+            else:
+                image_2d = light_profile.image_2d_from(
+                    grid=evaluation_grid, xp=self._xp
+                )
+                blurring_image_2d = light_profile.image_2d_from(
+                    grid=evaluation_blurring_grid, xp=self._xp
+                )
 
             if convolution_mask is not None:
                 image_2d = OperateImage._binned_for_convolution(
