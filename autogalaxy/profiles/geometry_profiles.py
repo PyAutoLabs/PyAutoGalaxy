@@ -6,6 +6,7 @@ The `GeometryProfile`, `SphProfile` and `EllProfile` classes provide the base ge
 light and mass profiles inherit, including translating a grid to the profile centre and rotating it to the
 profile's position angle.
 """
+
 import numpy as np
 
 from typing import Optional, Tuple, Type
@@ -13,6 +14,7 @@ from typing import Optional, Tuple, Type
 import autoarray as aa
 
 from autogalaxy import convert
+from autogalaxy.profiles import validate
 
 
 class GeometryProfile:
@@ -232,6 +234,7 @@ class EllProfile(SphProfile):
         """
         super().__init__(centre=centre)
 
+        validate.validate_ell_comps(ell_comps=ell_comps)
         self.ell_comps = ell_comps
 
     def axis_ratio(self, xp=np) -> float:

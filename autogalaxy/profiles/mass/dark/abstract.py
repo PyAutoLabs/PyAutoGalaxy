@@ -8,6 +8,7 @@ from autogalaxy.cosmology.model import LensingCosmology
 
 
 from autogalaxy import exc
+from autogalaxy.profiles import validate
 
 
 class DarkProfile:
@@ -92,6 +93,7 @@ class AbstractgNFW(MassProfile, DarkProfile):
         super().__init__(centre=centre, ell_comps=ell_comps)
 
         self.kappa_s = kappa_s
+        validate.validate_scale_radius(scale_radius=scale_radius)
         self.scale_radius = scale_radius
         self.inner_slope = inner_slope
 

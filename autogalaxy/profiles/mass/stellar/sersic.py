@@ -12,6 +12,7 @@ from autogalaxy.profiles.mass.abstract.cse import (
     MassProfileCSE,
 )
 from autogalaxy.profiles.mass.stellar.abstract import StellarProfile
+from autogalaxy.profiles import validate
 
 
 def cse_settings_from(
@@ -171,6 +172,7 @@ class AbstractSersic(MassProfile, MassProfileCSE, StellarProfile):
         self.mass_to_light_ratio = mass_to_light_ratio
         self.intensity = intensity
         self.effective_radius = effective_radius
+        validate.validate_sersic_index(sersic_index=sersic_index)
         self.sersic_index = sersic_index
 
     def deflections_yx_2d_from(self, grid: aa.type.Grid2DLike, xp=np, **kwargs):

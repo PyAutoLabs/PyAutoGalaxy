@@ -12,6 +12,7 @@ from autogalaxy.profiles.mass.dark.kaplinghat import (
     _trapezoid_from,
 )
 from autogalaxy.profiles.mass.abstract.abstract import MassProfile
+from autogalaxy.profiles import validate
 
 
 def _yang24_parameter_ratios_from(tau):
@@ -114,6 +115,7 @@ class YangSIDMSph(MassProfile, DarkProfile):
         super().__init__(centre=centre, ell_comps=(0.0, 0.0))
 
         self.kappa_s = kappa_s
+        validate.validate_scale_radius(scale_radius=scale_radius)
         self.scale_radius = scale_radius
         self.tau = min(max(float(tau), 0.0), 1.0)
 

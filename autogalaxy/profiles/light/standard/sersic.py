@@ -13,6 +13,7 @@ Special cases: n=1 is the exponential (disk) profile, n=4 is the de Vaucouleurs 
 
 This module provides both elliptical (`Sersic`) and spherical (`SersicSph`) variants.
 """
+
 import numpy as np
 
 from numpy import seterr
@@ -24,6 +25,7 @@ from autogalaxy.profiles.light.abstract import LightProfile
 from autogalaxy.profiles.light.decorators import (
     check_operated_only,
 )
+from autogalaxy.profiles import validate
 
 
 class AbstractSersic(LightProfile):
@@ -54,6 +56,7 @@ class AbstractSersic(LightProfile):
         """
         super().__init__(centre=centre, ell_comps=ell_comps, intensity=intensity)
         self.effective_radius = effective_radius
+        validate.validate_sersic_index(sersic_index=sersic_index)
         self.sersic_index = sersic_index
 
     @property
