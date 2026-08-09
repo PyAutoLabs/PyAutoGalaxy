@@ -10,6 +10,7 @@ import autoarray as aa
 from autogalaxy.profiles.mass.dark.abstract import DarkProfile
 from autogalaxy.profiles.mass.dark.nfw import NFWSph
 from autogalaxy.profiles.mass.abstract.abstract import MassProfile
+from autogalaxy.profiles import validate
 
 
 @functools.lru_cache(maxsize=1)
@@ -183,6 +184,7 @@ class KaplinghatCoredNFWSph(MassProfile, DarkProfile):
         super().__init__(centre=centre, ell_comps=(0.0, 0.0))
 
         self.kappa_s = kappa_s
+        validate.validate_scale_radius(scale_radius=scale_radius)
         self.scale_radius = scale_radius
         self.sigma_over_m = sigma_over_m
         self.t_age = t_age

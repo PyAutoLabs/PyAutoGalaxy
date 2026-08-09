@@ -27,6 +27,7 @@ from autogalaxy.profiles.light.abstract import LightProfile
 from autogalaxy.profiles.light.linear import LightProfileLinear
 from autogalaxy.profiles.light.snr.abstract import LightProfileSNR
 from autogalaxy.profiles.mass.abstract.abstract import MassProfile
+from autogalaxy.profiles import validate
 
 
 class Galaxy(af.ModelObject, OperateImageList):
@@ -49,6 +50,9 @@ class Galaxy(af.ModelObject, OperateImageList):
             The pixelization of the galaxy used to reconstruct an observed image using an inversion.
         """
         super().__init__()
+
+        validate.validate_redshift(redshift=redshift)
+
         self.redshift = redshift
 
         for name, val in kwargs.items():

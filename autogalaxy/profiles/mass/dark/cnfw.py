@@ -6,6 +6,7 @@ from autogalaxy.profiles.mass.dark.abstract import AbstractgNFW
 from autogalaxy.profiles.mass.abstract.mge import MGEDecomposer
 
 import autoarray as aa
+from autogalaxy.profiles import validate
 
 
 def F_func_from(theta, radius, xp=np):
@@ -126,6 +127,7 @@ class cNFW(AbstractgNFW):
         super().__init__(centre=centre, ell_comps=ell_comps)
 
         self.kappa_s = kappa_s
+        validate.validate_scale_radius(scale_radius=scale_radius)
         self.scale_radius = scale_radius
         self.core_radius = core_radius
 
@@ -275,6 +277,7 @@ class cNFWSph(cNFW):
         super().__init__(centre=centre, ell_comps=(0.0, 0.0))
 
         self.kappa_s = kappa_s
+        validate.validate_scale_radius(scale_radius=scale_radius)
         self.scale_radius = scale_radius
         self.core_radius = core_radius
 
