@@ -44,6 +44,9 @@ from autoarray.inversion.mesh.interpolator.rectangular import (
 from autoarray.inversion.mesh.interpolator.delaunay import (
     InterpolatorDelaunay,
 )  # noqa
+from autoarray.inversion.mesh.interpolator.sibson import (
+    InterpolatorDelaunayNN,
+)  # noqa
 from autoarray.structures.vectors.uniform import VectorYX2D  # noqa
 from autoarray.structures.vectors.irregular import VectorYX2DIrregular  # noqa
 from autoarray.layout.region import Region1D  # noqa
