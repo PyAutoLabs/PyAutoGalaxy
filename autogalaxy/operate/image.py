@@ -14,6 +14,7 @@ All three classes are mixins — they are not instantiated directly but are inhe
 (`LightProfile`, `Galaxy`, `Galaxies`, `Tracer`) to expose a consistent API for blurring and Fourier
 transforming images.
 """
+
 from __future__ import annotations
 import numpy as np
 from typing import TYPE_CHECKING, Dict, List, Optional
@@ -55,6 +56,18 @@ class OperateImage:
             `True` returns only `LightProfileOperated` images; `False` excludes them.
         """
         raise NotImplementedError
+
+    def image_2d_unbinned_from(
+        self, grid: aa.Grid2D, xp=np, operated_only: Optional[bool] = None
+    ):
+        """Evaluate on every over-sampled coordinate without binning.
+
+        Subclasses that need the parent grid's mask or over-sampling metadata
+        override this method. The fallback preserves the historical behaviour.
+        """
+        return self.image_2d_from(
+            grid=grid.over_sampled, xp=xp, operated_only=operated_only
+        )
 
     def has(self, cls) -> bool:
         """
@@ -129,14 +142,12 @@ class OperateImage:
 
         For a regular PSF the input grids are returned unchanged (evaluation is
         binned to image resolution and the mask travels on the arrays). For an
-        oversampled PSF (`convolve_over_sample_size > 1`) the over-sampled
-        coordinates are returned — `grid.over_sampled` is a `Grid2DIrregular` in
-        per-pixel sub-block order, which the `over_sample` decorator passes through
-        unbinned and which is the oversampled Convolver's input format — along with
-        the image mask, which those coordinate arrays cannot carry themselves.
+        oversampled PSF (`convolve_over_sample_size > 1`) the parent grids are also
+        returned, along with the image mask. The caller requests unbinned values
+        separately so discrete profiles retain access to the parent-pixel geometry.
         """
         if psf.convolve_over_sample_size > 1:
-            return grid.over_sampled, blurring_grid.over_sampled, grid.mask
+            return grid, blurring_grid, grid.mask
 
         return grid, blurring_grid, None
 
@@ -208,12 +219,20 @@ class OperateImage:
             )
         )
 
-        image_2d_not_operated = self.image_2d_from(
-            grid=evaluation_grid, xp=xp, operated_only=False
-        )
-        blurring_image_2d_not_operated = self.image_2d_from(
-            grid=evaluation_blurring_grid, xp=xp, operated_only=False
-        )
+        if convolution_mask is not None:
+            image_2d_not_operated = self.image_2d_unbinned_from(
+                grid=evaluation_grid, xp=xp, operated_only=False
+            )
+            blurring_image_2d_not_operated = self.image_2d_unbinned_from(
+                grid=evaluation_blurring_grid, xp=xp, operated_only=False
+            )
+        else:
+            image_2d_not_operated = self.image_2d_from(
+                grid=evaluation_grid, xp=xp, operated_only=False
+            )
+            blurring_image_2d_not_operated = self.image_2d_from(
+                grid=evaluation_blurring_grid, xp=xp, operated_only=False
+            )
 
         blurred_image_2d = self._convolved_from_evaluations(
             image_2d=image_2d_not_operated,
@@ -314,8 +333,8 @@ class OperateImage:
             mask=padded_mask, over_sample_size=over_sample_size
         )
 
-        image_over_sampled = self.image_2d_from(
-            grid=padded_grid.over_sampled, xp=xp, operated_only=False
+        image_over_sampled = self.image_2d_unbinned_from(
+            grid=padded_grid, xp=xp, operated_only=False
         )
 
         convolved = psf.convolved_image_from(
@@ -433,6 +452,13 @@ class OperateImageList(OperateImage):
     def image_2d_list_from(self, grid: aa.Grid2D, operated_only: Optional[bool] = None):
         raise NotImplementedError
 
+    def image_2d_list_unbinned_from(
+        self, grid: aa.Grid2D, operated_only: Optional[bool] = None, xp=np
+    ):
+        return self.image_2d_list_from(
+            grid=grid.over_sampled, operated_only=operated_only, xp=xp
+        )
+
     def blurred_image_2d_list_from(
         self,
         grid: aa.Grid2D,
@@ -468,12 +494,20 @@ class OperateImageList(OperateImage):
             )
         )
 
-        image_2d_not_operated_list = self.image_2d_list_from(
-            grid=evaluation_grid, operated_only=False
-        )
-        blurring_image_2d_not_operated_list = self.image_2d_list_from(
-            grid=evaluation_blurring_grid, operated_only=False
-        )
+        if convolution_mask is not None:
+            image_2d_not_operated_list = self.image_2d_list_unbinned_from(
+                grid=evaluation_grid, operated_only=False
+            )
+            blurring_image_2d_not_operated_list = self.image_2d_list_unbinned_from(
+                grid=evaluation_blurring_grid, operated_only=False
+            )
+        else:
+            image_2d_not_operated_list = self.image_2d_list_from(
+                grid=evaluation_grid, operated_only=False
+            )
+            blurring_image_2d_not_operated_list = self.image_2d_list_from(
+                grid=evaluation_blurring_grid, operated_only=False
+            )
 
         blurred_image_2d_list = []
 
@@ -597,6 +631,13 @@ class OperateImageGalaxies(OperateImageList):
     ) -> Dict[Galaxy, aa.Array2D]:
         raise NotImplementedError
 
+    def galaxy_image_2d_dict_unbinned_from(
+        self, grid: aa.Grid2D, xp=np, operated_only: Optional[bool] = None
+    ):
+        return self.galaxy_image_2d_dict_from(
+            grid=grid.over_sampled, xp=xp, operated_only=operated_only
+        )
+
     def galaxy_blurred_image_2d_dict_from(
         self, grid, psf, blurring_grid, xp=np
     ) -> Dict[Galaxy, aa.Array2D]:
@@ -627,13 +668,22 @@ class OperateImageGalaxies(OperateImageList):
             )
         )
 
-        galaxy_image_2d_not_operated_dict = self.galaxy_image_2d_dict_from(
-            grid=evaluation_grid, operated_only=False, xp=xp
-        )
-
-        galaxy_blurring_image_2d_not_operated_dict = self.galaxy_image_2d_dict_from(
-            grid=evaluation_blurring_grid, operated_only=False, xp=xp
-        )
+        if convolution_mask is not None:
+            galaxy_image_2d_not_operated_dict = self.galaxy_image_2d_dict_unbinned_from(
+                grid=evaluation_grid, operated_only=False, xp=xp
+            )
+            galaxy_blurring_image_2d_not_operated_dict = (
+                self.galaxy_image_2d_dict_unbinned_from(
+                    grid=evaluation_blurring_grid, operated_only=False, xp=xp
+                )
+            )
+        else:
+            galaxy_image_2d_not_operated_dict = self.galaxy_image_2d_dict_from(
+                grid=evaluation_grid, operated_only=False, xp=xp
+            )
+            galaxy_blurring_image_2d_not_operated_dict = self.galaxy_image_2d_dict_from(
+                grid=evaluation_blurring_grid, operated_only=False, xp=xp
+            )
 
         galaxy_image_2d_operated_dict = self.galaxy_image_2d_dict_from(
             grid=grid, operated_only=True, xp=xp

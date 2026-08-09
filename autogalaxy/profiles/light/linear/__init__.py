@@ -1,5 +1,6 @@
 from .abstract import LightProfile, LightProfileLinear, LightProfileLinearObjFuncList
 from .gaussian import Gaussian, GaussianSph
+from .point_source import PointSource
 from .moffat import Moffat, MoffatSph
 from .sersic import Sersic, SersicSph
 from .exponential import Exponential, ExponentialSph
