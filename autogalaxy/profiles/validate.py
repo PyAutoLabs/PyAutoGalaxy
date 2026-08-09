@@ -81,6 +81,42 @@ def validate_sersic_index(sersic_index, name: str = "sersic_index"):
     )
 
 
+def validate_redshift(redshift, name: str = "redshift"):
+    """
+    Raise if a galaxy redshift is a concrete scalar which is negative or non-finite.
+
+    A negative redshift is unphysical and produces meaningless angular diameter
+    distances in every multi-plane calculation that consumes it.
+
+    Zero is permitted: ``redshift=0.0`` is a legitimate way to place a galaxy at the
+    observer, and is used in single-plane work where the redshift is a label rather
+    than a cosmological quantity.
+
+    **This does not touch the ``z_lens > z_source`` question.** Multi-plane lensing
+    genuinely supports geometries that look wrong under two-plane naming, so that
+    case must warn at most, never raise, and is held pending the reporter's answer on
+    PyAutoLens#532.
+
+    Parameters
+    ----------
+    redshift
+        The redshift to validate.
+    name
+        The parameter's name, used in the error message.
+    """
+    validate.validate_non_negative_finite(
+        value=redshift,
+        name=name,
+        extra=(
+            "A redshift is a cosmological distance measure and cannot be negative — "
+            "a negative value yields meaningless angular diameter distances in every "
+            "multi-plane calculation that consumes it. Note that a lens redshift "
+            "above a source redshift is NOT rejected: multi-plane lensing supports "
+            "geometries that look inverted under two-plane naming"
+        ),
+    )
+
+
 def validate_ell_comps(ell_comps, name: str = "ell_comps"):
     """
     Raise if the elliptical components are concrete scalars whose magnitude is not

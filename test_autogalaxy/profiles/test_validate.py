@@ -142,6 +142,48 @@ def test__b12__control__ell_comps_inside_the_unit_circle_still_build(ell_comps):
 
 
 # ======================================================================================
+# Negative redshift (the PyAutoLens#532 half that lives in this repo)
+# ======================================================================================
+#
+# Filed on PyAutoLens#532 because the reporter reached it through `al.Galaxy`, but
+# `al.Galaxy` IS `ag.Galaxy` — the class and its `redshift` assignment live here, so
+# the guard belongs here. The `Tracer(galaxies=...)` half of that issue is in
+# PyAutoLens.
+
+
+@pytest.mark.parametrize("redshift", [-0.5, -1.0, float("nan"), float("inf")])
+def test__galaxy_rejects_a_negative_or_non_finite_redshift(redshift):
+    with pytest.raises(ValueError, match="redshift"):
+        ag.Galaxy(redshift=redshift)
+
+
+def test__control__zero_and_tiny_redshifts_are_still_accepted():
+    """
+    Zero places a galaxy at the observer and is legitimate. `1e-12` was flagged by the
+    reporter as degenerate, but it is not *invalid* — rejecting it would break
+    single-plane work where the redshift is a label, so it stays accepted.
+    """
+    assert ag.Galaxy(redshift=0.0).redshift == 0.0
+    assert ag.Galaxy(redshift=1e-12).redshift == 1e-12
+
+
+def test__control__a_lens_redshift_above_the_source_redshift_still_constructs():
+    """
+    PHASE 4 GUARD-RAIL — deliberately pinning today's permissive behaviour.
+
+    `z_lens > z_source` must NOT raise: multi-plane lensing genuinely supports
+    geometries that look inverted under two-plane naming. Whether it should even
+    *warn* is an open question put to @rhayes777 on PyAutoLens#532. This test exists
+    so that phase 4 cannot quietly turn it into an error.
+    """
+    lens = ag.Galaxy(redshift=1.0, mass=ag.mp.IsothermalSph(einstein_radius=1.0))
+    source = ag.Galaxy(redshift=0.5, bulge=ag.lp.Sersic(intensity=1.0))
+
+    assert lens.redshift == 1.0
+    assert source.redshift == 0.5
+
+
+# ======================================================================================
 # Tracer safety
 # ======================================================================================
 
