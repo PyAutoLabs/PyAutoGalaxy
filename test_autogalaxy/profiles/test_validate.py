@@ -18,7 +18,9 @@ rather than by importing JAX into the library unit tests.
 import numpy as np
 import pytest
 
+import autofit as af
 import autogalaxy as ag
+from autofit.non_linear.fitness import Fitness
 from autogalaxy.profiles import validate
 
 
@@ -44,6 +46,50 @@ class _NotAConcreteScalar:
 
     def __add__(self, other):
         return self
+
+
+@pytest.mark.parametrize(
+    "constructor",
+    [
+        lambda: ag.mp.NFW(scale_radius=0.0),
+        lambda: ag.lp.Sersic(sersic_index=0.0),
+        lambda: ag.lp.Sersic(ell_comps=(1.0, 1.0)),
+        lambda: ag.Galaxy(redshift=-1.0),
+    ],
+)
+def test__invalid_model_parameters_are_value_errors_and_fit_exceptions(constructor):
+    """
+    The same narrow error contract serves direct API calls and model fitting:
+    users see ``ValueError`` while PyAutoFit treats the candidate as resampleable.
+    """
+    with pytest.raises(ag.exc.ModelParameterException) as error:
+        constructor()
+
+    assert isinstance(error.value, ValueError)
+    assert isinstance(error.value, af.exc.FitException)
+
+
+def test__invalid_sampled_profile_is_returned_as_a_resample_figure_of_merit():
+    """Exercise the PyAutoFit boundary that non-linear searches call."""
+
+    class Model:
+        @staticmethod
+        def instance_from_vector(vector, xp):
+            return ag.lp.Sersic(sersic_index=vector[0])
+
+    class Analysis(af.Analysis):
+        @staticmethod
+        def log_likelihood_function(instance):
+            return 1.0
+
+    fitness = Fitness(
+        model=Model(),
+        analysis=Analysis(),
+        resample_figure_of_merit=-1.0e99,
+    )
+
+    assert fitness.call([0.0]) == fitness.resample_figure_of_merit
+    assert fitness.call([1.0]) == 1.0
 
 
 # ======================================================================================

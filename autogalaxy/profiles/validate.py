@@ -24,6 +24,7 @@ nothing inside a trace.
 import numpy as np
 
 from autoarray import validate
+from autogalaxy import exc
 
 
 def validate_scale_radius(scale_radius, name: str = "scale_radius"):
@@ -45,6 +46,7 @@ def validate_scale_radius(scale_radius, name: str = "scale_radius"):
     validate.validate_positive_finite(
         value=scale_radius,
         name=name,
+        exc_type=exc.ModelParameterException,
         extra=(
             "The scale radius is the angular radius at which the halo's log-slope "
             "changes, so it must be above zero. A value of 0.0 divides the grid by "
@@ -72,6 +74,7 @@ def validate_sersic_index(sersic_index, name: str = "sersic_index"):
     validate.validate_positive_finite(
         value=sersic_index,
         name=name,
+        exc_type=exc.ModelParameterException,
         extra=(
             "The Sersic index controls the concentration of the profile and appears "
             "as a divisor in its normalisation, so it must be above zero. A value of "
@@ -107,6 +110,7 @@ def validate_redshift(redshift, name: str = "redshift"):
     validate.validate_non_negative_finite(
         value=redshift,
         name=name,
+        exc_type=exc.ModelParameterException,
         extra=(
             "A redshift is a cosmological distance measure and cannot be negative — "
             "a negative value yields meaningless angular diameter distances in every "
@@ -152,7 +156,7 @@ def validate_ell_comps(ell_comps, name: str = "ell_comps"):
     magnitude_squared = ell_y * ell_y + ell_x * ell_x
 
     if not np.isfinite(magnitude_squared) or magnitude_squared >= 1.0:
-        raise ValueError(
+        raise exc.ModelParameterException(
             f"{name} must satisfy {name}[0]**2 + {name}[1]**2 < 1; got "
             f"{tuple(ell_comps)!r}, whose magnitude is "
             f"{np.sqrt(magnitude_squared) if np.isfinite(magnitude_squared) else magnitude_squared!r}. "
