@@ -13,6 +13,18 @@ class ProfileException(Exception):
     pass
 
 
+class ModelParameterException(ValueError, af.exc.FitException):
+    """
+    Raised when a concrete model parameter is outside its physical domain.
+
+    Direct profile construction remains a conventional ``ValueError`` for users,
+    while PyAutoFit can recognize the same failure as a ``FitException`` and reject
+    that candidate instead of terminating a non-linear search.
+    """
+
+    pass
+
+
 class GalaxyException(Exception):
     """
     Raises exceptions associated with the `galaxy` module and `Galaxy` class.
