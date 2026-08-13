@@ -12,6 +12,7 @@ class MockResult(af.m.MockResult):
     def __init__(
         self,
         samples: mock.MockSamples = None,
+        samples_summary: af.m.MockSamplesSummary = None,
         instance: af.Instance = None,
         model: af.Model = None,
         analysis: mock.MockAnalysis = None,
@@ -21,6 +22,7 @@ class MockResult(af.m.MockResult):
     ):
         super().__init__(
             samples=samples,
+            samples_summary=samples_summary,
             instance=instance,
             model=model,
             analysis=analysis,
