@@ -59,3 +59,33 @@ def test__image_2d_from__spherical_profile__matches_elliptical_with_zero_ellipti
     image_spherical = spherical.image_2d_from(grid=grid)
 
     assert image_elliptical.array == pytest.approx(image_spherical.array, 1.0e-4)
+
+
+@pytest.mark.parametrize(
+    "ell_comps",
+    [(0.0, 0.0), (0.18, 0.22), (-0.31, 0.14), (0.0, 0.9995)],
+)
+def test__image_2d_from__cartesian_radii_match_transformed_reference_frame(
+    ell_comps,
+):
+    profile = ag.lp.Sersic(
+        centre=(0.07, -0.11),
+        ell_comps=ell_comps,
+        intensity=1.3,
+        effective_radius=0.8,
+        sersic_index=2.2,
+    )
+    grid = ag.Grid2DIrregular(
+        [[0.13, -0.22], [0.51, 0.37], [-0.42, 0.81], [1.2, -0.63]]
+    )
+
+    transformed_grid = profile.transformed_to_reference_frame_grid_from(grid=grid)
+    transformed_grid.is_transformed = True
+
+    image = profile.image_2d_from(grid=grid)
+    image_via_transformed_grid = profile.image_2d_from(grid=transformed_grid)
+
+    assert image.array == pytest.approx(
+        image_via_transformed_grid.array, rel=2.0e-12, abs=2.0e-12
+    )
+

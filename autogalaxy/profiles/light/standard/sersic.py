@@ -166,10 +166,46 @@ class Sersic(AbstractSersic, LightProfile):
             ),
         )
 
+    @aa.decorators.to_array
+    def _eccentric_radii_grid_from_cartesian(
+        self, grid: aa.type.Grid2DLike, xp=np, **kwargs
+    ) -> np.ndarray:
+        """Return eccentric radii without converting ``ell_comps`` to polar form."""
+        ell_comps_y, ell_comps_x = self.ell_comps
+        ell_comps_norm = xp.sqrt(
+            xp.maximum(
+                xp.add(xp.square(ell_comps_y), xp.square(ell_comps_x)),
+                1.0e-12,
+            )
+        )
+        ell_comps_scale = xp.minimum(1.0, 0.999 / ell_comps_norm)
+
+        ell_comps_y = xp.multiply(ell_comps_y, ell_comps_scale)
+        ell_comps_x = xp.multiply(ell_comps_x, ell_comps_scale)
+        ell_comps_norm_squared = xp.add(xp.square(ell_comps_y), xp.square(ell_comps_x))
+
+        y = xp.add(grid.array[:, 0], -self.centre[0])
+        x = xp.add(grid.array[:, 1], -self.centre[1])
+
+        numerator = xp.add(
+            xp.multiply(
+                xp.add(1.0 + ell_comps_norm_squared, -2.0 * ell_comps_x),
+                xp.square(x),
+            ),
+            xp.add(
+                xp.multiply(-4.0 * ell_comps_y, xp.multiply(x, y)),
+                xp.multiply(
+                    xp.add(1.0 + ell_comps_norm_squared, 2.0 * ell_comps_x),
+                    xp.square(y),
+                ),
+            ),
+        )
+
+        return xp.sqrt(xp.divide(numerator, 1.0 - ell_comps_norm_squared))
+
     @aa.over_sample
     @aa.decorators.to_array
     @check_operated_only
-    @aa.decorators.transform
     def image_2d_from(
         self,
         grid: aa.type.Grid2DLike,
@@ -194,7 +230,12 @@ class Sersic(AbstractSersic, LightProfile):
             The image of the Sersic evaluated at every (y,x) coordinate on the transformed grid.
         """
 
-        grid_radii = self.eccentric_radii_grid_from(grid=grid, xp=xp, **kwargs)
+        if getattr(grid, "is_transformed", False):
+            grid_radii = self.eccentric_radii_grid_from(grid=grid, xp=xp, **kwargs)
+        else:
+            grid_radii = self._eccentric_radii_grid_from_cartesian(
+                grid=grid, xp=xp, **kwargs
+            )
 
         return self.image_2d_via_radii_from(grid_radii=grid_radii, xp=xp, **kwargs)
 
