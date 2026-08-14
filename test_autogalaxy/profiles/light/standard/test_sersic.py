@@ -60,6 +60,7 @@ def test__image_2d_from__spherical_profile__matches_elliptical_with_zero_ellipti
 
     assert image_elliptical.array == pytest.approx(image_spherical.array, 1.0e-4)
 
+
 @pytest.mark.parametrize(
     "ell_comps",
     [(0.0, 0.0), (0.18, 0.22), (-0.31, 0.14), (0.0, 0.9995)],
