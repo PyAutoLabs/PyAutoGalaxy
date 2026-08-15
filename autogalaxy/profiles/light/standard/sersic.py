@@ -25,6 +25,7 @@ from autogalaxy.profiles.light.abstract import LightProfile
 from autogalaxy.profiles.light.decorators import (
     check_operated_only,
 )
+from autogalaxy import convert
 from autogalaxy.profiles import validate
 
 
@@ -178,7 +179,9 @@ class Sersic(AbstractSersic, LightProfile):
                 1.0e-12,
             )
         )
-        ell_comps_scale = xp.minimum(1.0, 0.999 / ell_comps_norm)
+        ell_comps_scale = xp.minimum(
+            1.0, convert.ELL_COMPS_MAGNITUDE_CLAMP / ell_comps_norm
+        )
 
         ell_comps_y = xp.multiply(ell_comps_y, ell_comps_scale)
         ell_comps_x = xp.multiply(ell_comps_x, ell_comps_scale)

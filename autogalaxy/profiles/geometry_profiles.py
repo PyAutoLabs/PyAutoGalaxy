@@ -237,6 +237,33 @@ class EllProfile(SphProfile):
         validate.validate_ell_comps(ell_comps=ell_comps)
         self.ell_comps = ell_comps
 
+    def __model_constraint__(self, xp=np):
+        """
+        How far beyond the ellipticity clamp this profile's `ell_comps` sit.
+
+        Zero inside the valid region, growing with the distance outside it. This
+        is the traced counterpart of the `validate_ell_comps` guard called in
+        `__init__` above: that guard states the same geometry but signals by
+        raising, which works only for concrete scalars — under a JAX trace the
+        condition is a tracer and a `raise` is impossible, so it returns early
+        (`validate.py:153-154`). PyAutoFit consumes this on the traced path
+        instead, to count multi-start lanes trapped where the clamp has removed
+        the radial gradient.
+
+        Two thresholds are in play and this one is deliberately the clamp's, not
+        the guard's. The guard rejects magnitude >= 1.0, where the geometry stops
+        meaning anything; the clamp saturates at 0.999, where the *gradient*
+        dies. The annulus between them is reachable and is exactly where a
+        gradient search sticks while still passing validation, so keying this to
+        the guard's threshold would miss it.
+
+        Returns a distance rather than a boolean so a future penalty term can use
+        the value directly — it carries a usable gradient back toward the valid
+        region, which a boolean would not.
+        """
+        magnitude = xp.sqrt(self.ell_comps[0] ** 2 + self.ell_comps[1] ** 2)
+        return xp.maximum(magnitude - convert.ELL_COMPS_MAGNITUDE_CLAMP, 0.0)
+
     def axis_ratio(self, xp=np) -> float:
         """
         The ratio of the minor-axis to major-axis (b/a) of the ellipse defined by profile (0.0 > q > 1.0).
