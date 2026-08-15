@@ -1,6 +1,21 @@
 import numpy as np
 from typing import Tuple, Optional
 
+# The ellipticity magnitude at which the axis-ratio conversion saturates. Beyond
+# it every magnitude maps onto the same axis ratio, so the likelihood is exactly
+# flat in the radial direction and carries no gradient there — a gradient search
+# that walks past this cannot walk back. `EllProfile.__model_constraint__`
+# reports the distance beyond it, which is how PyAutoFit's multi-start searches
+# count the lanes trapped in that region.
+#
+# Deliberately distinct from the `magnitude_squared >= 1.0` validity threshold in
+# `profiles/validate.py`. They answer different questions — this is where the
+# *gradient* dies, that is where the *geometry* stops meaning anything — and the
+# annulus between them is reachable: at magnitude 0.9995 the radial derivative is
+# already exactly zero while `validate_ell_comps` still calls the point valid.
+# Stated together here rather than left as unrelated literals in separate files.
+ELL_COMPS_MAGNITUDE_CLAMP = 0.999
+
 
 def ell_comps_from(axis_ratio: float, angle: float, xp=np) -> Tuple[float, float]:
     """
@@ -72,9 +87,9 @@ def axis_ratio_and_angle_from(
     if xp.__name__.startswith("jax"):
         import jax
 
-        fac = jax.lax.min(fac, 0.999)
+        fac = jax.lax.min(fac, ELL_COMPS_MAGNITUDE_CLAMP)
     else:  # NumPy
-        fac = np.minimum(fac, 0.999)
+        fac = np.minimum(fac, ELL_COMPS_MAGNITUDE_CLAMP)
 
     axis_ratio = (1 - fac) / (1 + fac)
     return axis_ratio, angle
