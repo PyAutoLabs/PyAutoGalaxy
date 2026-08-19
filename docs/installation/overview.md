@@ -2,7 +2,7 @@
 
 # Overview
 
-**PyAutoGalaxy** requires Python 3.12 - 3.13 and supports the Linux, MacOS and Windows operating systems.
+**PyAutoGalaxy** requires Python 3.12 or later and supports the Linux, MacOS and Windows operating systems.
 
 **PyAutoGalaxy** can be installed via the Python distribution [Anaconda](https://www.anaconda.com/) or using
 [PyPI](https://pypi.org/) to `pip install autogalaxy` into your Python distribution.
