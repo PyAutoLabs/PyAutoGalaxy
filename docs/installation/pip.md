@@ -24,14 +24,16 @@ The latest version of **PyAutoGalaxy** is installed via pip as follows (specifyi
 the installation has clean dependencies):
 
 ```bash
-pip install autogalaxy[jax]
+pip install autogalaxy
 ```
 
-The `[jax]` extra installs \[**JAX**\](<https://docs.jax.dev/en/latest/notebooks/thinking_in_jax.html>), which
-**PyAutoGalaxy** uses for just-in-time compilation and GPU acceleration. **JAX is not installed by default** — a
-plain `pip install autogalaxy` gives a fully working install that runs on NumPy, without JAX acceleration. The
-extra installs CPU-only JAX; for GPU support, follow the official
+This installs \[**JAX**\](<https://docs.jax.dev/en/latest/notebooks/thinking_in_jax.html>) by default, which
+**PyAutoGalaxy** uses for just-in-time compilation and GPU acceleration (the older
+`pip install autogalaxy[jax]` command still works and installs the same thing). The default install is CPU-only
+JAX; for GPU support, follow the official
 \[JAX installation guide\](<https://jax.readthedocs.io/en/latest/installation.html>) **before** installing.
+On Intel (x86_64) macOS, where JAX publishes no wheels, the install automatically excludes JAX and runs on
+the slower NumPy path — a warning is printed at import to make this clear.
 
 If pip prints warnings about dependency version conflicts, these can usually be ignored — the instructions below
 will identify clearly if the installation is a success.

@@ -24,15 +24,16 @@ classifiers = [
 ]
 keywords = ["cli"]
 dependencies = [
-    # Floors, not pins. Without them, pip backtracking the extras chain
-    # (autogalaxy[jax] -> autofit[jax] -> autonerves[jax]) may walk the release
-    # history to 2022: "version X does not provide the extra 'jax'" is a pip
-    # *warning*, not an error, so a pre-extras release is a legal solution.
-    # PyAutoLens#687.
+    # Floors, not pins (PyAutoLens#687) — bump to the first release with JAX
+    # in the family's base dependencies once it exists (PyAutoLens#702), so
+    # backtracking cannot pair this autogalaxy with a jax-optional chain.
     "autofit>=2026.7.29.2",
     "autoarray>=2026.7.29.2",
     "astropy>=5.0",
-    "nautilus-sampler==1.0.5"
+    "nautilus-sampler==1.0.5",
+    # Marker-gated like the jax deps in autonerves (jax_zero_contour depends
+    # on jax, which has no wheels on Intel macOS). PyAutoLens#702.
+    'jax_zero_contour>=2.0.0,<3.0.0; sys_platform != "darwin" or platform_machine == "arm64"'
 ]
 
 [project.urls]
@@ -50,15 +51,9 @@ local_scheme = "no-local-version"
 
 
 [project.optional-dependencies]
-jax = [
-    # autofit[jax] rather than autonerves[jax] directly: it supplies everything
-    # autonerves[jax] does *plus* optax, which autofit's JAX-native gradient MAP
-    # searches (MultiStartAdam / MultiStartProdigy) import. Without it the chain
-    # autolens[jax] -> autogalaxy[jax] stopped at autonerves[jax], so `pip
-    # install autolens[jax]` left those searches raising ImportError.
-    "autofit[jax]>=2026.7.29.2",
-    "jax_zero_contour>=2.0.0,<3.0.0"
-]
+# JAX moved into the base dependencies (PyAutoLens#702). Kept as a declared
+# no-op so `pip install autogalaxy[jax]` keeps resolving (PyAutoLens#687).
+jax = []
 optional = [
     "autogalaxy[jax]",
     "numba",
