@@ -357,8 +357,10 @@ def _critical_curves_method():
         except ImportError:
             logger.warning(
                 "critical_curves_method='zero_contour' requested, but "
-                "jax_zero_contour is not installed. Install autogalaxy[jax] "
-                "to use this method. Falling back to 'marching_squares'."
+                "jax_zero_contour is not installed. It is a default dependency "
+                "except on platforms without JAX wheels (e.g. Intel macOS); "
+                "install it with `pip install jax_zero_contour` to use this "
+                "method. Falling back to 'marching_squares'."
             )
             return "marching_squares"
 
