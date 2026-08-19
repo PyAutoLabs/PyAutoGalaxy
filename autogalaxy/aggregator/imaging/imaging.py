@@ -13,6 +13,8 @@ Two public objects are provided:
 - ``ImagingAgg`` — a class wrapping an ``Aggregator`` that returns a lazy generator of
   ``Imaging`` datasets, avoiding loading all results into memory at once.
 """
+
+from __future__ import annotations
 from functools import partial
 from typing import List
 

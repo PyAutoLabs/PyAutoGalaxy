@@ -15,6 +15,8 @@ Two public objects are provided:
   generator of ``Interferometer`` datasets, avoiding loading all results into memory at
   once.
 """
+
+from __future__ import annotations
 from functools import partial
 from typing import List
 
