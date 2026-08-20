@@ -76,3 +76,5 @@ Information on how to cite **PyAutoGalaxy** in publications can be found [on the
 Information on how to contribute to **PyAutoGalaxy** can be found [on the contributing page](https://github.com/PyAutoLabs/PyAutoGalaxy/blob/main/CONTRIBUTING.md).
 
 Hands on support for contributions is available via our Slack workspace, again please email to request an invite.
+
+<sub><i><a href="https://open.spotify.com/track/3i9QKRl5Ql3pgUfNdYBVTc">glow</a></i></sub>
