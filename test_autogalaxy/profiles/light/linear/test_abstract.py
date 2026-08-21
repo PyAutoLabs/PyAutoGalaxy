@@ -79,6 +79,28 @@ def test__operated_mapping_matrix__columns_match_individual_blurred_images(
     ] == pytest.approx(lp_1_blurred_image.array, 1.0e-4)
 
 
+def test__operated_mapping_matrix_override__psf_none_returns_none(
+    grid_2d_7x7, blurring_grid_2d_7x7
+):
+    lp_linear_obj_func_list = LightProfileLinearObjFuncList(
+        grid=grid_2d_7x7,
+        blurring_grid=blurring_grid_2d_7x7,
+        psf=None,
+        light_profile_list=[ag.lp_linear.Sersic(effective_radius=1.0)],
+    )
+
+    assert lp_linear_obj_func_list.operated_mapping_matrix_override is None
+
+    lp_linear_obj_func_list_operated = LightProfileLinearObjFuncList(
+        grid=grid_2d_7x7,
+        blurring_grid=blurring_grid_2d_7x7,
+        psf=None,
+        light_profile_list=[ag.lp_linear_operated.Gaussian()],
+    )
+
+    assert lp_linear_obj_func_list_operated.operated_mapping_matrix_override is None
+
+
 def test__lp_instance_from__returns_non_linear_instance_with_correct_type_and_centre():
     lp_linear = ag.lp_linear.Sersic(centre=(1.0, 2.0))
 
