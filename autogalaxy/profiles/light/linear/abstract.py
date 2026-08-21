@@ -336,6 +336,13 @@ class LightProfileLinearObjFuncList(aa.AbstractLinearObjFuncList):
         performed in the linear equation solvers.
         """
 
+        if self.psf is None:
+            # Interferometer fits construct this object with `psf=None`: the override below is
+            # image-space and PSF-based, whereas an interferometer override must be in visibility
+            # space, so `None` keeps the standard mapping_matrix -> transformer inversion path
+            # (which is correct for both ordinary and operated light profiles).
+            return None
+
         if isinstance(self.light_profile_list[0], LightProfileOperated):
             return self.mapping_matrix
 
