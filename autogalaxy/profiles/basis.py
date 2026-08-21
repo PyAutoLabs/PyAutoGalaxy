@@ -159,9 +159,13 @@ class Basis(LightProfile, MassProfile):
                 )
             elif kwargs.get("binned", True) is False:
                 image_2d_list.append(xp.zeros((grid.over_sampled.shape[0],)))
-            else:
+            elif isinstance(grid, aa.Grid2D):
                 image_2d_list.append(
                     aa.Array2D(values=xp.zeros((grid.shape[0],)), mask=grid.mask)
+                )
+            else:
+                image_2d_list.append(
+                    aa.ArrayIrregular(values=xp.zeros((grid.shape[0],)))
                 )
 
         return image_2d_list
