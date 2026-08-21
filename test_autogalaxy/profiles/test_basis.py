@@ -61,6 +61,25 @@ def test__image_2d_from__returns_array2d_for_linear_only_basis(grid_2d_7x7):
     assert isinstance(image, aa.Array2D)
 
 
+def test__image_2d_from__grid_2d_irregular__linear_profile_placeholder_has_no_mask():
+    # Regression test: the linear-intensity-unknown placeholder used to be built as
+    # `Array2D(..., mask=grid.mask)`, which raised `AttributeError: Grid2DIrregular
+    # does not have attribute mask` whenever a basis containing a linear light
+    # profile was evaluated on an irregular grid (as JIT-traced likelihood paths do).
+    grid = aa.Grid2DIrregular(values=[(1.0, 1.0), (2.0, 2.0), (3.0, 3.0)])
+
+    lp = ag.lp.Sersic(intensity=0.1)
+    lp_linear = ag.lp_linear.Sersic(effective_radius=2.0, sersic_index=2.0)
+
+    basis = ag.lp_basis.Basis(profile_list=[lp, lp_linear])
+
+    image = basis.image_2d_from(grid=grid)
+
+    assert isinstance(image, aa.ArrayIrregular)
+    assert image.shape == (3,)
+    assert image == pytest.approx(np.asarray(lp.image_2d_from(grid=grid)), 1.0e-8)
+
+
 def test__image_2d_from__operated_only_false__returns_only_non_operated_profile_image(
     grid_2d_7x7, lp_0, lp_operated_0
 ):
