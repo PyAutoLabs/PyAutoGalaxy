@@ -1,5 +1,12 @@
 {
-    "rectangular.RectangularAdaptDensity": {
+    "Voronoi": {
+        "pixels": {
+            "type": "Uniform",
+            "lower_limit": 0.0,
+            "upper_limit": 1.0
+        }
+    },
+    "rectangular_bilinear_adapt_density.RectangularBilinearAdaptDensity": {
         "shape_0": {
             "type": "Uniform",
             "lower_limit": 10.0,
@@ -11,11 +18,16 @@
             "upper_limit": 30.0
         }
     },
-    "Voronoi": {
-        "pixels": {
+    "rectangular_rtu_adapt_density.RectangularRTUAdaptDensity": {
+        "shape_0": {
             "type": "Uniform",
-            "lower_limit": 0.0,
-            "upper_limit": 1.0
+            "lower_limit": 10.0,
+            "upper_limit": 30.0
+        },
+        "shape_1": {
+            "type": "Uniform",
+            "lower_limit": 10.0,
+            "upper_limit": 30.0
         }
     }
 }

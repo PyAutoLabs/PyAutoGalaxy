@@ -49,7 +49,10 @@ Mesh [ag.mesh]
    :template: custom-class-template.rst
    :recursive:
 
-   RectangularAdaptDensity
+   RectangularBilinearAdaptDensity
+   RectangularBilinearAdaptImage
+   RectangularRTUAdaptDensity
+   RectangularRTUAdaptImage
    Delaunay
 
 Regularization [ag.reg]
