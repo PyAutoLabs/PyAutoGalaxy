@@ -90,7 +90,7 @@ be passed through `Operator` objects to apply a 2D convolution or Fast Fourier T
 the `Galaxy`'s image to an imaging or interferometer dataset. The `inversion` package contains a range of non-parametric
 models which fit a galaxy's light using a Bayesian linear matrix inversion. The `astropy` cosmology module is
 used to handle unit conversions and calculations are optimized using the packages `NumPy` [@numpy], `numba` [@numba]
-and `PyNUFFT` [@pynufft].
+and `nufftax` [@nufftax].
 
 ```python
 import autogalaxy as ag
