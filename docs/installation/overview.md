@@ -54,4 +54,4 @@ our [building from source installation guide](https://pyautogalaxy.readthedocs.i
 
 And the following optional dependencies:
 
-**pynufft**: <https://github.com/jyhmiinlin/pynufft>
+**nufftax**: <https://github.com/GragasLab/nufftax>

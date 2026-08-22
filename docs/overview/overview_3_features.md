@@ -34,7 +34,7 @@ Modeling interferometer data from submillimeter (e.g. ALMA) and radio (e.g. LOFA
 
 Visibilities data is fitted directly in the uv-plane, circumventing issues that arise when fitting a dirty image
 such as correlated noise. This uses the non-uniform fast fourier transform algorithm
-\[PyNUFFT\](<https://github.com/jyhmiinlin/pynufft>) to efficiently map the galaxy model images to the uv-plane.
+\[nufftax\](<https://github.com/GragasLab/nufftax>) to efficiently map the galaxy model images to the uv-plane.
 
 Checkout the `autogalaxy_workspace/*/interferometer` package to get started.
 
