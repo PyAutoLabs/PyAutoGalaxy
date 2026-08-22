@@ -27,8 +27,8 @@ dependencies = [
     # Floors, not pins (PyAutoLens#687) — bump to the first release with JAX
     # in the family's base dependencies once it exists (PyAutoLens#702), so
     # backtracking cannot pair this autogalaxy with a jax-optional chain.
-    "autofit>=2026.7.29.2",
-    "autoarray>=2026.7.29.2",
+    "autofit>=2026.8.22.1",
+    "autoarray>=2026.8.22.1",
     "astropy>=5.0",
     "nautilus-sampler==1.0.5",
     # Marker-gated like the jax deps in autonerves (jax_zero_contour depends
