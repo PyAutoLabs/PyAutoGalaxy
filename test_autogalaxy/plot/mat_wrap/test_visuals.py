@@ -38,7 +38,7 @@ def test__2d__caustics_from_mass_obj(gal_x1_mp, grid_2d_7x7):
 
 def test__mass_plotter__tangential_critical_curves(gal_x1_mp, grid_2d_7x7):
     import numpy as np
-    from autogalaxy.plot.plot_utils import _critical_curves_from
+    from autogalaxy.util.plot_utils import _critical_curves_from
 
     tc, rc = _critical_curves_from(gal_x1_mp, grid_2d_7x7)
 
