@@ -36,7 +36,7 @@ def _check_no_linear(galaxies):
 def _galaxies_critical_curves(galaxies, grid, tc=None, rc=None):
     """Return the tangential and radial critical curves for a set of galaxies.
 
-    Thin wrapper around :func:`~autogalaxy.plot.plot_utils._critical_curves_from`
+    Thin wrapper around :func:`~autogalaxy.util.plot_utils._critical_curves_from`
     that keeps the galaxies-plot API decoupled from the utility layer.
 
     Parameters

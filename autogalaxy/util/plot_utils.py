@@ -419,7 +419,6 @@ def _critical_curves_from(mass_obj, grid, tc=None, rc=None):
 
     The algorithm used when *tc* is ``None`` is controlled by
     ``general.critical_curves_method`` in ``visualize/general.yaml``:
-/btw ok
     - ``"zero_contour"`` *(default)* — uses ``jax_zero_contour``; no dense
       grid needed, seed points found automatically via a coarse grid scan.
     - ``"marching_squares"`` — evaluates eigen values on the full *grid* and
