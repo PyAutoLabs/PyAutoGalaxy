@@ -50,15 +50,15 @@ environment with all the required dependencies already installed.
 This is a great way to get started quickly without needing to install **PyAutoGalaxy** on your own machine,
 so you can check it is the right software for you before going through the installation process:
 
-- [imaging/start_here.ipynb](https://colab.research.google.com/github/PyAutoLabs/autogalaxy_workspace/blob/2026.8.20.1/notebooks/imaging/start_here.ipynb):
+- [imaging/start_here.ipynb](https://colab.research.google.com/github/PyAutoLabs/autogalaxy_workspace/blob/2026.8.22.1/notebooks/imaging/start_here.ipynb):
   Galaxy modeling with CCD imaging (e.g. Hubble, James Webb, ground-based telescopes).
-- [interferometer/start_here.ipynb](https://colab.research.google.com/github/PyAutoLabs/autogalaxy_workspace/blob/2026.8.20.1/notebooks/interferometer/start_here.ipynb):
+- [interferometer/start_here.ipynb](https://colab.research.google.com/github/PyAutoLabs/autogalaxy_workspace/blob/2026.8.22.1/notebooks/interferometer/start_here.ipynb):
   Galaxy modeling with interferometer data (e.g. ALMA), fitting directly in the uv-plane.
-- [multi_band/start_here.ipynb](https://colab.research.google.com/github/PyAutoLabs/autogalaxy_workspace/blob/2026.8.20.1/notebooks/multi_dataset/start_here.ipynb):
+- [multi_band/start_here.ipynb](https://colab.research.google.com/github/PyAutoLabs/autogalaxy_workspace/blob/2026.8.22.1/notebooks/multi_dataset/start_here.ipynb):
   Multi-band galaxy modeling to study colour gradients and wavelength-dependent structure.
-- [multi_galaxy/start_here.ipynb](https://colab.research.google.com/github/PyAutoLabs/autogalaxy_workspace/blob/2026.8.20.1/notebooks/multi_galaxy/start_here.ipynb):
+- [multi_galaxy/start_here.ipynb](https://colab.research.google.com/github/PyAutoLabs/autogalaxy_workspace/blob/2026.8.22.1/notebooks/multi_galaxy/start_here.ipynb):
   Blended multi-galaxy systems — one free light model per galaxy, fitted simultaneously.
-- [cluster/start_here.ipynb](https://colab.research.google.com/github/PyAutoLabs/autogalaxy_workspace/blob/2026.8.20.1/notebooks/cluster/start_here.ipynb):
+- [cluster/start_here.ipynb](https://colab.research.google.com/github/PyAutoLabs/autogalaxy_workspace/blob/2026.8.22.1/notebooks/cluster/start_here.ipynb):
   Cluster fields — a BCG plus a catalogue-driven member population.
 
 ## Still Unsure?
