@@ -133,13 +133,17 @@ def norm_from(array, use_log10=False, vmin=None, vmax=None):
     ``plot_*`` functions do, without needing a plotter object that the public
     namespaces no longer export.
 
-    The behaviour mirrors the normalisation applied inside
-    ``autoarray.plot.array.plot_array``.
+    The behaviour is not defined here: this is a thin delegate to
+    ``autoarray.plot.utils.norm_from``, the one implementation every PyAuto
+    colour scale is built from. It used to be a third copy of that logic, and
+    the copies had diverged — see the autoarray helper's docstring for the
+    behaviour and for which divergence was resolved which way. Only the name
+    is autogalaxy's, so the GUI callers keep working.
 
     Parameters
     ----------
     array
-        The image being normalised. Only read when *use_log10* is ``True`` and
+        The values being coloured. Only read when *use_log10* is ``True`` and
         no explicit *vmax* is given.
     use_log10
         When ``True`` a ``LogNorm`` is applied, with values clipped at the
@@ -152,36 +156,9 @@ def norm_from(array, use_log10=False, vmin=None, vmax=None):
     -------
     matplotlib.colors.Normalize or None
     """
-    if use_log10:
-        try:
-            from autonerves import conf as _conf
+    from autoarray.plot.utils import norm_from as _norm_from
 
-            log10_min = _conf.instance["visualize"]["general"]["general"][
-                "log10_min_value"
-            ]
-        except Exception:
-            log10_min = 1.0e-4
-
-        clipped = np.clip(array, log10_min, None)
-        vmin_log = vmin if (vmin is not None and np.isfinite(vmin)) else log10_min
-        if vmax is not None and np.isfinite(vmax):
-            vmax_log = vmax
-        else:
-            with np.errstate(all="ignore"):
-                vmax_log = np.nanmax(clipped)
-        if not np.isfinite(vmax_log) or vmax_log <= vmin_log:
-            vmax_log = vmin_log * 10.0
-
-        from matplotlib.colors import LogNorm
-
-        return LogNorm(vmin=vmin_log, vmax=vmax_log)
-
-    if vmin is not None or vmax is not None:
-        from matplotlib.colors import Normalize
-
-        return Normalize(vmin=vmin, vmax=vmax)
-
-    return None
+    return _norm_from(array=array, use_log10=use_log10, vmin=vmin, vmax=vmax)
 
 
 def _resolve_format(output_format):
