@@ -9,6 +9,9 @@ class Scribbler:
         image,
         segment_names=None,
         cmap=None,
+        norm=None,
+        vmin=None,
+        vmax=None,
         brush_width=0.05,
         backend="TkAgg",
         mask_overlay=None,
@@ -22,6 +25,19 @@ class Scribbler:
         the gui folder for a description.
 
         This script is Adapted from https://gist.github.com/brikeats/4f63f867fd8ea0f196c78e9b835150ab
+
+        Parameters
+        ----------
+        cmap
+            The colormap name, e.g. ``"jet"``. ``None`` or ``"default"`` uses
+            the configured default. A legacy ``Cmap``-style object exposing
+            ``norm_from`` is still accepted and takes precedence over the
+            *norm* / *vmin* / *vmax* arguments below.
+        norm
+            ``"log"`` for a logarithmic colour scale, ``"linear"`` (or ``None``)
+            otherwise.
+        vmin, vmax
+            Explicit colour-scale limits.
         """
 
         if extent is not None:
@@ -74,12 +90,30 @@ class Scribbler:
             plt.imshow(rgb_image, origin=_conf_imshow_origin())
         self.ax = self.figure.add_subplot(111)
 
-        if cmap is None:
+        if cmap is None and norm is None and vmin is None and vmax is None:
             plt.imshow(image, interpolation="none", origin=_conf_imshow_origin())
+        elif hasattr(cmap, "norm_from"):
+            # Legacy `Cmap`-style object. The public plot namespaces no longer
+            # export one, but a caller holding an instance still works.
+            mpl_norm = cmap.norm_from(array=image)
+            cmap_name = getattr(cmap, "cmap_name", None) or cmap.config_dict.get(
+                "cmap", "viridis"
+            )
+            plt.imshow(
+                image, cmap=cmap_name, norm=mpl_norm, origin=_conf_imshow_origin()
+            )
         else:
-            norm = cmap.norm_from(array=image)
-            cmap_name = getattr(cmap, "cmap_name", None) or cmap.config_dict.get("cmap", "viridis")
-            plt.imshow(image, cmap=cmap_name, norm=norm, origin=_conf_imshow_origin())
+            from autogalaxy.util.plot_utils import _resolve_colormap, norm_from
+
+            mpl_norm = norm_from(
+                array=image, use_log10=norm == "log", vmin=vmin, vmax=vmax
+            )
+            plt.imshow(
+                image,
+                cmap=_resolve_colormap(cmap),
+                norm=mpl_norm,
+                origin=_conf_imshow_origin(),
+            )
 
         if mask_overlay is not None:
             grid = mask_overlay.derive_grid.edge

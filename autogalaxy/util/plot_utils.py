@@ -102,6 +102,66 @@ def _resolve_colormap(colormap):
     return colormap
 
 
+def norm_from(array, use_log10=False, vmin=None, vmax=None):
+    """Build the matplotlib colour norm for *array* from flat arguments.
+
+    This is the flat-API replacement for the removed ``Cmap`` object's
+    ``norm_from`` method. It exists so that code drawing its own axes — the
+    ``Clicker`` and ``Scribbler`` GUIs — scales colour the same way the
+    ``plot_*`` functions do, without needing a plotter object that the public
+    namespaces no longer export.
+
+    The behaviour mirrors the normalisation applied inside
+    ``autoarray.plot.array.plot_array``.
+
+    Parameters
+    ----------
+    array
+        The image being normalised. Only read when *use_log10* is ``True`` and
+        no explicit *vmax* is given.
+    use_log10
+        When ``True`` a ``LogNorm`` is applied, with values clipped at the
+        configured ``log10_min_value`` floor.
+    vmin, vmax
+        Explicit colour-scale limits. When both are ``None`` and *use_log10* is
+        ``False``, ``None`` is returned and matplotlib applies its own default.
+
+    Returns
+    -------
+    matplotlib.colors.Normalize or None
+    """
+    if use_log10:
+        try:
+            from autonerves import conf as _conf
+
+            log10_min = _conf.instance["visualize"]["general"]["general"][
+                "log10_min_value"
+            ]
+        except Exception:
+            log10_min = 1.0e-4
+
+        clipped = np.clip(array, log10_min, None)
+        vmin_log = vmin if (vmin is not None and np.isfinite(vmin)) else log10_min
+        if vmax is not None and np.isfinite(vmax):
+            vmax_log = vmax
+        else:
+            with np.errstate(all="ignore"):
+                vmax_log = np.nanmax(clipped)
+        if not np.isfinite(vmax_log) or vmax_log <= vmin_log:
+            vmax_log = vmin_log * 10.0
+
+        from matplotlib.colors import LogNorm
+
+        return LogNorm(vmin=vmin_log, vmax=vmax_log)
+
+    if vmin is not None or vmax is not None:
+        from matplotlib.colors import Normalize
+
+        return Normalize(vmin=vmin, vmax=vmax)
+
+    return None
+
+
 def _resolve_format(output_format):
     """Normalise output_format: accept a list/tuple or a plain string."""
     from autoarray.plot.utils import _conf_output_format
