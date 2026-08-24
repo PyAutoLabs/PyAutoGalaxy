@@ -102,6 +102,28 @@ def _resolve_colormap(colormap):
     return colormap
 
 
+def _mask_edge(mask):
+    """Convert a mask to the ``(N, 2)`` edge coordinates ``plot_array`` overlays.
+
+    Accepts a ``Mask2D`` (or anything exposing ``derive_grid.edge``) as well as
+    coordinates that are already in that form. Mirrors the contract of
+    ``autoarray.plot.utils.auto_mask_edge``, returning ``None`` when there is no
+    edge to draw.
+    """
+    if mask is None:
+        return None
+    try:
+        if mask.is_all_false:
+            return None
+        return np.array(mask.derive_grid.edge.array)
+    except AttributeError:
+        pass
+    try:
+        return np.asarray(mask)
+    except Exception:
+        return None
+
+
 def norm_from(array, use_log10=False, vmin=None, vmax=None):
     """Build the matplotlib colour norm for *array* from flat arguments.
 
@@ -196,6 +218,7 @@ def plot_array(
     lines=None,
     line_colors=None,
     grid=None,
+    mask=None,
     cb_unit=None,
     ax=None,
 ):
@@ -237,6 +260,10 @@ def plot_array(
         Colours for each entry in *lines*.
     grid : array-like or None
         An additional grid of points to overlay.
+    mask : Mask2D or array-like or None
+        A mask whose edge is overlaid as black dots. Pass this when the outline
+        wanted is *not* the array's own mask — for an already-masked array the
+        edge is derived automatically and this can be left ``None``.
     ax : matplotlib.axes.Axes or None
         Existing ``Axes`` to draw into.  When provided the figure is *not*
         saved — the caller is responsible for saving.
@@ -266,6 +293,7 @@ def plot_array(
     _aa_plot_array(
         array=array,
         ax=ax,
+        mask=_mask_edge(mask),
         grid=_numpy_grid(grid),
         positions=_positions_list,
         lines=_lines_list,
