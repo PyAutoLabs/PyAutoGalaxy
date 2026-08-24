@@ -21,15 +21,16 @@ class Clicker:
 
     def start(self, data, pixel_scales):
         from matplotlib import pyplot as plt
-        import autoarray.plot as aplt
         from autoarray.plot.utils import _conf_imshow_origin
+        from autogalaxy.util.plot_utils import norm_from
 
         n_y, n_x = data.shape_native
         hw = int(n_x / 2) * pixel_scales
         ext = [-hw, hw, -hw, hw]
         fig = plt.figure(figsize=(14, 14))
-        cmap = aplt.Cmap(cmap="jet", norm="log", vmin=1.0e-3, vmax=np.max(data) / 3.0)
-        norm = cmap.norm_from(array=data, use_log10=True)
+        norm = norm_from(
+            array=data, use_log10=True, vmin=1.0e-3, vmax=np.max(data) / 3.0
+        )
         plt.imshow(data.native, cmap="jet", norm=norm, extent=ext, origin=_conf_imshow_origin())
         if not data.mask.is_all_false:
             grid = data.mask.derive_grid.edge

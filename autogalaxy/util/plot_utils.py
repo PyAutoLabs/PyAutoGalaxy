@@ -102,6 +102,88 @@ def _resolve_colormap(colormap):
     return colormap
 
 
+def _mask_edge(mask):
+    """Convert a mask to the ``(N, 2)`` edge coordinates ``plot_array`` overlays.
+
+    Accepts a ``Mask2D`` (or anything exposing ``derive_grid.edge``) as well as
+    coordinates that are already in that form. Mirrors the contract of
+    ``autoarray.plot.utils.auto_mask_edge``, returning ``None`` when there is no
+    edge to draw.
+    """
+    if mask is None:
+        return None
+    try:
+        if mask.is_all_false:
+            return None
+        return np.array(mask.derive_grid.edge.array)
+    except AttributeError:
+        pass
+    try:
+        return np.asarray(mask)
+    except Exception:
+        return None
+
+
+def norm_from(array, use_log10=False, vmin=None, vmax=None):
+    """Build the matplotlib colour norm for *array* from flat arguments.
+
+    This is the flat-API replacement for the removed ``Cmap`` object's
+    ``norm_from`` method. It exists so that code drawing its own axes — the
+    ``Clicker`` and ``Scribbler`` GUIs — scales colour the same way the
+    ``plot_*`` functions do, without needing a plotter object that the public
+    namespaces no longer export.
+
+    The behaviour mirrors the normalisation applied inside
+    ``autoarray.plot.array.plot_array``.
+
+    Parameters
+    ----------
+    array
+        The image being normalised. Only read when *use_log10* is ``True`` and
+        no explicit *vmax* is given.
+    use_log10
+        When ``True`` a ``LogNorm`` is applied, with values clipped at the
+        configured ``log10_min_value`` floor.
+    vmin, vmax
+        Explicit colour-scale limits. When both are ``None`` and *use_log10* is
+        ``False``, ``None`` is returned and matplotlib applies its own default.
+
+    Returns
+    -------
+    matplotlib.colors.Normalize or None
+    """
+    if use_log10:
+        try:
+            from autonerves import conf as _conf
+
+            log10_min = _conf.instance["visualize"]["general"]["general"][
+                "log10_min_value"
+            ]
+        except Exception:
+            log10_min = 1.0e-4
+
+        clipped = np.clip(array, log10_min, None)
+        vmin_log = vmin if (vmin is not None and np.isfinite(vmin)) else log10_min
+        if vmax is not None and np.isfinite(vmax):
+            vmax_log = vmax
+        else:
+            with np.errstate(all="ignore"):
+                vmax_log = np.nanmax(clipped)
+        if not np.isfinite(vmax_log) or vmax_log <= vmin_log:
+            vmax_log = vmin_log * 10.0
+
+        from matplotlib.colors import LogNorm
+
+        return LogNorm(vmin=vmin_log, vmax=vmax_log)
+
+    if vmin is not None or vmax is not None:
+        from matplotlib.colors import Normalize
+
+        return Normalize(vmin=vmin, vmax=vmax)
+
+    return None
+
+
 def _resolve_format(output_format):
     """Normalise output_format: accept a list/tuple or a plain string."""
     from autoarray.plot.utils import _conf_output_format
@@ -136,6 +218,7 @@ def plot_array(
     lines=None,
     line_colors=None,
     grid=None,
+    mask=None,
     cb_unit=None,
     ax=None,
 ):
@@ -177,6 +260,10 @@ def plot_array(
         Colours for each entry in *lines*.
     grid : array-like or None
         An additional grid of points to overlay.
+    mask : Mask2D or array-like or None
+        A mask whose edge is overlaid as black dots. Pass this when the outline
+        wanted is *not* the array's own mask — for an already-masked array the
+        edge is derived automatically and this can be left ``None``.
     ax : matplotlib.axes.Axes or None
         Existing ``Axes`` to draw into.  When provided the figure is *not*
         saved — the caller is responsible for saving.
@@ -206,6 +293,7 @@ def plot_array(
     _aa_plot_array(
         array=array,
         ax=ax,
+        mask=_mask_edge(mask),
         grid=_numpy_grid(grid),
         positions=_positions_list,
         lines=_lines_list,
