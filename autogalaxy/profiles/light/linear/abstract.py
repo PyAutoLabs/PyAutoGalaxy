@@ -346,6 +346,43 @@ class LightProfileLinearObjFuncList(aa.AbstractLinearObjFuncList):
         if isinstance(self.light_profile_list[0], LightProfileOperated):
             return self.mapping_matrix
 
+        if (
+            self._xp is np
+            and self.psf.convolve_over_sample_size == 1
+            and self.blurring_grid is not None
+        ):
+            # Numpy fast path: convolve every light profile in one batched call
+            # instead of looping `convolved_image_from` once per profile. For an
+            # MGE of N Gaussians the loop rebuilds the `ConvolverState` and runs a
+            # separate 2D convolution N times; here the images are stacked into a
+            # single (pixels, N) mapping matrix and convolved as one (ny, nx, N)
+            # cube against the kernel.
+            #
+            # This is numerically the same operation: for `xp is np` and
+            # `convolve_over_sample_size == 1`, `convolved_image_from` itself
+            # dispatches to `convolved_image_via_real_space_np_from`, which
+            # scatters the image and blurring image into the very same
+            # `ConvolverState` frame (`state.mask` / `state.blurring_mask`) that
+            # the batched call below uses.
+            mapping_matrix = self.mapping_matrix
+
+            blurring_mapping_matrix = np.stack(
+                [
+                    light_profile.image_2d_from(
+                        grid=self.blurring_grid, xp=np
+                    ).slim.array
+                    for light_profile in self.light_profile_list
+                ],
+                axis=1,
+            )
+
+            return self.psf.convolved_mapping_matrix_via_real_space_np_from(
+                mapping_matrix=mapping_matrix,
+                mask=self.grid.mask,
+                blurring_mapping_matrix=blurring_mapping_matrix,
+                blurring_mask=self.blurring_grid.mask,
+            )
+
         if self.psf.convolve_over_sample_size > 1:
             # Retain the parent Grid2D while requesting unbinned values. A
             # discrete profile needs the parent-pixel geometry to place its
