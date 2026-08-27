@@ -278,3 +278,86 @@ def test__operated_mapping_matrix_override__oversampled_psf__matches_direct_conv
             image=image_sub, blurring_image=blurring_sub, mask=mask
         )
         assert override[:, i] == pytest.approx(np.array(direct), abs=1.0e-14)
+
+
+def test__operated_mapping_matrix_override__batched_numpy_path__matches_per_profile_convolution():
+    # The numpy fast path convolves every linear light profile in one batched call
+    # instead of looping `psf.convolved_image_from` once per profile. Each column
+    # must still equal the per-profile convolution exactly, including the flux
+    # blurred in from outside the mask (a bright Gaussian sits at the mask edge)
+    # and for a non-symmetric kernel.
+    mask = aa.Mask2D.circular(shape_native=(25, 25), pixel_scales=0.1, radius=0.9)
+
+    kernel_native = np.random.default_rng(7).random((5, 7)) + 0.05
+    kernel = aa.Array2D.no_mask(
+        values=kernel_native / kernel_native.sum(), pixel_scales=0.1
+    )
+    psf = aa.Convolver(kernel=kernel)
+
+    assert psf.convolve_over_sample_size == 1
+
+    grid = aa.Grid2D.from_mask(mask=mask)
+    blurring_mask = mask.derive_mask.blurring_from(
+        kernel_shape_native=psf.kernel_shape_image_resolution, allow_padding=True
+    )
+    blurring_grid = aa.Grid2D.from_mask(mask=blurring_mask)
+
+    light_profile_list = [
+        # Bright and narrow, sat on the mask edge so its flux is dominated by the
+        # blurring region -- this is what breaks if the blurring mapping matrix is
+        # scattered in the wrong order.
+        ag.lp_linear.Gaussian(centre=(0.85, 0.0), sigma=0.05),
+        ag.lp_linear.Gaussian(centre=(-0.8, 0.6), sigma=0.08),
+        ag.lp_linear.Sersic(centre=(0.1, -0.2), effective_radius=0.4, sersic_index=3.0),
+        ag.lp_linear.Gaussian(centre=(0.0, 0.0), sigma=0.3),
+    ]
+
+    func_list = LightProfileLinearObjFuncList(
+        grid=grid,
+        blurring_grid=blurring_grid,
+        psf=psf,
+        light_profile_list=light_profile_list,
+        regularization=None,
+    )
+
+    override = np.array(func_list.operated_mapping_matrix_override)
+
+    assert override.shape == (mask.pixels_in_mask, len(light_profile_list))
+
+    for i, light_profile in enumerate(light_profile_list):
+        image = light_profile.image_2d_from(grid=grid, xp=np)
+        blurring_image = light_profile.image_2d_from(grid=blurring_grid, xp=np)
+
+        direct = psf.convolved_image_from(
+            image=image, blurring_image=blurring_image, xp=np
+        )
+
+        assert override[:, i] == pytest.approx(np.array(direct), abs=1.0e-13)
+
+
+def test__operated_mapping_matrix_override__blurring_mask_ordering_matches_convolver_state():
+    # The batched call scatters the blurring mapping matrix using the blurring mask
+    # derived inside the `ConvolverState` (from the resized FFT-frame mask), whereas
+    # the blurring grid is built upstream from the unresized mask. The two masks live
+    # on different frames, so this asserts their slim orderings are the same
+    # permutation of the same pixels (a pure translation of the native indices).
+    mask = aa.Mask2D.circular(shape_native=(21, 21), pixel_scales=0.1, radius=0.7)
+
+    kernel_native = np.random.default_rng(3).random((5, 7)) + 0.05
+    kernel = aa.Array2D.no_mask(
+        values=kernel_native / kernel_native.sum(), pixel_scales=0.1
+    )
+    psf = aa.Convolver(kernel=kernel)
+
+    upstream_blurring_mask = mask.derive_mask.blurring_from(
+        kernel_shape_native=psf.kernel_shape_image_resolution, allow_padding=True
+    )
+    state_blurring_mask = psf.state_from(mask=mask).blurring_mask
+
+    y_up, x_up = (np.asarray(a) for a in upstream_blurring_mask.slim_to_native_tuple)
+    y_st, x_st = (np.asarray(a) for a in state_blurring_mask.slim_to_native_tuple)
+
+    assert y_up.shape == y_st.shape
+
+    assert (y_st - (y_st[0] - y_up[0]) == y_up).all()
+    assert (x_st - (x_st[0] - x_up[0]) == x_up).all()
