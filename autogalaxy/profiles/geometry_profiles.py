@@ -237,6 +237,21 @@ class EllProfile(SphProfile):
         validate.validate_ell_comps(ell_comps=ell_comps)
         self.ell_comps = ell_comps
 
+    # The projectable form of the constraint below, read by PyAutoFit's
+    # `ClipperPriorBoxJoint` (see `autofit.mapper.prior_model.constraint`).
+    # `__model_constraint__` MEASURES how far outside the disk a profile sits;
+    # this states the disk itself, which is what a search needs to put a lane
+    # back inside it.
+    #
+    # The radius is the CLAMP (0.999), not the guard's 1.0 and not `1 - margin`
+    # for any small margin. Between 0.999 and 1.0 the conversion to an axis
+    # ratio saturates, so the likelihood is flat in the radial direction and a
+    # gradient lane projected into that annulus has nothing to climb back out
+    # on -- it would be moved from a region the model rejects into one the
+    # optimizer cannot leave. Projecting onto the clamp puts the lane exactly at
+    # the edge of the region where the radial gradient is alive again.
+    __model_ball_constraints__ = ((("ell_comps",), convert.ELL_COMPS_MAGNITUDE_CLAMP),)
+
     def __model_constraint__(self, xp=np):
         """
         How far beyond the ellipticity clamp this profile's `ell_comps` sit.
