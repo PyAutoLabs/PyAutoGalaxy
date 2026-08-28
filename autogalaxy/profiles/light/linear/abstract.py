@@ -13,6 +13,7 @@ The `LightProfileLinearObjFuncList` subclass additionally supports regularizatio
 intensities to be penalized by a smoothness prior.
 """
 
+import functools
 import inspect
 import itertools
 import numpy as np
@@ -28,6 +29,25 @@ from autogalaxy.profiles.light.operated.abstract import (
 from autogalaxy.profiles.light.abstract import LightProfile
 
 from autogalaxy import exc
+
+
+@functools.lru_cache(maxsize=1)
+def _gaussian_image_2d_from():
+    """
+    The `Gaussian.image_2d_from` function object, whose body is exactly
+    `image_2d_via_radii_from(eccentric_radii_grid_from(grid))`.
+
+    `LightProfileLinearObjFuncList._shared_eccentric_radii_index_groups` compares the profile class's
+    `image_2d_from` against this to decide whether an eccentric-radius grid can be shared across the list. Identity
+    of the function object is the exact test: every subclass which inherits this implementation (the linear,
+    operated and spherical Gaussians) matches, and every subclass which overrides it (e.g. `GaussianMultipole`)
+    does not.
+
+    Imported lazily because `autogalaxy.profiles.light.standard` imports this module's base classes.
+    """
+    from autogalaxy.profiles.light.standard.gaussian import Gaussian
+
+    return Gaussian.image_2d_from
 
 
 class LightProfileLinear(LightProfile):
@@ -306,15 +326,165 @@ class LightProfileLinearObjFuncList(aa.AbstractLinearObjFuncList):
         The `mapping_matrix` of the linear light profiles.
         """
 
-        image_2d_list = []
+        return self._xp.stack(
+            self._image_slim_list_from(grid=self.grid, xp=self._xp), axis=1
+        )
 
-        for pixel, light_profile in enumerate(self.light_profile_list):
+    @cached_property
+    def _shared_eccentric_radii_index_groups(self) -> List[List[int]]:
+        """
+        The light profiles grouped by the geometry they share, as lists of indices into `light_profile_list`.
 
-            image_2d = light_profile.image_2d_from(grid=self.grid, xp=self._xp).slim
+        Only groups of two or more `Gaussian` profiles with an identical `centre` and `ell_comps` are returned:
+        those are the groups which can share one reference-frame transform and one eccentric-radius grid. Every
+        other profile is left out of the groups and evaluated on its own.
 
-            image_2d_list.append(image_2d.array)
+        This is the multi-Gaussian expansion (MGE) case: a basis of tens of `Gaussian` profiles which differ only
+        in their `sigma`. Every one of them would otherwise translate and rotate the same grid into the same
+        reference frame and then form the same eccentric radii from it. The transform is by far the most
+        expensive part of evaluating a Gaussian -- it costs an `arctan2`, a `sin` and a `cos` per coordinate,
+        against the single `exp` of the profile itself -- so hoisting it out of the loop is most of the cost of
+        an MGE's mapping matrix.
 
-        return self._xp.stack(image_2d_list, axis=1)
+        A basis is deliberately not required to be one group. The workspace's canonical MGE recipe stacks two
+        sets of 30 Gaussians which share a centre but carry their own `ell_comps`, and lands both sets in a
+        single `LightProfileLinearObjFuncList`; grouping serves that as two shared transforms rather than 60.
+
+        A `Gaussian`'s `image_2d_from` is exactly `image_2d_via_radii_from(eccentric_radii_grid_from(grid))`,
+        which is what makes the two shared quantities well defined. The test is the identity of the
+        `image_2d_from` function object, not `isinstance`: every subclass which inherits that implementation (the
+        linear, operated and spherical Gaussians) shares the radii, and every subclass which overrides it (e.g.
+        `GaussianMultipole`, whose multipole perturbation is applied to the radius) does not.
+
+        Other profiles are deliberately excluded even when they share a geometry. `Sersic` and its children
+        already avoid the polar transform via `_eccentric_radii_grid_from_cartesian`, which is only taken when
+        the grid handed to them is *not* pre-transformed -- so hoisting a transformed grid into them would be
+        both slower and a different floating-point expression.
+
+        Returns
+        -------
+        The index groups whose profiles share an eccentric-radius grid.
+        """
+        index_group_dict: Dict[tuple, List[int]] = {}
+
+        for index, light_profile in enumerate(self.light_profile_list):
+            if type(light_profile).image_2d_from is not _gaussian_image_2d_from():
+                continue
+
+            key = (
+                type(light_profile),
+                tuple(light_profile.centre),
+                tuple(light_profile.ell_comps),
+            )
+
+            index_group_dict.setdefault(key, []).append(index)
+
+        return [
+            index_group
+            for index_group in index_group_dict.values()
+            if len(index_group) > 1
+        ]
+
+    def _image_slim_list_from(self, grid, xp=np) -> List[np.ndarray]:
+        """
+        The `slim` image of every light profile in the list, evaluated on the input grid.
+
+        This is the per-profile loop that builds the columns of the `mapping_matrix` (and, for imaging data, of
+        the blurring mapping matrix). Profiles which form an MGE basis (see
+        `_shared_eccentric_radii_index_groups`) are evaluated a group at a time by
+        `_shared_eccentric_radii_image_slim_list_from`, which hoists the work they have in common out of the
+        loop; every other profile is evaluated independently, exactly as before.
+
+        Parameters
+        ----------
+        grid
+            The 2D (y,x) coordinates the light profile images are evaluated on.
+        xp
+            The array module used (numpy, or `jax.numpy` for the JAX calculation).
+
+        Returns
+        -------
+        A list of the `slim` image of every light profile.
+        """
+        light_profile_list = self.light_profile_list
+
+        index_groups = (
+            self._shared_eccentric_radii_index_groups
+            if xp is np and isinstance(grid, aa.Grid2D)
+            else []
+        )
+
+        if not index_groups:
+            return [
+                light_profile.image_2d_from(grid=grid, xp=xp).slim.array
+                for light_profile in light_profile_list
+            ]
+
+        image_slim_list = [None] * len(light_profile_list)
+
+        for index_group in index_groups:
+            image_slim_group = self._shared_eccentric_radii_image_slim_list_from(
+                grid=grid,
+                light_profile_list=[light_profile_list[i] for i in index_group],
+            )
+
+            for index, image_slim in zip(index_group, image_slim_group):
+                image_slim_list[index] = image_slim
+
+        for index, light_profile in enumerate(light_profile_list):
+            if image_slim_list[index] is None:
+                image_slim_list[index] = light_profile.image_2d_from(
+                    grid=grid, xp=np
+                ).slim.array
+
+        return image_slim_list
+
+    def _shared_eccentric_radii_image_slim_list_from(
+        self, grid, light_profile_list
+    ) -> List[np.ndarray]:
+        """
+        The `slim` image of every light profile in one shared-geometry group, computing the two parts of the
+        calculation which are identical for all of them -- the reference-frame transform of the over-sampled
+        grid, and the eccentric radii formed from it -- exactly once.
+
+        Both are computed by calling the same methods on the first profile of the group, with the same inputs,
+        that every profile would otherwise call on itself, so each profile is then handed a bit-identical radius
+        grid and the images returned are bit-identical to the per-profile loop.
+
+        Binning the over-sampled values back down stays a per-profile call, because
+        `OverSampler.binned_array_2d_from` takes a 1D array. Evaluating the `exp` stays a per-profile call too:
+        the arithmetic is transcendental-bound rather than overhead-bound, so stacking the profiles into one
+        (over-sampled pixels, profiles) block buys nothing and would have to be sliced column-wise to bin.
+
+        Parameters
+        ----------
+        grid
+            The 2D (y,x) coordinates the light profile images are evaluated on.
+        light_profile_list
+            One group of light profiles sharing a class, a `centre` and an `ell_comps`.
+
+        Returns
+        -------
+        A list of the `slim` image of every light profile in the group.
+        """
+        light_profile_0 = light_profile_list[0]
+
+        over_sampler = grid.over_sampler
+
+        transformed_grid = light_profile_0.transformed_to_reference_frame_grid_from(
+            grid.over_sampled, np
+        )
+
+        eccentric_radii = light_profile_0.eccentric_radii_grid_from(
+            grid=transformed_grid, xp=np
+        )
+
+        return [
+            over_sampler.binned_array_2d_from(
+                array=light_profile.image_2d_via_radii_from(eccentric_radii, np), xp=np
+            ).slim.array
+            for light_profile in light_profile_list
+        ]
 
     @cached_property
     def operated_mapping_matrix_override(self) -> Optional[np.ndarray]:
@@ -367,12 +537,7 @@ class LightProfileLinearObjFuncList(aa.AbstractLinearObjFuncList):
             mapping_matrix = self.mapping_matrix
 
             blurring_mapping_matrix = np.stack(
-                [
-                    light_profile.image_2d_from(
-                        grid=self.blurring_grid, xp=np
-                    ).slim.array
-                    for light_profile in self.light_profile_list
-                ],
+                self._image_slim_list_from(grid=self.blurring_grid, xp=np),
                 axis=1,
             )
 
