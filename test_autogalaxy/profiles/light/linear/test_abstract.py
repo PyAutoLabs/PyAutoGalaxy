@@ -361,3 +361,249 @@ def test__operated_mapping_matrix_override__blurring_mask_ordering_matches_convo
 
     assert (y_st - (y_st[0] - y_up[0]) == y_up).all()
     assert (x_st - (x_st[0] - x_up[0]) == x_up).all()
+
+
+def _shared_geometry_grids():
+    """
+    A masked `Grid2D` with a non-uniform over-sample size (so the binning takes the `bincount` branch) and its
+    blurring grid, used by the shared-geometry tests below.
+    """
+    mask = aa.Mask2D.circular(shape_native=(25, 25), pixel_scales=0.1, radius=0.9)
+
+    over_sample_size = aa.util.over_sample.over_sample_size_via_radial_bins_from(
+        grid=aa.Grid2D.from_mask(mask=mask),
+        sub_size_list=[4, 2, 1],
+        radial_list=[0.3, 0.6],
+        centre_list=[(0.0, 0.0)],
+    )
+
+    grid = aa.Grid2D.from_mask(mask=mask, over_sample_size=over_sample_size)
+
+    assert not grid.over_sampler.sub_is_uniform
+
+    kernel_native = np.random.default_rng(7).random((5, 7)) + 0.05
+    kernel = aa.Array2D.no_mask(
+        values=kernel_native / kernel_native.sum(), pixel_scales=0.1
+    )
+    psf = aa.Convolver(kernel=kernel)
+
+    blurring_mask = mask.derive_mask.blurring_from(
+        kernel_shape_native=psf.kernel_shape_image_resolution, allow_padding=True
+    )
+    blurring_grid = aa.Grid2D.from_mask(mask=blurring_mask)
+
+    return grid, blurring_grid, psf
+
+
+def _per_profile_image_slim_list(light_profile_list, grid):
+    """
+    The per-profile loop the shared-geometry fast path replaces: every profile evaluates the whole of
+    `image_2d_from`, including its own reference-frame transform and eccentric-radius grid.
+    """
+    return [
+        light_profile.image_2d_from(grid=grid, xp=np).slim.array
+        for light_profile in light_profile_list
+    ]
+
+
+def test__mapping_matrix__shared_geometry_matches_per_profile_loop():
+    # An MGE basis: every Gaussian shares a centre and ell_comps and differs only in sigma, so the
+    # reference-frame transform and the eccentric-radius grid are computed once and reused. The images
+    # must be bit-identical to evaluating every profile independently.
+    grid, blurring_grid, psf = _shared_geometry_grids()
+
+    light_profile_list = [
+        ag.lp_linear.Gaussian(centre=(0.1, -0.2), ell_comps=(0.2, 0.3), sigma=sigma)
+        for sigma in [0.05, 0.1, 0.2, 0.4, 0.8]
+    ]
+
+    func_list = LightProfileLinearObjFuncList(
+        grid=grid,
+        blurring_grid=blurring_grid,
+        psf=psf,
+        light_profile_list=light_profile_list,
+        regularization=None,
+    )
+
+    assert func_list._shared_eccentric_radii_index_groups == [[0, 1, 2, 3, 4]]
+
+    for grid_input in [grid, blurring_grid]:
+        assert np.array_equal(
+            np.stack(func_list._image_slim_list_from(grid=grid_input, xp=np), axis=1),
+            np.stack(
+                _per_profile_image_slim_list(light_profile_list, grid_input), axis=1
+            ),
+        )
+
+    assert np.array_equal(
+        np.array(func_list.mapping_matrix),
+        np.stack(_per_profile_image_slim_list(light_profile_list, grid), axis=1),
+    )
+
+    # The override the imaging inversion actually consumes must equal the per-profile convolution.
+
+    override = np.array(func_list.operated_mapping_matrix_override)
+
+    for i, light_profile in enumerate(light_profile_list):
+        direct = psf.convolved_image_from(
+            image=light_profile.image_2d_from(grid=grid, xp=np),
+            blurring_image=light_profile.image_2d_from(grid=blurring_grid, xp=np),
+            xp=np,
+        )
+
+        assert override[:, i] == pytest.approx(np.array(direct), abs=1.0e-13)
+
+
+def test__mapping_matrix__spherical_gaussians_share_radii_and_match_the_loop():
+    # `GaussianSph` inherits `Gaussian.image_2d_from`, so it shares radii too -- via the spherical branch of
+    # `transformed_to_reference_frame_grid_from`, which translates without rotating.
+    grid, blurring_grid, psf = _shared_geometry_grids()
+
+    light_profile_list = [
+        ag.lp_linear.GaussianSph(centre=(0.1, -0.2), sigma=sigma)
+        for sigma in [0.05, 0.2, 0.8]
+    ]
+
+    func_list = LightProfileLinearObjFuncList(
+        grid=grid,
+        blurring_grid=blurring_grid,
+        psf=psf,
+        light_profile_list=light_profile_list,
+        regularization=None,
+    )
+
+    assert func_list._shared_eccentric_radii_index_groups == [[0, 1, 2]]
+
+    assert np.array_equal(
+        np.stack(func_list._image_slim_list_from(grid=grid, xp=np), axis=1),
+        np.stack(_per_profile_image_slim_list(light_profile_list, grid), axis=1),
+    )
+
+
+def test__mapping_matrix__mixed_geometry_falls_back():
+    # Any mismatch -- a different centre, a different ell_comps, or a different profile class -- must take the
+    # per-profile loop, and match it exactly.
+    grid, blurring_grid, psf = _shared_geometry_grids()
+
+    shared = ag.lp_linear.Gaussian(centre=(0.1, -0.2), ell_comps=(0.2, 0.3), sigma=0.1)
+
+    mismatch_list = [
+        [
+            shared,
+            ag.lp_linear.Gaussian(centre=(0.3, -0.2), ell_comps=(0.2, 0.3), sigma=0.2),
+        ],
+        [
+            shared,
+            ag.lp_linear.Gaussian(centre=(0.1, -0.2), ell_comps=(0.1, 0.3), sigma=0.2),
+        ],
+        [
+            shared,
+            ag.lp_linear.GaussianSph(centre=(0.1, -0.2), sigma=0.2),
+        ],
+    ]
+
+    for light_profile_list in mismatch_list:
+        func_list = LightProfileLinearObjFuncList(
+            grid=grid,
+            blurring_grid=blurring_grid,
+            psf=psf,
+            light_profile_list=light_profile_list,
+            regularization=None,
+        )
+
+        assert func_list._shared_eccentric_radii_index_groups == []
+
+        assert np.array_equal(
+            np.stack(func_list._image_slim_list_from(grid=grid, xp=np), axis=1),
+            np.stack(_per_profile_image_slim_list(light_profile_list, grid), axis=1),
+        )
+
+
+def test__mapping_matrix__non_gaussian_and_single_profile_take_the_loop():
+    # Classes whose `image_2d_from` is not the Gaussian one must take the loop even when they share a geometry:
+    # `Sersic` reaches its eccentric radii from Cartesian coordinates when the grid is *not* pre-transformed,
+    # and `GaussianMultipole` perturbs the radius, so neither can be handed a shared radius grid. A one-profile
+    # list has nothing to share.
+    grid, blurring_grid, psf = _shared_geometry_grids()
+
+    def func_list_from(light_profile_list):
+        return LightProfileLinearObjFuncList(
+            grid=grid,
+            blurring_grid=blurring_grid,
+            psf=psf,
+            light_profile_list=light_profile_list,
+            regularization=None,
+        )
+
+    single = func_list_from([ag.lp_linear.Gaussian(sigma=0.1)])
+
+    assert single._shared_eccentric_radii_index_groups == []
+
+    loop_list = [
+        [
+            ag.lp_linear.Sersic(
+                centre=(0.1, -0.2),
+                ell_comps=(0.2, 0.3),
+                effective_radius=effective_radius,
+                sersic_index=2.0,
+            )
+            for effective_radius in [0.2, 0.5, 1.0]
+        ],
+        [
+            ag.lp_linear.GaussianMultipole(
+                centre=(0.1, -0.2),
+                ell_comps=(0.2, 0.3),
+                sigma=sigma,
+                multipole_3_comps=(0.05, 0.02),
+                multipole_4_comps=(0.03, 0.01),
+            )
+            for sigma in [0.1, 0.3]
+        ],
+    ]
+
+    for light_profile_list in loop_list:
+        func_list = func_list_from(light_profile_list)
+
+        assert func_list._shared_eccentric_radii_index_groups == []
+
+        assert np.array_equal(
+            np.stack(func_list._image_slim_list_from(grid=grid, xp=np), axis=1),
+            np.stack(_per_profile_image_slim_list(light_profile_list, grid), axis=1),
+        )
+
+
+def test__mapping_matrix__two_basis_mge_is_grouped_by_ell_comps():
+    # The workspace's canonical MGE recipe stacks two sets of Gaussians which share a centre but carry their
+    # own ell_comps, and lands both sets in one func list. They must be served as two shared-geometry groups
+    # rather than falling back to 60 independent evaluations, and the Sersic mixed in with them must still take
+    # the per-profile loop.
+    grid, blurring_grid, psf = _shared_geometry_grids()
+
+    light_profile_list = [
+        ag.lp_linear.Gaussian(centre=(0.1, -0.2), ell_comps=(0.2, 0.3), sigma=0.05),
+        ag.lp_linear.Gaussian(centre=(0.1, -0.2), ell_comps=(-0.1, 0.0), sigma=0.05),
+        ag.lp_linear.Gaussian(centre=(0.1, -0.2), ell_comps=(0.2, 0.3), sigma=0.2),
+        ag.lp_linear.Sersic(
+            centre=(0.1, -0.2), ell_comps=(0.2, 0.3), effective_radius=0.5
+        ),
+        ag.lp_linear.Gaussian(centre=(0.1, -0.2), ell_comps=(-0.1, 0.0), sigma=0.2),
+        ag.lp_linear.Gaussian(centre=(0.1, -0.2), ell_comps=(0.2, 0.3), sigma=0.8),
+    ]
+
+    func_list = LightProfileLinearObjFuncList(
+        grid=grid,
+        blurring_grid=blurring_grid,
+        psf=psf,
+        light_profile_list=light_profile_list,
+        regularization=None,
+    )
+
+    assert func_list._shared_eccentric_radii_index_groups == [[0, 2, 5], [1, 4]]
+
+    for grid_input in [grid, blurring_grid]:
+        assert np.array_equal(
+            np.stack(func_list._image_slim_list_from(grid=grid_input, xp=np), axis=1),
+            np.stack(
+                _per_profile_image_slim_list(light_profile_list, grid_input), axis=1
+            ),
+        )
