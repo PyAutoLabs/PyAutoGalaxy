@@ -80,3 +80,43 @@ def test__instance_with_associated_adapt_images_from__galaxy_name_image_plane_me
     assert adapt_images.galaxy_image_plane_mesh_grid_dict[
         galaxies.source
     ].native == pytest.approx(4.0 * np.ones((2, 2)), 1.0e-4)
+
+
+class _RaisingGalaxiesResult:
+    """
+    Result double whose galaxies cannot be built, because materializing the maximum log
+    likelihood sample as a model instance fails.
+    """
+
+    def __init__(self, error):
+        self._error = error
+
+    @property
+    def max_log_likelihood_galaxies(self):
+        raise self._error
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        AttributeError("no galaxies on this result"),
+        af.exc.SamplesException("stored parameters cannot be reconstructed"),
+        af.exc.FitException("ell_comps must satisfy e0**2+e1**2 < 1"),
+    ],
+)
+def test__save_results__galaxies_failure_never_kills_the_fit(
+    analysis_imaging_7x7, error
+):
+    """
+    `save_results` runs after the search has finished but before `paths.completed()`, so a
+    failure writing the (optional) `galaxies.json` must be logged and swallowed rather than
+    losing the run its `.completed` marker (PyAutoFit #1535).
+    """
+    paths = af.DirectoryPaths()
+
+    analysis_imaging_7x7.save_results(
+        paths=paths,
+        result=_RaisingGalaxiesResult(error),
+    )
+
+    assert not (paths._files_path / "galaxies.json").exists()

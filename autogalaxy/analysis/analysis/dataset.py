@@ -175,8 +175,16 @@ class AnalysisDataset(Analysis):
                 obj=result.max_log_likelihood_galaxies,
                 file_path=paths._files_path / "galaxies.json",
             )
-        except AttributeError:
-            pass
+        except (AttributeError, af.exc.SamplesException, af.exc.FitException) as e:
+            # Building the galaxies requires materializing the maximum log likelihood
+            # sample as a model instance, which the model may reject (e.g. `ell_comps`
+            # outside the unit disk). Writing an extra output file must never kill a
+            # completed fit before `paths.completed()` is called (PyAutoFit #1535), so
+            # the failure is logged and the fit finishes without `galaxies.json`.
+            logger.warning(
+                f"The maximum log likelihood galaxies could not be written to "
+                f"galaxies.json, the model-fit is otherwise unaffected:\n{e}"
+            )
 
     def adapt_images_via_instance_from(
         self,
