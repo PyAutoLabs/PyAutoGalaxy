@@ -129,6 +129,135 @@ def test__hessian_from__axis_aligned_grid__correct_values():
     assert hessian_xx == pytest.approx(np.array([2.22209, 0.0]), 1.0e-4)
 
 
+def test__hessian_from__adaptive_step__compact_sis_near_centre():
+    """
+    Regression test for the adaptive Richardson step (issue #591).
+
+    Close to the centre of a compact deflector the deflection field varies on a scale far smaller
+    than the 0.01" step the NumPy Hessian used to be hardcoded to, so the finite differences
+    straddled the whole deflector and returned values that were ~100% wrong (and, for the
+    magnification, sign-flipped). With the step adapted per point the Hessian must reproduce the
+    profile's own analytic shear and convergence.
+
+    ``IsothermalSph`` has closed-form shear and convergence, so the analytic values are an
+    independent oracle: at radius ``r`` from the centre both have magnitude
+    ``einstein_radius / (2 r)``, i.e. of order 100-330 for the radii used here.
+    """
+    mp = ag.mp.IsothermalSph(centre=(0.0, 0.0), einstein_radius=0.2)
+
+    radii = [3.0e-4, 4.0e-4, 5.5e-4, 7.0e-4, 8.5e-4, 1.0e-3]
+    angles = [10.0, 55.0, 100.0, 170.0, 230.0, 310.0]
+
+    grid = ag.Grid2DIrregular(
+        values=[
+            (
+                radius * math.sin(math.radians(angle)),
+                radius * math.cos(math.radians(angle)),
+            )
+            for radius, angle in zip(radii, angles)
+        ]
+    )
+
+    od = LensCalc.from_mass_obj(mp)
+
+    shear_analytic = np.asarray(mp.shear_yx_2d_from(grid=grid))
+    shear_via_hessian = np.asarray(od.shear_yx_2d_via_hessian_from(grid=grid))
+
+    convergence_analytic = np.asarray(mp.convergence_2d_from(grid=grid))
+    convergence_via_hessian = np.asarray(od.convergence_2d_via_hessian_from(grid=grid))
+
+    np.testing.assert_allclose(shear_via_hessian, shear_analytic, rtol=1.0e-4)
+    np.testing.assert_allclose(
+        convergence_via_hessian, convergence_analytic, rtol=1.0e-4
+    )
+
+
+def test__hessian_from__adaptive_step__smooth_field_unchanged():
+    """
+    The adaptive step of issue #591 must not move the answer on the smooth fields the fixed-step
+    implementation already handled well: the values pinned by
+    ``test__hessian_from__diagonal_grid__correct_values`` and
+    ``test__hessian_from__axis_aligned_grid__correct_values`` must still hold, and the adaptive
+    result must agree with the old fixed-step Richardson extrapolation (one pair at h=0.01 and
+    h=0.005) to far inside those tests' tolerances.
+
+    Where the two differ at all it is the fixed step's own residual truncation error: the adaptive
+    result is the more accurate of the two (checked here against the profile's analytic
+    convergence, which it reproduces to ~1e-12 against the fixed step's ~1e-9).
+    """
+    mp = ag.mp.Isothermal(
+        centre=(0.0, 0.0), ell_comps=(0.0, -0.111111), einstein_radius=2.0
+    )
+
+    od = LensCalc.from_mass_obj(mp)
+
+    grid_diagonal = ag.Grid2DIrregular(values=[(0.5, 0.5), (1.0, 1.0)])
+    grid_axis_aligned = ag.Grid2DIrregular(values=[(1.0, 0.0), (0.0, 1.0)])
+
+    for grid in [grid_diagonal, grid_axis_aligned]:
+        hessian_h = np.stack(od._hessian_via_finite_difference(grid=grid, buffer=0.01))
+        hessian_h2 = np.stack(
+            od._hessian_via_finite_difference(grid=grid, buffer=0.005)
+        )
+        hessian_fixed_step = (4.0 * hessian_h2 - hessian_h) / 3.0
+
+        hessian_adaptive = np.stack(od.hessian_from(grid=grid))
+
+        np.testing.assert_allclose(
+            hessian_adaptive, hessian_fixed_step, rtol=1.0e-7, atol=1.0e-10
+        )
+
+        convergence_adaptive = 0.5 * (hessian_adaptive[0] + hessian_adaptive[3])
+        convergence_fixed_step = 0.5 * (hessian_fixed_step[0] + hessian_fixed_step[3])
+        convergence_analytic = np.asarray(mp.convergence_2d_from(grid=grid))
+
+        assert np.max(np.abs(convergence_adaptive - convergence_analytic)) <= np.max(
+            np.abs(convergence_fixed_step - convergence_analytic)
+        )
+
+    hessian_yy, hessian_xy, hessian_yx, hessian_xx = od.hessian_from(grid=grid_diagonal)
+
+    assert hessian_yy == pytest.approx(np.array([1.3882113, 0.6941056]), 1.0e-4)
+    assert hessian_xy == pytest.approx(np.array([-1.3882113, -0.6941056]), 1.0e-4)
+    assert hessian_yx == pytest.approx(np.array([-1.3882113, -0.6941056]), 1.0e-4)
+    assert hessian_xx == pytest.approx(np.array([1.3882113, 0.6941056]), 1.0e-4)
+
+    hessian_yy, hessian_xy, hessian_yx, hessian_xx = od.hessian_from(
+        grid=grid_axis_aligned
+    )
+
+    assert hessian_yy == pytest.approx(np.array([0.0, 1.777699]), 1.0e-4)
+    assert hessian_xy == pytest.approx(np.array([0.0, 0.0]), 1.0e-4)
+    assert hessian_yx == pytest.approx(np.array([0.0, 0.0]), 1.0e-4)
+    assert hessian_xx == pytest.approx(np.array([2.22209, 0.0]), 1.0e-4)
+
+
+def test__hessian_from__unconverged_points_warn():
+    """
+    The deflection angles of an isothermal sphere are discontinuous at its centre, so no step size
+    resolves the Hessian there and the adaptive refinement must give up. It must do so loudly (a
+    single ``UserWarning``), never silently and never by raising -- a raise here would kill an
+    otherwise-converged model fit. The values it keeps must stay finite, and the smooth point on
+    the same grid, which converged on the first pair, must be unaffected.
+    """
+    mp = ag.mp.IsothermalSph(centre=(0.0, 0.0), einstein_radius=1.0)
+
+    grid = ag.Grid2DIrregular(values=[(0.0, 0.0), (1.0, 1.0)])
+
+    od = LensCalc.from_mass_obj(mp)
+
+    with pytest.warns(UserWarning, match="did not converge"):
+        hessian = od.hessian_from(grid=grid)
+
+    assert np.all(np.isfinite(np.stack(hessian)))
+
+    convergence_smooth = 0.5 * (hessian[0][1] + hessian[3][1])
+
+    assert convergence_smooth == pytest.approx(
+        float(np.asarray(mp.convergence_2d_from(grid=grid))[1]), 1.0e-4
+    )
+
+
 def test__convergence_2d_via_hessian_from():
     grid = ag.Grid2DIrregular(
         values=[(1.075, -0.125), (-0.875, -0.075), (-0.925, -0.075), (0.075, 0.925)]

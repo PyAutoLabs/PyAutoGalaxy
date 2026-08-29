@@ -19,6 +19,7 @@ The class is constructed with `LensCalc.from_mass_obj(mass)` or `LensCalc.from_t
 from functools import wraps
 import importlib
 import logging
+import warnings
 import numpy as np
 from typing import List, Tuple, Union
 
@@ -394,8 +395,20 @@ class LensCalc:
         - **NumPy** (``xp=np``, default): 2-point central finite-difference approximation,
           Richardson-extrapolated at step sizes ``h`` and ``h/2`` and combined as
           ``(4 * H(h/2) - H(h)) / 3``. This cancels the leading ``O(h^2)`` truncation term,
-          giving ``O(h^4)`` accuracy and matching the JAX path to float64 precision. JAX is
-          not imported.
+          giving ``O(h^4)`` accuracy. JAX is not imported.
+
+          The step is **adaptive per grid point**. The pair ``H(h)``, ``H(h/2)`` also yields a
+          truncation-error estimate ``E = |H(h/2) - H(h)| / 3``; a point is converged when all
+          four Hessian components satisfy ``E <= atol + rtol * |R|`` (defaults ``rtol=1e-6``,
+          ``atol=1e-8``). Points that are not converged have their step halved -- reusing the
+          previous half-step evaluation, so each halving costs one new finite-difference
+          evaluation on the shrinking unconverged subset only -- for up to ``max_halvings=12``
+          halvings. A smooth field therefore converges on the first pair at the same cost as
+          before, while a point close to a compact deflector (where a fixed 0.01" step is far
+          too coarse) refines until it is accurate. Any point still unconverged after the last
+          halving keeps its final extrapolated value and triggers a single ``UserWarning``
+          reporting how many points did not converge; nothing is ever silently returned as
+          converged, and no exception is raised.
 
         - **JAX** (``xp=jnp``): exact derivatives via ``jax.jacfwd`` applied to
           ``deflections_yx_scalar``, vectorised over the grid with ``jnp.vectorize``.
@@ -414,18 +427,101 @@ class LensCalc:
             return self._hessian_via_richardson(grid=grid)
         return self._hessian_via_jax(grid=grid, xp=xp)
 
-    def _hessian_via_richardson(self, grid, buffer: float = 0.01) -> Tuple:
-        yy_h, xy_h, yx_h, xx_h = self._hessian_via_finite_difference(
-            grid=grid, buffer=buffer
-        )
-        yy_h2, xy_h2, yx_h2, xx_h2 = self._hessian_via_finite_difference(
-            grid=grid, buffer=buffer / 2.0
-        )
-        hessian_yy = (4.0 * yy_h2 - yy_h) / 3.0
-        hessian_xy = (4.0 * xy_h2 - xy_h) / 3.0
-        hessian_yx = (4.0 * yx_h2 - yx_h) / 3.0
-        hessian_xx = (4.0 * xx_h2 - xx_h) / 3.0
-        return hessian_yy, hessian_xy, hessian_yx, hessian_xx
+    def _hessian_via_richardson(
+        self,
+        grid,
+        buffer: float = 0.01,
+        rtol: float = 1.0e-6,
+        atol: float = 1.0e-8,
+        max_halvings: int = 12,
+    ) -> Tuple:
+        """
+        Returns the Hessian via Richardson-extrapolated central finite differences with a step
+        size that adapts, per grid point, to the scale the deflection field actually varies on.
+
+        The finite-difference pair ``H(h)`` and ``H(h/2)`` gives both the extrapolated value
+        ``R = (4 H(h/2) - H(h)) / 3``, which is ``O(h^4)`` accurate, and an estimate of the
+        truncation error ``E = |H(h/2) - H(h)| / 3``, which the fixed-step implementation
+        discarded. Points whose four components all satisfy ``E <= atol + rtol * |R|`` are
+        accepted; the rest have ``h`` halved, the previous ``H(h/2)`` becoming the new ``H(h)``
+        so only one new finite-difference evaluation is needed, and only on the unconverged
+        subset. Smooth fields therefore exit after the first pair at the original cost.
+
+        Points still unconverged after ``max_halvings`` halvings keep their last extrapolated
+        value and raise a single ``UserWarning``; they are never silently accepted, and no
+        exception is raised (a raise here would kill an otherwise-converged model fit).
+
+        Parameters
+        ----------
+        grid
+            The 2D grid of (y,x) arc-second coordinates the Hessian is computed on.
+        buffer
+            The initial finite-difference step size in arc-seconds.
+        rtol
+            The relative tolerance the per-point truncation-error estimate must meet.
+        atol
+            The absolute tolerance the per-point truncation-error estimate must meet.
+        max_halvings
+            The maximum number of times the step is halved before unconverged points are warned
+            about and their last value kept.
+        """
+        grid_values = grid.array if hasattr(grid, "array") else grid
+        grid_values = np.array(grid_values, dtype=np.float64, copy=True)
+
+        hessian_h = np.stack(
+            self._hessian_via_finite_difference(grid=grid, buffer=buffer)
+        ).astype(np.float64)
+        hessian_h2 = np.stack(
+            self._hessian_via_finite_difference(grid=grid, buffer=buffer / 2.0)
+        ).astype(np.float64)
+
+        richardson = (4.0 * hessian_h2 - hessian_h) / 3.0
+        error = np.abs(hessian_h2 - hessian_h) / 3.0
+
+        unconverged = np.any(error > atol + rtol * np.abs(richardson), axis=0)
+
+        step = buffer
+        halvings = 0
+
+        while np.any(unconverged) and halvings < max_halvings:
+            halvings += 1
+            step /= 2.0
+
+            index = np.flatnonzero(unconverged)
+
+            grid_subset = aa.Grid2DIrregular(values=grid_values[index])
+
+            hessian_subset_h = hessian_h2[:, index]
+            hessian_subset_h2 = np.stack(
+                self._hessian_via_finite_difference(grid=grid_subset, buffer=step / 2.0)
+            ).astype(np.float64)
+
+            richardson_subset = (4.0 * hessian_subset_h2 - hessian_subset_h) / 3.0
+            error_subset = np.abs(hessian_subset_h2 - hessian_subset_h) / 3.0
+
+            hessian_h[:, index] = hessian_subset_h
+            hessian_h2[:, index] = hessian_subset_h2
+            richardson[:, index] = richardson_subset
+            error[:, index] = error_subset
+
+            unconverged = np.zeros(unconverged.shape, dtype=bool)
+            unconverged[index] = np.any(
+                error_subset > atol + rtol * np.abs(richardson_subset), axis=0
+            )
+
+        if np.any(unconverged):
+            total = int(unconverged.shape[0])
+            number = int(np.count_nonzero(unconverged))
+            denominator = np.where(np.abs(richardson) > 0.0, np.abs(richardson), 1.0)
+            largest = float(np.max((error / denominator)[:, unconverged]))
+            warnings.warn(
+                f"LensCalc Hessian: {number} of {total} points did not converge after "
+                f"{max_halvings} halvings (largest relative error estimate "
+                f"{largest:.2e}); values kept.",
+                UserWarning,
+            )
+
+        return richardson[0], richardson[1], richardson[2], richardson[3]
 
     def _hessian_via_jax(self, grid, xp) -> Tuple:
         import jax
