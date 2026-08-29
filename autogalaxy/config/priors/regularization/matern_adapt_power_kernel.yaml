@@ -1,0 +1,54 @@
+MaternAdaptPowerKernel:
+  scale:
+    type: LogUniform
+    lower_limit: 1.0e-06
+    upper_limit: 1000000.0
+    width_modifier:
+      type: Relative
+      value: 0.2
+    limits:
+      lower: 0.0
+      upper: inf
+  nu:
+    type: Uniform
+    lower_limit: 0.5
+    upper_limit: 5.5
+    width_modifier:
+      type: Relative
+      value: 0.2
+    limits:
+      lower: 0.0
+      upper: inf
+  inner_coefficient:
+    type: LogUniform
+    lower_limit: 1.0e-06
+    upper_limit: 1000000.0
+    width_modifier:
+      type: Relative
+      value: 0.5
+    limits:
+      lower: 0.0
+      upper: inf
+  outer_coefficient:
+    type: LogUniform
+    lower_limit: 1.0e-06
+    upper_limit: 1000000.0
+    width_modifier:
+      type: Relative
+      value: 0.5
+    limits:
+      lower: 0.0
+      upper: inf
+  signal_scale:
+    type: Uniform
+    lower_limit: 0.0
+    upper_limit: 1.0
+    width_modifier:
+      type: Relative
+      value: 0.2
+    limits:
+      lower: 0.0
+      upper: inf
+  power:
+    type: Constant
+    value: 1.0
