@@ -397,15 +397,17 @@ class LensCalc:
           ``(4 * H(h/2) - H(h)) / 3``. This cancels the leading ``O(h^2)`` truncation term,
           giving ``O(h^4)`` accuracy. JAX is not imported.
 
-          The step is **adaptive per grid point**. The pair ``H(h)``, ``H(h/2)`` also yields a
-          truncation-error estimate ``E = |H(h/2) - H(h)| / 3``; a point is converged when all
-          four Hessian components satisfy ``E <= atol + rtol * |R|`` (defaults ``rtol=1e-6``,
-          ``atol=1e-8``). Points that are not converged have their step halved -- reusing the
-          previous half-step evaluation, so each halving costs one new finite-difference
-          evaluation on the shrinking unconverged subset only -- for up to ``max_halvings=12``
-          halvings. A smooth field therefore converges on the first pair at the same cost as
-          before, while a point close to a compact deflector (where a fixed 0.01" step is far
-          too coarse) refines until it is accurate. Any point still unconverged after the last
+          The step is **adaptive per grid point**, and convergence is judged on the change
+          between **successive** extrapolants: ``R_k`` from the pair ``(h_k, h_k/2)`` and
+          ``R_{k+1}`` from ``(h_k/2, h_k/4)``, which costs one new finite-difference evaluation
+          because the half-step evaluation is reused. A point is converged when all four Hessian
+          components satisfy ``|R_{k+1} - R_k| <= atol + rtol * |R_{k+1}|`` (defaults
+          ``rtol=1e-6``, ``atol=1e-8``); the latest extrapolant is the value returned. Points
+          that are not converged keep halving, each halving costing one finite-difference
+          evaluation on the shrinking unconverged subset only, for up to ``max_halvings=20``
+          halvings. A smooth field therefore settles after three finite-difference evaluations,
+          while a point close to a compact deflector (where a fixed 0.01" step is far too coarse)
+          refines until the extrapolant stops moving. Any point still unconverged after the last
           halving keeps its final extrapolated value and triggers a single ``UserWarning``
           reporting how many points did not converge; nothing is ever silently returned as
           converged, and no exception is raised.
@@ -433,23 +435,30 @@ class LensCalc:
         buffer: float = 0.01,
         rtol: float = 1.0e-6,
         atol: float = 1.0e-8,
-        max_halvings: int = 12,
+        max_halvings: int = 20,
     ) -> Tuple:
         """
         Returns the Hessian via Richardson-extrapolated central finite differences with a step
         size that adapts, per grid point, to the scale the deflection field actually varies on.
 
-        The finite-difference pair ``H(h)`` and ``H(h/2)`` gives both the extrapolated value
-        ``R = (4 H(h/2) - H(h)) / 3``, which is ``O(h^4)`` accurate, and an estimate of the
-        truncation error ``E = |H(h/2) - H(h)| / 3``, which the fixed-step implementation
-        discarded. Points whose four components all satisfy ``E <= atol + rtol * |R|`` are
-        accepted; the rest have ``h`` halved, the previous ``H(h/2)`` becoming the new ``H(h)``
-        so only one new finite-difference evaluation is needed, and only on the unconverged
-        subset. Smooth fields therefore exit after the first pair at the original cost.
+        A finite-difference pair ``H(h)``, ``H(h/2)`` gives the extrapolant
+        ``R = (4 H(h/2) - H(h)) / 3``, which cancels the leading ``O(h^2)`` truncation term. The
+        fixed-step implementation returned the first such ``R`` whatever the field looked like.
+        Here the step keeps halving and convergence is judged on the change between successive
+        extrapolants: ``R_k`` from ``(h_k, h_k/2)`` against ``R_{k+1}`` from ``(h_k/2, h_k/4)``,
+        a point being converged when all four components satisfy
+        ``|R_{k+1} - R_k| <= atol + rtol * |R_{k+1}|``. Because the half-step evaluation is
+        reused as the next full-step one, each halving costs a single finite-difference
+        evaluation, and only on the shrinking unconverged subset.
 
-        Points still unconverged after ``max_halvings`` halvings keep their last extrapolated
-        value and raise a single ``UserWarning``; they are never silently accepted, and no
-        exception is raised (a raise here would kill an otherwise-converged model fit).
+        Judging on the extrapolants rather than on the pair's own error estimate
+        ``|H(h/2) - H(h)| / 3`` matters: that estimate bounds the error of ``H(h/2)``, which is
+        ``O(h^2)``, not of ``R``, which is ``O(h^4)``, so it declares non-convergence orders of
+        magnitude past the point where the returned value has stopped moving.
+
+        Points still unconverged after ``max_halvings`` halvings keep their last extrapolant and
+        raise a single ``UserWarning``; they are never silently accepted, and no exception is
+        raised (a raise here would kill an otherwise-converged model fit).
 
         Parameters
         ----------
@@ -458,9 +467,9 @@ class LensCalc:
         buffer
             The initial finite-difference step size in arc-seconds.
         rtol
-            The relative tolerance the per-point truncation-error estimate must meet.
+            The relative tolerance the change between successive extrapolants must meet.
         atol
-            The absolute tolerance the per-point truncation-error estimate must meet.
+            The absolute tolerance the change between successive extrapolants must meet.
         max_halvings
             The maximum number of times the step is halved before unconverged points are warned
             about and their last value kept.
@@ -476,9 +485,9 @@ class LensCalc:
         ).astype(np.float64)
 
         richardson = (4.0 * hessian_h2 - hessian_h) / 3.0
-        error = np.abs(hessian_h2 - hessian_h) / 3.0
+        change = np.full(richardson.shape, np.inf)
 
-        unconverged = np.any(error > atol + rtol * np.abs(richardson), axis=0)
+        unconverged = np.ones(richardson.shape[1], dtype=bool)
 
         step = buffer
         halvings = 0
@@ -497,23 +506,23 @@ class LensCalc:
             ).astype(np.float64)
 
             richardson_subset = (4.0 * hessian_subset_h2 - hessian_subset_h) / 3.0
-            error_subset = np.abs(hessian_subset_h2 - hessian_subset_h) / 3.0
+            change_subset = np.abs(richardson_subset - richardson[:, index])
 
             hessian_h[:, index] = hessian_subset_h
             hessian_h2[:, index] = hessian_subset_h2
             richardson[:, index] = richardson_subset
-            error[:, index] = error_subset
+            change[:, index] = change_subset
 
             unconverged = np.zeros(unconverged.shape, dtype=bool)
             unconverged[index] = np.any(
-                error_subset > atol + rtol * np.abs(richardson_subset), axis=0
+                change_subset > atol + rtol * np.abs(richardson_subset), axis=0
             )
 
         if np.any(unconverged):
             total = int(unconverged.shape[0])
             number = int(np.count_nonzero(unconverged))
             denominator = np.where(np.abs(richardson) > 0.0, np.abs(richardson), 1.0)
-            largest = float(np.max((error / denominator)[:, unconverged]))
+            largest = float(np.max((change / denominator)[:, unconverged]))
             warnings.warn(
                 f"LensCalc Hessian: {number} of {total} points did not converge after "
                 f"{max_halvings} halvings (largest relative error estimate "
