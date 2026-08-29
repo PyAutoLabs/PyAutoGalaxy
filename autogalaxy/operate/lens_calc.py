@@ -400,17 +400,27 @@ class LensCalc:
           The step is **adaptive per grid point**, and convergence is judged on the change
           between **successive** extrapolants: ``R_k`` from the pair ``(h_k, h_k/2)`` and
           ``R_{k+1}`` from ``(h_k/2, h_k/4)``, which costs one new finite-difference evaluation
-          because the half-step evaluation is reused. A point is converged when all four Hessian
-          components satisfy ``|R_{k+1} - R_k| <= atol + rtol * |R_{k+1}|`` (defaults
-          ``rtol=1e-6``, ``atol=1e-8``); the latest extrapolant is the value returned. Points
-          that are not converged keep halving, each halving costing one finite-difference
-          evaluation on the shrinking unconverged subset only, for up to ``max_halvings=20``
-          halvings. A smooth field therefore settles after three finite-difference evaluations,
-          while a point close to a compact deflector (where a fixed 0.01" step is far too coarse)
-          refines until the extrapolant stops moving. Any point still unconverged after the last
-          halving keeps its final extrapolated value and triggers a single ``UserWarning``
-          reporting how many points did not converge; nothing is ever silently returned as
-          converged, and no exception is raised.
+          because the half-step evaluation is reused. A point stops refining on either of two
+          rules:
+
+          1. **Tolerance** -- all four Hessian components satisfy
+             ``|R_{k+1} - R_k| <= atol + rtol * |R_{k+1}|`` (defaults ``rtol=1e-7``,
+             ``atol=1e-8``). ``R_{k+1}`` is returned.
+          2. **Roundoff floor** -- the change has stopped shrinking (``|R_{k+1} - R_k|`` is
+             larger, relatively, than ``|R_k - R_{k-1}|``) while already below
+             ``roundoff_guard=1e-4`` relative. Halving further only feeds cancellation error, so
+             ``R_k``, the estimate from before the growth, is returned. This is what keeps a
+             configuration whose deflections are themselves evaluated numerically (a multi-plane
+             trace, say, which can floor at ~3e-8 relative) from warning on every call.
+
+          Neither rule warns. Points that reach ``max_halvings=20`` halvings while their change
+          is still shrinking -- a genuine singularity, e.g. a grid point exactly on an isothermal
+          centre, whose relative change never falls below the guard -- keep their final
+          extrapolant and trigger a single ``UserWarning`` reporting how many points did not
+          converge. Nothing is ever silently returned as converged, and no exception is raised.
+
+          A smooth field settles after three finite-difference evaluations; only points near
+          compact structure, where a fixed 0.01" step is far too coarse, iterate further.
 
         - **JAX** (``xp=jnp``): exact derivatives via ``jax.jacfwd`` applied to
           ``deflections_yx_scalar``, vectorised over the grid with ``jnp.vectorize``.
@@ -433,9 +443,10 @@ class LensCalc:
         self,
         grid,
         buffer: float = 0.01,
-        rtol: float = 1.0e-6,
+        rtol: float = 1.0e-7,
         atol: float = 1.0e-8,
         max_halvings: int = 20,
+        roundoff_guard: float = 1.0e-4,
     ) -> Tuple:
         """
         Returns the Hessian via Richardson-extrapolated central finite differences with a step
@@ -444,21 +455,31 @@ class LensCalc:
         A finite-difference pair ``H(h)``, ``H(h/2)`` gives the extrapolant
         ``R = (4 H(h/2) - H(h)) / 3``, which cancels the leading ``O(h^2)`` truncation term. The
         fixed-step implementation returned the first such ``R`` whatever the field looked like.
-        Here the step keeps halving and convergence is judged on the change between successive
-        extrapolants: ``R_k`` from ``(h_k, h_k/2)`` against ``R_{k+1}`` from ``(h_k/2, h_k/4)``,
-        a point being converged when all four components satisfy
-        ``|R_{k+1} - R_k| <= atol + rtol * |R_{k+1}|``. Because the half-step evaluation is
-        reused as the next full-step one, each halving costs a single finite-difference
-        evaluation, and only on the shrinking unconverged subset.
+        Here the step keeps halving and each point stops on one of two rules, neither of which
+        warns:
 
-        Judging on the extrapolants rather than on the pair's own error estimate
+        1. **Tolerance.** ``R_k`` from ``(h_k, h_k/2)`` and ``R_{k+1}`` from ``(h_k/2, h_k/4)``
+           agree on all four components: ``|R_{k+1} - R_k| <= atol + rtol * |R_{k+1}|``.
+           ``R_{k+1}`` is kept.
+        2. **Roundoff floor.** The relative change grew instead of shrinking, while already
+           below ``roundoff_guard``. Finite differences fall as ``O(h^2)`` only until
+           cancellation in ``(f(x+h) - f(x-h))`` takes over, after which halving makes the answer
+           *worse*; the turning point is the best the arithmetic can do. ``R_k``, the estimate
+           from before the growth, is kept.
+
+        Because the half-step evaluation is reused as the next full-step one, each halving costs a
+        single finite-difference evaluation, and only on the shrinking active subset.
+
+        Judging on the extrapolants rather than on a pair's own error estimate
         ``|H(h/2) - H(h)| / 3`` matters: that estimate bounds the error of ``H(h/2)``, which is
         ``O(h^2)``, not of ``R``, which is ``O(h^4)``, so it declares non-convergence orders of
         magnitude past the point where the returned value has stopped moving.
 
-        Points still unconverged after ``max_halvings`` halvings keep their last extrapolant and
-        raise a single ``UserWarning``; they are never silently accepted, and no exception is
-        raised (a raise here would kill an otherwise-converged model fit).
+        Rule 2 is guarded by ``roundoff_guard`` so that it cannot silence a genuine singularity:
+        a grid point sitting exactly on an isothermal centre has a relative change that stays at
+        ~0.5 forever, never entering the guard band, so it runs to ``max_halvings``, keeps its
+        last extrapolant and raises a single ``UserWarning``. It is never silently accepted, and
+        no exception is raised (a raise here would kill an otherwise-converged model fit).
 
         Parameters
         ----------
@@ -471,58 +492,76 @@ class LensCalc:
         atol
             The absolute tolerance the change between successive extrapolants must meet.
         max_halvings
-            The maximum number of times the step is halved before unconverged points are warned
-            about and their last value kept.
+            The maximum number of times the step is halved before points that are still refining
+            are warned about and their last value kept.
+        roundoff_guard
+            The relative change below which a growing change is read as the roundoff floor rather
+            than as a field the step has not resolved yet.
         """
         grid_values = grid.array if hasattr(grid, "array") else grid
         grid_values = np.array(grid_values, dtype=np.float64, copy=True)
 
-        hessian_h = np.stack(
+        hessian_full = np.stack(
             self._hessian_via_finite_difference(grid=grid, buffer=buffer)
         ).astype(np.float64)
-        hessian_h2 = np.stack(
+        hessian_half = np.stack(
             self._hessian_via_finite_difference(grid=grid, buffer=buffer / 2.0)
         ).astype(np.float64)
 
-        richardson = (4.0 * hessian_h2 - hessian_h) / 3.0
-        change = np.full(richardson.shape, np.inf)
+        richardson = (4.0 * hessian_half - hessian_full) / 3.0
 
-        unconverged = np.ones(richardson.shape[1], dtype=bool)
+        total = richardson.shape[1]
+        relative_change = np.full(total, np.inf)
+        refining = np.ones(total, dtype=bool)
 
         step = buffer
         halvings = 0
 
-        while np.any(unconverged) and halvings < max_halvings:
+        while np.any(refining) and halvings < max_halvings:
             halvings += 1
             step /= 2.0
 
-            index = np.flatnonzero(unconverged)
+            index = np.flatnonzero(refining)
 
             grid_subset = aa.Grid2DIrregular(values=grid_values[index])
 
-            hessian_subset_h = hessian_h2[:, index]
-            hessian_subset_h2 = np.stack(
+            full_subset = hessian_half[:, index]
+            half_subset = np.stack(
                 self._hessian_via_finite_difference(grid=grid_subset, buffer=step / 2.0)
             ).astype(np.float64)
 
-            richardson_subset = (4.0 * hessian_subset_h2 - hessian_subset_h) / 3.0
-            change_subset = np.abs(richardson_subset - richardson[:, index])
+            richardson_subset = (4.0 * half_subset - full_subset) / 3.0
 
-            hessian_h[:, index] = hessian_subset_h
-            hessian_h2[:, index] = hessian_subset_h2
-            richardson[:, index] = richardson_subset
-            change[:, index] = change_subset
+            change = np.abs(richardson_subset - richardson[:, index])
 
-            unconverged = np.zeros(unconverged.shape, dtype=bool)
-            unconverged[index] = np.any(
-                change_subset > atol + rtol * np.abs(richardson_subset), axis=0
+            within_tolerance = np.all(
+                change <= atol + rtol * np.abs(richardson_subset), axis=0
             )
 
-        if np.any(unconverged):
-            total = int(unconverged.shape[0])
-            number = int(np.count_nonzero(unconverged))
-            denominator = np.where(np.abs(richardson) > 0.0, np.abs(richardson), 1.0)
-            largest = float(np.max((change / denominator)[:, unconverged]))
+            denominator = np.where(
+                np.abs(richardson_subset) > 0.0, np.abs(richardson_subset), 1.0
+            )
+            change_relative = np.max(change / denominator, axis=0)
+
+            at_roundoff_floor = (change_relative > relative_change[index]) & (
+                relative_change[index] <= roundoff_guard
+            )
+
+            # Points at the roundoff floor keep R_k, the extrapolant from before the change
+            # started growing, so their columns are left untouched; every other point adopts
+            # the new extrapolant and the half-step evaluation that will seed its next pair.
+            adopted = index[~at_roundoff_floor]
+
+            richardson[:, adopted] = richardson_subset[:, ~at_roundoff_floor]
+            hessian_half[:, adopted] = half_subset[:, ~at_roundoff_floor]
+            relative_change[adopted] = change_relative[~at_roundoff_floor]
+
+            refining = np.zeros(total, dtype=bool)
+            refining[index] = ~(within_tolerance | at_roundoff_floor)
+
+        if np.any(refining):
+            number = int(np.count_nonzero(refining))
+            largest = float(np.max(relative_change[refining]))
             warnings.warn(
                 f"LensCalc Hessian: {number} of {total} points did not converge after "
                 f"{max_halvings} halvings (largest relative error estimate "
