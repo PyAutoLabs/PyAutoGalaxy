@@ -664,3 +664,74 @@ def test__sersic_convergence_2d_via_mge_from__elliptical():
     )
 
     assert convergence == pytest.approx(5.38066670129, 1e-3)
+
+
+def test__wofz__numpy_path_is_scipy__rational_path_agrees_to_1e_4():
+    """The numpy path is `scipy.special.wofz` itself (max relative error 1.3e-14 against
+    an mpmath reference at dps 40); the hand-rolled rational routine kept for JAX is
+    accurate to ~6 significant digits (3.0e-6 against the same reference)."""
+    from scipy.special import wofz
+
+    from autogalaxy.profiles.mass.abstract.mge import _wofz_rational
+
+    z_list = [
+        20.0 + 1j * 0.001,
+        7.0 + 1j * 0.1,
+        7.0 + 1j * 1e-11,
+        2.0 + 1j * 0.001,
+        2.0 + 1j * 1.0,
+        1.0 + 1j * 0.001,
+    ]
+
+    for z in z_list:
+        assert MGEDecomposer.wofz(z) == pytest.approx(wofz(z), rel=1.0e-12)
+        assert _wofz_rational(z) == pytest.approx(wofz(z), rel=1.0e-4)
+
+
+def test__deflections_2d_via_mge_from__spherical_case__is_radial_and_matches_elliptical_limit(
+    monkeypatch,
+):
+    """A profile whose *unclamped* axis ratio is exactly 1 takes the exact radial closed
+    form on the numpy path, instead of an elliptical Faddeeva sum at the q = 0.9999 clamp.
+
+    The deflection of a circular profile is exactly radial (no cross-axis component on
+    the axes; the clamped elliptical path leaves a spurious ~1e-8 one), and it matches
+    the elliptical form in its q -> 1 limit. Reaching that limit needs the 0.9999 clamp
+    lifted -- the clamp *is* the ~6e-5 bias the branch removes -- so it is monkeypatched
+    away for the comparison only.
+    """
+    gnfw_sph = ag.mp.gNFWSph(
+        centre=(0.0, 0.0), kappa_s=0.2, inner_slope=1.5, scale_radius=10.0
+    )
+
+    grid_axes = ag.Grid2DIrregular([[1.0, 0.0], [0.0, 2.5], [-1.7, 0.0], [0.0, 0.0]])
+
+    deflections = gnfw_sph.deflections_yx_2d_from(grid=grid_axes)
+
+    assert deflections[0, 1] == 0.0
+    assert deflections[1, 0] == 0.0
+    assert deflections[2, 1] == 0.0
+    assert deflections[3, 0] == 0.0 and deflections[3, 1] == 0.0
+
+    monkeypatch.setattr(
+        MGEDecomposer,
+        "axis_ratio",
+        lambda self, xp=np: self.mass_profile.axis_ratio(xp=xp),
+    )
+
+    ell_comps = ag.convert.ell_comps_from(axis_ratio=0.999999, angle=0.0)
+
+    gnfw_ell = ag.mp.gNFW(
+        centre=(0.0, 0.0),
+        ell_comps=(float(ell_comps[0]), float(ell_comps[1])),
+        kappa_s=0.2,
+        inner_slope=1.5,
+        scale_radius=10.0,
+    )
+
+    grid = ag.Grid2DIrregular([[0.5, 1.0], [-2.0, 0.3], [1.5, -1.5], [0.05, 0.05]])
+
+    deflections_sph = np.asarray(gnfw_sph.deflections_yx_2d_from(grid=grid).array)
+    deflections_ell = np.asarray(gnfw_ell.deflections_yx_2d_from(grid=grid).array)
+
+    assert deflections_sph == pytest.approx(deflections_ell, rel=1.0e-5)
