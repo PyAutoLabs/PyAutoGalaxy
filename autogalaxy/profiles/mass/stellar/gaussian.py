@@ -5,6 +5,12 @@ from typing import Tuple
 import autoarray as aa
 
 from autogalaxy.profiles.mass.abstract.abstract import MassProfile
+from autogalaxy.profiles.mass.abstract.mge import (
+    MGEDecomposer,
+    _is_circular,
+    _spherical_mge_deflections_from,
+    _wofz_masked,
+)
 from autogalaxy.profiles.mass.stellar.abstract import StellarProfile
 
 
@@ -88,6 +94,16 @@ class Gaussian(MassProfile, StellarProfile):
 
         """
 
+        if xp is np and _is_circular(self.ell_comps):
+            # A circular Gaussian has an exact real radial form -- take it instead of
+            # the complex Faddeeva evaluated at the q = 0.9999 clamp. JAX keeps the
+            # elliptical path (no data-dependent branching under a trace).
+            return _spherical_mge_deflections_from(
+                grid=grid,
+                amps=np.array([self.mass_to_light_ratio * self.intensity]),
+                sigmas=np.array([self.sigma]),
+            )
+
         deflections = (
             self.mass_to_light_ratio
             * self.intensity
@@ -123,8 +139,6 @@ class Gaussian(MassProfile, StellarProfile):
     @aa.decorators.to_array
     @aa.decorators.transform
     def potential_2d_from(self, grid: aa.type.Grid2DLike, xp=np, **kwargs):
-        from autogalaxy.profiles.mass.abstract.mge import MGEDecomposer
-
         radii_min = self.sigma / 100.0
         radii_max = self.sigma * 20.0
         sigmas = xp.exp(xp.linspace(xp.log(radii_min), xp.log(radii_max), 100))
@@ -182,97 +196,15 @@ class Gaussian(MassProfile, StellarProfile):
 
         exp_term = xp.exp(-(xs * xs) * (1.0 - q2) - (ys * ys) * (1.0 / q2 - 1.0))
 
-        core = -1j * (self.wofz(z1, xp=xp) - exp_term * self.wofz(z2, xp=xp))
+        if xp is np:
+            w2 = _wofz_masked(z2, exp_term)
+        else:
+            w2 = self.wofz(z2, xp=xp)
+
+        core = -1j * (self.wofz(z1, xp=xp) - exp_term * w2)
 
         return xp.where(ind_pos_y, core, xp.conj(core))
 
-    @staticmethod
-    def wofz(z, xp=np):
-        """
-        JAX-compatible Faddeeva function w(z) = exp(-z^2) * erfc(-i z)
-        Based on the Poppe–Wijers / Zaghloul–Ali rational approximations.
-        Valid for all complex z. JIT + autodiff safe.
-        """
-
-        z = xp.asarray(z, dtype=xp.complex128)
-        x = xp.real(z)
-        y = xp.imag(z)
-
-        r2 = x * x + y * y
-        y2 = y * y
-        z2 = z * z
-
-        sqrt_pi = xp.asarray(xp.sqrt(xp.pi), dtype=xp.float64)
-        inv_sqrt_pi = xp.asarray(1.0 / sqrt_pi, dtype=xp.float64)
-
-        # ---------- Large-|z| continued fraction ----------
-        r1_s1 = xp.asarray([2.5, 2.0, 1.5, 1.0, 0.5], dtype=xp.float64)
-
-        t = z
-        for c in r1_s1:
-            t = z - c / t
-
-        w_large = 1j * inv_sqrt_pi / t
-
-        # ---------- Region 5 ----------
-        U5 = xp.asarray(
-            [1.320522, 35.7668, 219.031, 1540.787, 3321.990, 36183.31], dtype=xp.float64
-        )
-        V5 = xp.asarray(
-            [1.841439, 61.57037, 364.2191, 2186.181, 9022.228, 24322.84, 32066.6],
-            dtype=xp.float64,
-        )
-
-        t = inv_sqrt_pi
-        for u in U5:
-            t = u + z2 * t
-
-        s = xp.asarray(1.0, dtype=xp.float64)
-        for v in V5:
-            s = v + z2 * s
-
-        real_exp = xp.clip(-xp.real(z2), None, 700.0)
-        imag_exp = -xp.imag(z2)
-        w5 = (
-            xp.exp(real_exp + 1j * imag_exp) + 1j * z * t / s
-        )  # clip prevents overflow error
-
-        # ---------- Region 6 ----------
-        U6 = xp.asarray(
-            [5.9126262, 30.180142, 93.15558, 181.92853, 214.38239, 122.60793],
-            dtype=xp.float64,
-        )
-        V6 = xp.asarray(
-            [
-                10.479857,
-                53.992907,
-                170.35400,
-                348.70392,
-                457.33448,
-                352.73063,
-                122.60793,
-            ],
-            dtype=xp.float64,
-        )
-
-        t = inv_sqrt_pi
-        for u in U6:
-            t = u - 1j * z * t
-
-        s = xp.asarray(1.0, dtype=xp.float64)
-        for v in V6:
-            s = v - 1j * z * s
-
-        w6 = t / s
-
-        # ---------- Region logic ----------
-        reg1 = (r2 >= 62.0) | ((r2 >= 30.0) & (r2 < 62.0) & (y2 >= 1e-13))
-        reg2 = ((r2 >= 30) & (r2 < 62) & (y2 < 1e-13)) | (
-            (r2 >= 2.5) & (r2 < 30) & (y2 < 0.072)
-        )
-
-        w = w6
-        w = xp.where(reg2, w5, w)
-        w = xp.where(reg1, w_large, w)
-
-        return w
+    # One Faddeeva body for the whole library: `staticmethod` is load-bearing, a
+    # bare assignment would bind `self` as `z` at the `self.wofz(z1, xp=xp)` call.
+    wofz = staticmethod(MGEDecomposer.wofz)

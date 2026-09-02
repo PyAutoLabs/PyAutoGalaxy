@@ -1,7 +1,201 @@
 import numpy as np
+from scipy import special
 
 import autoarray as aa
+from autogalaxy import convert
 from autogalaxy.profiles.mass.abstract.abstract import MassProfile
+
+# Coefficients of the Poppe-Wijers / Zaghloul-Ali rational approximations used by
+# `_wofz_rational`. Hoisted to module level (as plain Python tuples) so the JAX
+# path neither rebuilds them nor traces a 0-d array constant per call.
+_WOFZ_R1_S1 = (2.5, 2.0, 1.5, 1.0, 0.5)
+
+_WOFZ_U5 = (1.320522, 35.7668, 219.031, 1540.787, 3321.990, 36183.31)
+_WOFZ_V5 = (1.841439, 61.57037, 364.2191, 2186.181, 9022.228, 24322.84, 32066.6)
+
+_WOFZ_U6 = (5.9126262, 30.180142, 93.15558, 181.92853, 214.38239, 122.60793)
+_WOFZ_V6 = (
+    10.479857,
+    53.992907,
+    170.35400,
+    348.70392,
+    457.33448,
+    352.73063,
+    122.60793,
+)
+
+_INV_SQRT_PI = float(1.0 / np.sqrt(np.pi))
+
+
+def _wofz_rational(z, xp=np):
+    """
+    JAX-compatible Faddeeva function w(z) = exp(-z^2) * erfc(-i z)
+    Based on the Poppe-Wijers / Zaghloul-Ali rational approximations.
+    Valid for all complex z. JIT + autodiff safe.
+
+    This is the hand-rolled routine used on the JAX path, where
+    `scipy.special.wofz` is not traceable. Its accuracy is ~6 significant
+    digits (max relative error 3.0e-6 against an mpmath reference at dps 40),
+    against 1.3e-14 for `scipy.special.wofz` -- which is why the numpy path
+    calls scipy instead (see `_wofz`).
+    """
+
+    z = xp.asarray(z, dtype=xp.complex128)
+    x = xp.real(z)
+    y = xp.imag(z)
+
+    r2 = x * x + y * y
+    y2 = y * y
+    z2 = z * z
+
+    # ---------- Large-|z| continued fraction ----------
+    t = z
+    for c in _WOFZ_R1_S1:
+        t = z - c / t
+
+    w_large = 1j * _INV_SQRT_PI / t
+
+    # ---------- Region 5 ----------
+    t = _INV_SQRT_PI
+    for u in _WOFZ_U5:
+        t = u + z2 * t
+
+    s = 1.0
+    for v in _WOFZ_V5:
+        s = v + z2 * s
+
+    real_exp = xp.clip(-xp.real(z2), None, 700.0)
+    imag_exp = -xp.imag(z2)
+    w5 = (
+        xp.exp(real_exp + 1j * imag_exp) + 1j * z * t / s
+    )  # clip prevents overflow error
+
+    # ---------- Region 6 ----------
+    t = _INV_SQRT_PI
+    for u in _WOFZ_U6:
+        t = u - 1j * z * t
+
+    s = 1.0
+    for v in _WOFZ_V6:
+        s = v - 1j * z * s
+
+    w6 = t / s
+
+    # ---------- Region logic ----------
+    reg1 = (r2 >= 62.0) | ((r2 >= 30.0) & (r2 < 62.0) & (y2 >= 1e-13))
+    reg2 = ((r2 >= 30) & (r2 < 62) & (y2 < 1e-13)) | (
+        (r2 >= 2.5) & (r2 < 30) & (y2 < 0.072)
+    )
+
+    w = w6
+    w = xp.where(reg2, w5, w)
+    w = xp.where(reg1, w_large, w)
+
+    return w
+
+
+def _wofz(z, xp=np):
+    """
+    Faddeeva function w(z) = exp(-z^2) * erfc(-i z), dispatched on the array
+    backend: `scipy.special.wofz` on numpy (faster and ~8 orders of magnitude
+    more accurate), the hand-rolled `_wofz_rational` on JAX (traceable).
+    """
+    if xp is np:
+        return special.wofz(np.asarray(z, dtype=np.complex128))
+
+    return _wofz_rational(z, xp=xp)
+
+
+def _wofz_masked(z, exp_term, threshold: float = 1e-18):
+    """
+    `w(z)` on the numpy path, evaluated only where the Gaussian envelope it is about to
+    be multiplied by is significant.
+
+    `zeta_from` only ever passes Im(z) >= 0, where |w(z)| <= 1, so wherever `exp_term`
+    has underflowed the product is negligible to < 1e-15 and `w` is simply taken as
+    zero. On the (N_gaussians, N_pixels) arrays of an MGE ~32% of the entries qualify;
+    where nothing qualifies (a single Gaussian on a typical grid) the mask would be pure
+    overhead, so the full array is evaluated instead.
+    """
+    significant = exp_term > threshold
+
+    if significant.all():
+        return _wofz(z)
+
+    w = np.zeros(np.shape(z), dtype=np.complex128)
+    w[significant] = _wofz(z[significant])
+    return w
+
+
+def _is_circular(ell_comps) -> bool:
+    """
+    Whether the *unclamped* geometry of a profile is exactly circular (q = 1).
+
+    The axis ratio used inside the MGE machinery is clamped to 0.9999 (the
+    elliptical Faddeeva form is singular at q = 1), so it can never be used to
+    detect a spherical profile -- this reads the profile's own ellipticity
+    components instead.
+    """
+    return float(convert.axis_ratio_from(ell_comps=ell_comps)) == 1.0
+
+
+def _spherical_mge_deflections_from(grid, amps, sigmas):
+    r"""
+    Deflection angles of a circular (q = 1) Multi-Gaussian Expansion, in closed
+    form on the numpy path.
+
+    For a circular Gaussian of convergence :math:`A_j \exp(-r^2/2\sigma_j^2)`
+    the deflection is purely radial, so the elliptical Faddeeva sum reduces
+    exactly (its q -> 1 limit) to
+
+    .. math::
+
+        \alpha_r(r) = \sum_j \frac{2 A_j \sigma_j^2}{r}
+                      \left(1 - e^{-r^2 / 2\sigma_j^2}\right)
+
+    which is evaluated here in real arithmetic, with :math:`\alpha_r(0) = 0`.
+    Evaluating a spherical profile through the elliptical path at the q = 0.9999
+    clamp instead costs a complex `(N_gaussians, N_pixels)` Faddeeva evaluation
+    and carries a ~6e-5 relative bias plus a spurious cross-axis deflection.
+
+    Parameters
+    ----------
+    grid
+        The (y,x) coordinates in the profile's reference frame.
+    amps
+        The amplitudes :math:`A_j` of the Gaussian components.
+    sigmas
+        The widths :math:`\sigma_j` of the Gaussian components.
+
+    Returns
+    -------
+    The (y,x) deflection angles, in the profile's reference frame.
+    """
+    y = np.asarray(grid.array[:, 0], dtype=np.float64)
+    x = np.asarray(grid.array[:, 1], dtype=np.float64)
+
+    amps = np.asarray(amps, dtype=np.float64)[:, None]
+    sigmas = np.asarray(sigmas, dtype=np.float64)[:, None]
+
+    radii_squared = y * y + x * x
+
+    magnitude = np.sum(
+        2.0
+        * amps
+        * sigmas**2.0
+        * -np.expm1(-0.5 * radii_squared[None, :] / sigmas**2.0),
+        axis=0,
+    )
+
+    # magnitude / r gives alpha_r, and the unit vector another 1 / r.
+    factor = np.divide(
+        magnitude,
+        radii_squared,
+        out=np.zeros_like(magnitude),
+        where=radii_squared > 0.0,
+    )
+
+    return np.vstack((factor * y, factor * x)).T
 
 
 class MGEDecomposer:
@@ -79,93 +273,15 @@ class MGEDecomposer:
     @staticmethod
     def wofz(z, xp=np):
         """
-        JAX-compatible Faddeeva function w(z) = exp(-z^2) * erfc(-i z)
-        Based on the Poppe–Wijers / Zaghloul–Ali rational approximations.
-        Valid for all complex z. JIT + autodiff safe.
+        Faddeeva function w(z) = exp(-z^2) * erfc(-i z), valid for all complex z.
+
+        The numpy path calls `scipy.special.wofz`; the JAX path calls the
+        hand-rolled `_wofz_rational` (the Poppe-Wijers / Zaghloul-Ali rational
+        approximations), which is JIT + autodiff safe. The split exists because
+        scipy is not traceable under JAX, and because scipy is both faster and
+        far more accurate (1.3e-14 vs 3.0e-6 max relative error against mpmath).
         """
-
-        z = xp.asarray(z, dtype=xp.complex128)
-        x = xp.real(z)
-        y = xp.imag(z)
-
-        r2 = x * x + y * y
-        y2 = y * y
-        z2 = z * z
-
-        sqrt_pi = xp.asarray(xp.sqrt(xp.pi), dtype=xp.float64)
-        inv_sqrt_pi = xp.asarray(1.0 / sqrt_pi, dtype=xp.float64)
-
-        # ---------- Large-|z| continued fraction ----------
-        r1_s1 = xp.asarray([2.5, 2.0, 1.5, 1.0, 0.5], dtype=xp.float64)
-
-        t = z
-        for c in r1_s1:
-            t = z - c / t
-
-        w_large = 1j * inv_sqrt_pi / t
-
-        # ---------- Region 5 ----------
-        U5 = xp.asarray(
-            [1.320522, 35.7668, 219.031, 1540.787, 3321.990, 36183.31], dtype=xp.float64
-        )
-        V5 = xp.asarray(
-            [1.841439, 61.57037, 364.2191, 2186.181, 9022.228, 24322.84, 32066.6],
-            dtype=xp.float64,
-        )
-
-        t = inv_sqrt_pi
-        for u in U5:
-            t = u + z2 * t
-
-        s = xp.asarray(1.0, dtype=xp.float64)
-        for v in V5:
-            s = v + z2 * s
-
-        real_exp = xp.clip(-xp.real(z2), None, 700.0)
-        imag_exp = -xp.imag(z2)
-        w5 = (
-            xp.exp(real_exp + 1j * imag_exp) + 1j * z * t / s
-        )  # clip prevents overflow error
-
-        # ---------- Region 6 ----------
-        U6 = xp.asarray(
-            [5.9126262, 30.180142, 93.15558, 181.92853, 214.38239, 122.60793],
-            dtype=xp.float64,
-        )
-        V6 = xp.asarray(
-            [
-                10.479857,
-                53.992907,
-                170.35400,
-                348.70392,
-                457.33448,
-                352.73063,
-                122.60793,
-            ],
-            dtype=xp.float64,
-        )
-
-        t = inv_sqrt_pi
-        for u in U6:
-            t = u - 1j * z * t
-
-        s = xp.asarray(1.0, dtype=xp.float64)
-        for v in V6:
-            s = v - 1j * z * s
-
-        w6 = t / s
-
-        # ---------- Region logic ----------
-        reg1 = (r2 >= 62.0) | ((r2 >= 30.0) & (r2 < 62.0) & (y2 >= 1e-13))
-        reg2 = ((r2 >= 30) & (r2 < 62) & (y2 < 1e-13)) | (
-            (r2 >= 2.5) & (r2 < 30) & (y2 < 0.072)
-        )
-
-        w = w6
-        w = xp.where(reg2, w5, w)
-        w = xp.where(reg1, w_large, w)
-
-        return w
+        return _wofz(z, xp=xp)
 
     @aa.decorators.to_vector_yx
     @aa.decorators.transform
@@ -199,20 +315,29 @@ class MGEDecomposer:
         """
         sigma_log_array = xp.asarray(sigma_log_list, dtype=xp.float64)
 
-        amps, sigmas = self.decompose_convergence_via_mge(
+        amps, _ = self.decompose_convergence_via_mge(
             sigma_log_list=sigma_log_array,
             func_terms=func_terms,
             three_D=three_D,
             xp=xp,
         )
 
-        q = xp.asarray(self.axis_ratio(xp), dtype=xp.float64)
-
         # Change ellipticity convention to (q**2*x**2 + y**2) (most profiles are in (x**2 + y**2/q**2))
         sigmas_factor = self.sigmas_factor_from(
             input_convention=ellipticity_convention, target_convention="minor", xp=xp
         )
         sigmas = sigmas_factor * sigma_log_array
+
+        if xp is np and _is_circular(self.ell_comps):
+            # A spherical profile has an exact real radial form -- take it instead of
+            # the complex Faddeeva sum evaluated at the q = 0.9999 clamp. JAX keeps
+            # the elliptical path (no data-dependent branching under a trace).
+            return self.mass_profile.rotated_grid_from_reference_frame_from(
+                _spherical_mge_deflections_from(grid=grid, amps=amps, sigmas=sigmas),
+                xp=xp,
+            )
+
+        q = xp.asarray(self.axis_ratio(xp), dtype=xp.float64)
 
         deflection_angles = (
             amps[:, None]
@@ -313,7 +438,12 @@ class MGEDecomposer:
 
         exp_term = xp.exp(-(xs * xs) * (1.0 - q2) - (ys * ys) * (1.0 / q2 - 1.0))
 
-        core = -1j * (self.wofz(z1, xp=xp) - exp_term * self.wofz(z2, xp=xp))
+        if xp is np:
+            w2 = _wofz_masked(z2, exp_term)
+        else:
+            w2 = self.wofz(z2, xp=xp)
+
+        core = -1j * (self.wofz(z1, xp=xp) - exp_term * w2)
 
         return xp.where(ind_pos_y[None, :], core, xp.conj(core))
 
@@ -506,7 +636,7 @@ class MGEDecomposer:
         """
         sigma_log_array = xp.asarray(sigma_log_list, dtype=xp.float64)
 
-        amps, sigmas = self.decompose_convergence_via_mge(
+        amps, _ = self.decompose_convergence_via_mge(
             sigma_log_list=sigma_log_array,
             func_terms=func_terms,
             three_D=three_D,
