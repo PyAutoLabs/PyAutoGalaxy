@@ -374,12 +374,29 @@ class Galaxy(af.ModelObject, OperateImageList):
             The source-plane (y, x) coordinates after deflection.
         """
         if isinstance(grid, aa.Grid2D):
+            traced_grid = grid - self.deflections_yx_2d_from(grid=grid, xp=xp)
+
+            # At a uniform over sample size of 1 every sub pixel is the pixel itself, so
+            # `grid.over_sampled` is the slim grid in the same order and tracing it again
+            # doubles the deflection angle calculation for a bit-identical result. The
+            # over sample size is host numpy, so this branch is static at JAX trace time.
+
+            sub_size_all_one = bool(np.all(np.asarray(grid.over_sample_size.array) == 1))
+
+            if sub_size_all_one:
+                traced_grid_over_sampled = aa.Grid2DIrregular(
+                    values=traced_grid.array, xp=xp
+                )
+            else:
+                traced_grid_over_sampled = grid.over_sampled - self.deflections_yx_2d_from(
+                    grid=grid.over_sampled, xp=xp
+                )
+
             return aa.Grid2D(
-                values=grid - self.deflections_yx_2d_from(grid=grid, xp=xp),
+                values=traced_grid,
                 mask=grid.mask,
                 over_sample_size=grid.over_sample_size,
-                over_sampled=grid.over_sampled
-                - self.deflections_yx_2d_from(grid=grid.over_sampled, xp=xp),
+                over_sampled=traced_grid_over_sampled,
                 over_sampler=grid.over_sampler,
             )
 
