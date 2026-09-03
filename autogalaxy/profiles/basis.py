@@ -16,6 +16,7 @@ from typing import Dict, List, Optional, Union
 import autoarray as aa
 
 from autogalaxy.profiles.light.abstract import LightProfile
+from autogalaxy.profiles.mass.abstract import deflections_memo
 from autogalaxy.profiles.mass.abstract.abstract import MassProfile
 
 from autogalaxy.profiles.light import linear as lp_linear
@@ -243,9 +244,14 @@ class Basis(LightProfile, MassProfile):
         The deflections of the mass profiles in the basis summed together.
         """
         if len(self.mass_profile_list) > 0:
+            # Routed through `deflections_memo` (not called directly) so each fixed
+            # Gaussian's field is computed once and rescaled by its
+            # `mass_to_light_ratio` on later evaluations; the helper falls through to
+            # `mass.deflections_yx_2d_from` whenever it cannot key the call exactly, and
+            # is a no-op on the JAX path.
             return sum(
                 [
-                    mass.deflections_yx_2d_from(grid=grid, xp=xp)
+                    deflections_memo.deflections_yx_2d_from(mass, grid, xp)
                     for mass in self.profile_list
                 ]
             )

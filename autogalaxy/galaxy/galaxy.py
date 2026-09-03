@@ -26,6 +26,7 @@ from autogalaxy.profiles.geometry_profiles import GeometryProfile
 from autogalaxy.profiles.light.abstract import LightProfile
 from autogalaxy.profiles.light.linear import LightProfileLinear
 from autogalaxy.profiles.light.snr.abstract import LightProfileSNR
+from autogalaxy.profiles.mass.abstract import deflections_memo
 from autogalaxy.profiles.mass.abstract.abstract import MassProfile
 from autogalaxy.profiles import validate
 
@@ -298,9 +299,13 @@ class Galaxy(af.ModelObject, OperateImageList):
             The 2D (y, x) coordinates where values of the deflection angles are evaluated.
         """
         if self.has(cls=MassProfile):
+            # Routed through `deflections_memo` (not called directly) so a fixed-geometry
+            # profile's field is reused across likelihood evaluations; the helper falls
+            # through to `p.deflections_yx_2d_from` whenever it cannot key the call
+            # exactly, and is a no-op on the JAX path.
             return sum(
                 map(
-                    lambda p: p.deflections_yx_2d_from(grid=grid, xp=xp),
+                    lambda p: deflections_memo.deflections_yx_2d_from(p, grid, xp),
                     self.cls_list_from(cls=MassProfile),
                 )
             )
