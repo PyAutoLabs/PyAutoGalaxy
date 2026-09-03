@@ -222,36 +222,83 @@ def test__image_2d_via_radii_from__sigma_2_radii_3():
     assert intensity == pytest.approx(0.32465, 1e-2)
 
 
-def test__wofz__regions_1_2_3():
-    """The hand-rolled rational approximation is the JAX-path routine (numpy goes to
-    `scipy.special.wofz`), so these region pins target it directly -- the suite never
-    imports jax, and `MGEDecomposer.wofz` would dispatch away from the branches."""
+def test__wofz__weideman_matches_scipy():
+    """The Weideman (1994) series is the JAX-path routine (numpy goes to
+    `scipy.special.wofz`), so these pins target it directly with `xp=np` -- the suite
+    never imports jax, and `MGEDecomposer.wofz` would dispatch away from it.
+
+    The sample points are the six the old piecewise routine's region pins used (they
+    straddle its `r2 = 2.5 / 30 / 62` and `y2 = 0.072 / 1e-13` boundaries, which the
+    seam-free series does not have), plus |z| = 1e3 and z = 0. The reference values are
+    `scipy.special.wofz`, not this routine's own output.
+    """
     from scipy.special import wofz
 
-    from autogalaxy.profiles.mass.abstract.mge import _wofz_rational as mp_wofz
+    from autogalaxy.profiles.mass.abstract.mge import _wofz_weideman
 
-    wofz_approx_reg_1 = mp_wofz(20.0 + 1j * 0.001)
-    wofz_approx_reg_2 = mp_wofz(2.0 + 1j * 0.001)
-    wofz_approx_reg_3 = mp_wofz(1.0 + 1j * 0.001)
+    z_list = [
+        20.0 + 1j * 0.001,
+        7.0 + 1j * 0.1,
+        7.0 + 1j * 1e-11,
+        2.0 + 1j * 0.001,
+        2.0 + 1j * 1.0,
+        1.0 + 1j * 0.001,
+        1.0e3 + 1j * 1.0e3,
+        1.0e3 + 1j * 0.0,
+        0.0 + 1j * 0.0,
+    ]
 
-    assert wofz_approx_reg_1 == pytest.approx(wofz(20.0 + 1j * 0.001), 1e-4)
-    assert wofz_approx_reg_2 == pytest.approx(wofz(2.0 + 1j * 0.001), 1e-4)
-    assert wofz_approx_reg_3 == pytest.approx(wofz(1.0 + 1j * 0.001), 1e-4)
+    for z in z_list:
+        assert _wofz_weideman(z, xp=np) == pytest.approx(wofz(z), rel=1.0e-10)
 
 
-def test__wofz__regions_4_5_6():
-    """See `test__wofz__regions_1_2_3`: these pin the JAX-path rational routine."""
-    from scipy.special import wofz
+def test__is_circular__only_static_scalars_are_circular():
+    """`_is_circular` is a branch predicate on the JAX path too, so a traced or array
+    ellipticity must fall through to the elliptical path (return `False`) rather than
+    raise. Detection is by the module the type is defined in, so no jax import here."""
+    from autogalaxy.profiles.mass.abstract.mge import _is_circular
 
-    from autogalaxy.profiles.mass.abstract.mge import _wofz_rational as mp_wofz
+    class FakeTracer:
+        pass
 
-    wofz_approx_reg_1 = mp_wofz(7.0 + 1j * 0.1)
-    wofz_approx_reg_2 = mp_wofz(7.0 + 1j * 1e-11)
-    wofz_approx_reg_3 = mp_wofz(2.0 + 1j * 1.0)
+    FakeTracer.__module__ = "jax._src.core"
 
-    assert wofz_approx_reg_1 == pytest.approx(wofz(7.0 + 1j * 0.1), 1e-4)
-    assert wofz_approx_reg_2 == pytest.approx(wofz(7.0 + 1j * 1e-11), 1e-4)
-    assert wofz_approx_reg_3 == pytest.approx(wofz(2.0 + 1j * 1.0), 1e-4)
+    assert _is_circular((0.0, 0.0)) is True
+    assert _is_circular((0.1, 0.0)) is False
+    assert _is_circular((np.zeros(1), np.zeros(1))) is False
+    assert _is_circular((FakeTracer(), FakeTracer())) is False
+
+
+def test__spherical_mge_deflections_from__numpy_path_is_unchanged():
+    """The exact radial branch became `xp`-generic (the `np.divide(out=, where=)` guard
+    became a `where`-safe denominator, so JAX can take the branch too). The numpy result
+    must be bit-identical to what it was before: the literals below are the pre-change
+    output, reproduced here to 17 significant digits."""
+    from autogalaxy.profiles.mass.abstract.mge import _spherical_mge_deflections_from
+
+    grid = ag.Grid2DIrregular(
+        [[1.0, 0.0], [0.0, 2.5], [-1.7, 0.3], [0.0, 0.0], [0.05, -0.05]]
+    )
+
+    deflections = _spherical_mge_deflections_from(
+        grid=grid,
+        amps=np.array([0.3, 1.2, 0.05]),
+        sigmas=np.array([0.5, 1.0, 4.0]),
+        xp=np,
+    )
+
+    assert np.array_equal(
+        np.asarray(deflections),
+        np.array(
+            [
+                [1.1232529490420373, 0.0],
+                [0.0, 1.0913706801871932],
+                [-1.2270755548552907, 0.21654274497446305],
+                [0.0, 0.0],
+                [0.07735011653487707, -0.07735011653487707],
+            ]
+        ),
+    )
 
 
 def test__deflections_yx_2d_from__spherical_case__is_radial_and_matches_elliptical_limit(

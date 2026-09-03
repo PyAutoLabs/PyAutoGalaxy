@@ -5,105 +5,88 @@ import autoarray as aa
 from autogalaxy import convert
 from autogalaxy.profiles.mass.abstract.abstract import MassProfile
 
-# Coefficients of the Poppe-Wijers / Zaghloul-Ali rational approximations used by
-# `_wofz_rational`. Hoisted to module level (as plain Python tuples) so the JAX
-# path neither rebuilds them nor traces a 0-d array constant per call.
-_WOFZ_R1_S1 = (2.5, 2.0, 1.5, 1.0, 0.5)
+# Weideman (1994) rational approximation to the Faddeeva function, order N = 32.
+# The coefficients are the real FFT of a Gaussian sampled on a tangent grid and
+# depend on nothing but the order, so they are computed once here with numpy and
+# hoisted to module level as plain Python floats -- the JAX path neither rebuilds
+# them nor traces a 0-d array constant per call.
+_WOFZ_WEIDEMAN_N = 32
 
-_WOFZ_U5 = (1.320522, 35.7668, 219.031, 1540.787, 3321.990, 36183.31)
-_WOFZ_V5 = (1.841439, 61.57037, 364.2191, 2186.181, 9022.228, 24322.84, 32066.6)
 
-_WOFZ_U6 = (5.9126262, 30.180142, 93.15558, 181.92853, 214.38239, 122.60793)
-_WOFZ_V6 = (
-    10.479857,
-    53.992907,
-    170.35400,
-    348.70392,
-    457.33448,
-    352.73063,
-    122.60793,
-)
+def _weideman_coefficients(n_terms: int):
+    """
+    `(L, a)` for the Weideman (1994) rational approximation of order `n_terms`.
+
+    See Weideman 1994, SIAM J. Numer. Anal. 31, 1497, Eq. (38): the coefficients
+    `a_k` are the Fourier coefficients of a Gaussian sampled on the tangent grid
+    `t = L tan(k pi / 2M)`, obtained here by a single real FFT.
+    """
+    m = 2 * n_terms
+    m2 = 2 * m
+    k = np.arange(-m + 1, m, dtype=np.float64)
+    scale = np.sqrt(n_terms / np.sqrt(2.0))
+    t = scale * np.tan(k * np.pi / m2)
+    f = np.exp(-(t**2.0)) * (scale**2.0 + t**2.0)
+    f = np.concatenate((np.zeros(1), f))
+    coefficients = np.real(np.fft.fft(np.fft.fftshift(f))) / m2
+    return float(scale), np.flipud(coefficients[1 : n_terms + 1]).copy()
+
+
+_WOFZ_WEIDEMAN_L, _WOFZ_WEIDEMAN_A = _weideman_coefficients(_WOFZ_WEIDEMAN_N)
+_WOFZ_WEIDEMAN_A = tuple(float(coefficient) for coefficient in _WOFZ_WEIDEMAN_A)
 
 _INV_SQRT_PI = float(1.0 / np.sqrt(np.pi))
 
 
-def _wofz_rational(z, xp=np):
+def _wofz_weideman(z, xp=np):
     """
-    JAX-compatible Faddeeva function w(z) = exp(-z^2) * erfc(-i z)
-    Based on the Poppe-Wijers / Zaghloul-Ali rational approximations.
-    Valid for all complex z. JIT + autodiff safe.
+    Faddeeva function w(z) = exp(-z^2) * erfc(-i z) by the Weideman (1994)
+    rational series of order 32, evaluated by Horner's rule in the conformal
+    variable (L + iz) / (L - iz).
 
-    This is the hand-rolled routine used on the JAX path, where
-    `scipy.special.wofz` is not traceable. Its accuracy is ~6 significant
-    digits (max relative error 3.0e-6 against an mpmath reference at dps 40),
-    against 1.3e-14 for `scipy.special.wofz` -- which is why the numpy path
-    calls scipy instead (see `_wofz`).
+    This is the routine used on the JAX path, where `scipy.special.wofz` is not
+    traceable. It is a single expression with no region selection, so it is as
+    smooth as `w` itself -- unlike a piecewise rational approximation, whose
+    *derivative* jumps where the regions meet.
+
+    **Valid for Im(z) >= 0 only.** The series approximates `w` on the closed
+    upper half-plane; in the lower half-plane it is silently wrong. Every caller
+    reaches it through `zeta_from`, which builds `z = xs + i ys` with
+    `ys = |y| * scale >= 0`, so the constraint holds -- but nothing in this
+    signature enforces it.
+
+    Accuracy and cost on the MGE domain (gNFW MGE-30 on an hst grid,
+    |z| = 0 ... 1e4): max relative error 1.9e-13 against `scipy.special.wofz`
+    (which is itself 1.2e-14 against mpmath at dps 40), and clean out to
+    |z| = 1e5 (1.5e-16 there). The origin -- where a piecewise routine carries
+    its largest error -- is exact to rounding: `w(0)` to 3.1e-14 and `w'(0)` to
+    3.7e-13 relative. On a (30, 15361) complex128 block it costs ~0.75x the
+    piecewise rational routine it replaces, with less than half the JAX compile
+    time.
     """
-
     z = xp.asarray(z, dtype=xp.complex128)
-    x = xp.real(z)
-    y = xp.imag(z)
 
-    r2 = x * x + y * y
-    y2 = y * y
-    z2 = z * z
+    denominator = _WOFZ_WEIDEMAN_L - 1j * z
+    ratio = (_WOFZ_WEIDEMAN_L + 1j * z) / denominator
 
-    # ---------- Large-|z| continued fraction ----------
-    t = z
-    for c in _WOFZ_R1_S1:
-        t = z - c / t
+    polynomial = xp.zeros_like(ratio)
+    for coefficient in _WOFZ_WEIDEMAN_A:
+        polynomial = polynomial * ratio + coefficient
 
-    w_large = 1j * _INV_SQRT_PI / t
-
-    # ---------- Region 5 ----------
-    t = _INV_SQRT_PI
-    for u in _WOFZ_U5:
-        t = u + z2 * t
-
-    s = 1.0
-    for v in _WOFZ_V5:
-        s = v + z2 * s
-
-    real_exp = xp.clip(-xp.real(z2), None, 700.0)
-    imag_exp = -xp.imag(z2)
-    w5 = (
-        xp.exp(real_exp + 1j * imag_exp) + 1j * z * t / s
-    )  # clip prevents overflow error
-
-    # ---------- Region 6 ----------
-    t = _INV_SQRT_PI
-    for u in _WOFZ_U6:
-        t = u - 1j * z * t
-
-    s = 1.0
-    for v in _WOFZ_V6:
-        s = v - 1j * z * s
-
-    w6 = t / s
-
-    # ---------- Region logic ----------
-    reg1 = (r2 >= 62.0) | ((r2 >= 30.0) & (r2 < 62.0) & (y2 >= 1e-13))
-    reg2 = ((r2 >= 30) & (r2 < 62) & (y2 < 1e-13)) | (
-        (r2 >= 2.5) & (r2 < 30) & (y2 < 0.072)
-    )
-
-    w = w6
-    w = xp.where(reg2, w5, w)
-    w = xp.where(reg1, w_large, w)
-
-    return w
+    return 2.0 * polynomial / denominator**2.0 + _INV_SQRT_PI / denominator
 
 
 def _wofz(z, xp=np):
     """
     Faddeeva function w(z) = exp(-z^2) * erfc(-i z), dispatched on the array
-    backend: `scipy.special.wofz` on numpy (faster and ~8 orders of magnitude
-    more accurate), the hand-rolled `_wofz_rational` on JAX (traceable).
+    backend: `scipy.special.wofz` on numpy (slightly faster and one order of
+    magnitude more accurate), the Weideman series `_wofz_weideman` on JAX
+    (traceable). Both are accurate to ~1e-13 or better on the MGE domain.
     """
     if xp is np:
         return special.wofz(np.asarray(z, dtype=np.complex128))
 
-    return _wofz_rational(z, xp=xp)
+    return _wofz_weideman(z, xp=xp)
 
 
 def _wofz_masked(z, exp_term, threshold: float = 1e-18):
@@ -127,6 +110,21 @@ def _wofz_masked(z, exp_term, threshold: float = 1e-18):
     return w
 
 
+def _is_static_scalar(value) -> bool:
+    """
+    Whether `value` is a Python / numpy scalar whose value is known outside any
+    array-backend trace.
+
+    A JAX tracer or array is rejected by the module its type is defined in, so
+    that nothing here has to import jax (the same test as
+    `autogalaxy.jax.registration._is_builtin`).
+    """
+    if type(value).__module__.startswith(("jax", "jaxlib")):
+        return False
+
+    return isinstance(value, (int, float, np.number))
+
+
 def _is_circular(ell_comps) -> bool:
     """
     Whether the *unclamped* geometry of a profile is exactly circular (q = 1).
@@ -135,14 +133,24 @@ def _is_circular(ell_comps) -> bool:
     elliptical Faddeeva form is singular at q = 1), so it can never be used to
     detect a spherical profile -- this reads the profile's own ellipticity
     components instead.
+
+    This is a branch predicate on the JAX path as well as the numpy one, so it
+    must be *static*: a `*Sph` class sets `ell_comps = (0.0, 0.0)` as Python
+    floats in `__init__` and they stay Python floats under `jax.jit` / `jax.vmap`
+    and through the `autofit` pytree, while a free (or traced) ellipticity gives
+    a JAX tracer or an array. Anything that is not a Python / numpy scalar
+    therefore returns `False` -- the elliptical path -- rather than raising.
     """
+    if not all(_is_static_scalar(component) for component in ell_comps):
+        return False
+
     return float(convert.axis_ratio_from(ell_comps=ell_comps)) == 1.0
 
 
-def _spherical_mge_deflections_from(grid, amps, sigmas):
+def _spherical_mge_deflections_from(grid, amps, sigmas, xp=np):
     r"""
     Deflection angles of a circular (q = 1) Multi-Gaussian Expansion, in closed
-    form on the numpy path.
+    form, on both array backends.
 
     For a circular Gaussian of convergence :math:`A_j \exp(-r^2/2\sigma_j^2)`
     the deflection is purely radial, so the elliptical Faddeeva sum reduces
@@ -166,36 +174,38 @@ def _spherical_mge_deflections_from(grid, amps, sigmas):
         The amplitudes :math:`A_j` of the Gaussian components.
     sigmas
         The widths :math:`\sigma_j` of the Gaussian components.
+    xp
+        The array backend, `numpy` or `jax.numpy`. The arithmetic is real on
+        both, and the branch that reaches here is static (see `_is_circular`).
 
     Returns
     -------
     The (y,x) deflection angles, in the profile's reference frame.
     """
-    y = np.asarray(grid.array[:, 0], dtype=np.float64)
-    x = np.asarray(grid.array[:, 1], dtype=np.float64)
+    y = xp.asarray(grid.array[:, 0], dtype=xp.float64)
+    x = xp.asarray(grid.array[:, 1], dtype=xp.float64)
 
-    amps = np.asarray(amps, dtype=np.float64)[:, None]
-    sigmas = np.asarray(sigmas, dtype=np.float64)[:, None]
+    amps = xp.asarray(amps, dtype=xp.float64)[:, None]
+    sigmas = xp.asarray(sigmas, dtype=xp.float64)[:, None]
 
     radii_squared = y * y + x * x
 
-    magnitude = np.sum(
+    magnitude = xp.sum(
         2.0
         * amps
         * sigmas**2.0
-        * -np.expm1(-0.5 * radii_squared[None, :] / sigmas**2.0),
+        * -xp.expm1(-0.5 * radii_squared[None, :] / sigmas**2.0),
         axis=0,
     )
 
-    # magnitude / r gives alpha_r, and the unit vector another 1 / r.
-    factor = np.divide(
-        magnitude,
-        radii_squared,
-        out=np.zeros_like(magnitude),
-        where=radii_squared > 0.0,
-    )
+    # magnitude / r gives alpha_r, and the unit vector another 1 / r. The
+    # denominator is made safe before the divide (rather than after) so that the
+    # r = 0 entry carries no NaN into a reverse-mode gradient.
+    is_off_centre = radii_squared > 0.0
+    radii_squared_safe = xp.where(is_off_centre, radii_squared, 1.0)
+    factor = xp.where(is_off_centre, magnitude / radii_squared_safe, 0.0)
 
-    return np.vstack((factor * y, factor * x)).T
+    return xp.vstack((factor * y, factor * x)).T
 
 
 class MGEDecomposer:
@@ -273,13 +283,13 @@ class MGEDecomposer:
     @staticmethod
     def wofz(z, xp=np):
         """
-        Faddeeva function w(z) = exp(-z^2) * erfc(-i z), valid for all complex z.
+        Faddeeva function w(z) = exp(-z^2) * erfc(-i z).
 
-        The numpy path calls `scipy.special.wofz`; the JAX path calls the
-        hand-rolled `_wofz_rational` (the Poppe-Wijers / Zaghloul-Ali rational
-        approximations), which is JIT + autodiff safe. The split exists because
-        scipy is not traceable under JAX, and because scipy is both faster and
-        far more accurate (1.3e-14 vs 3.0e-6 max relative error against mpmath).
+        The numpy path calls `scipy.special.wofz`; the JAX path calls
+        `_wofz_weideman` (the Weideman 1994 rational series, order 32), which is
+        JIT + autodiff safe. The split exists because scipy is not traceable
+        under JAX. Note that the JAX routine is valid for Im(z) >= 0 only, which
+        is all `zeta_from` ever passes.
         """
         return _wofz(z, xp=xp)
 
@@ -328,12 +338,16 @@ class MGEDecomposer:
         )
         sigmas = sigmas_factor * sigma_log_array
 
-        if xp is np and _is_circular(self.ell_comps):
+        if _is_circular(self.ell_comps):
             # A spherical profile has an exact real radial form -- take it instead of
-            # the complex Faddeeva sum evaluated at the q = 0.9999 clamp. JAX keeps
-            # the elliptical path (no data-dependent branching under a trace).
+            # the complex Faddeeva sum evaluated at the q = 0.9999 clamp. The
+            # predicate is static on both backends (a `*Sph` class has literal
+            # `ell_comps = (0.0, 0.0)`), so this is not a data-dependent branch
+            # under a trace and JAX takes it too.
             return self.mass_profile.rotated_grid_from_reference_frame_from(
-                _spherical_mge_deflections_from(grid=grid, amps=amps, sigmas=sigmas),
+                _spherical_mge_deflections_from(
+                    grid=grid, amps=amps, sigmas=sigmas, xp=xp
+                ),
                 xp=xp,
             )
 
