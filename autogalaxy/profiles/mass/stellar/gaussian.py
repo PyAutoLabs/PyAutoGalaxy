@@ -94,14 +94,16 @@ class Gaussian(MassProfile, StellarProfile):
 
         """
 
-        if xp is np and _is_circular(self.ell_comps):
+        if _is_circular(self.ell_comps):
             # A circular Gaussian has an exact real radial form -- take it instead of
-            # the complex Faddeeva evaluated at the q = 0.9999 clamp. JAX keeps the
-            # elliptical path (no data-dependent branching under a trace).
+            # the complex Faddeeva evaluated at the q = 0.9999 clamp. The predicate
+            # reads the literal `ell_comps`, which stays a Python float tuple under a
+            # trace, so this is not a data-dependent branch and JAX takes it too.
             return _spherical_mge_deflections_from(
                 grid=grid,
-                amps=np.array([self.mass_to_light_ratio * self.intensity]),
-                sigmas=np.array([self.sigma]),
+                amps=xp.atleast_1d(self.mass_to_light_ratio * self.intensity),
+                sigmas=xp.atleast_1d(self.sigma),
+                xp=xp,
             )
 
         deflections = (

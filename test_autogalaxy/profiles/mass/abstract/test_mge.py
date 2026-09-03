@@ -666,13 +666,13 @@ def test__sersic_convergence_2d_via_mge_from__elliptical():
     assert convergence == pytest.approx(5.38066670129, 1e-3)
 
 
-def test__wofz__numpy_path_is_scipy__rational_path_agrees_to_1e_4():
+def test__wofz__numpy_path_is_scipy__weideman_path_agrees_to_1e_10():
     """The numpy path is `scipy.special.wofz` itself (max relative error 1.3e-14 against
-    an mpmath reference at dps 40); the hand-rolled rational routine kept for JAX is
-    accurate to ~6 significant digits (3.0e-6 against the same reference)."""
+    an mpmath reference at dps 40); the Weideman (1994) series kept for JAX is accurate
+    to ~1.9e-13 on the MGE input domain against the same reference."""
     from scipy.special import wofz
 
-    from autogalaxy.profiles.mass.abstract.mge import _wofz_rational
+    from autogalaxy.profiles.mass.abstract.mge import _wofz_weideman
 
     z_list = [
         20.0 + 1j * 0.001,
@@ -685,7 +685,7 @@ def test__wofz__numpy_path_is_scipy__rational_path_agrees_to_1e_4():
 
     for z in z_list:
         assert MGEDecomposer.wofz(z) == pytest.approx(wofz(z), rel=1.0e-12)
-        assert _wofz_rational(z) == pytest.approx(wofz(z), rel=1.0e-4)
+        assert _wofz_weideman(z) == pytest.approx(wofz(z), rel=1.0e-10)
 
 
 def test__deflections_2d_via_mge_from__spherical_case__is_radial_and_matches_elliptical_limit(
