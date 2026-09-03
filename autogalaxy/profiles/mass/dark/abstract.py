@@ -16,18 +16,29 @@ class DarkProfile:
 
 
 def coord_func_f_from(grid_radius, xp=np):
+    """
+    The NFW auxiliary function f(x): arccos(1/x) / sqrt(x^2 - 1) outside the scale radius,
+    arccosh(1/x) / sqrt(1 - x^2) inside it, and 1 on it.
+
+    The result has the dtype of the input: a real radius gives a real f (each branch is
+    evaluated on inputs masked into its own domain, so no branch sees a radius it is not
+    defined for), and a complex radius the complex continuation the gNFW family relies on.
+    """
     if isinstance(grid_radius, float) or isinstance(grid_radius, complex):
         grid_radius = xp.array([grid_radius])
 
-    f = xp.ones(shape=grid_radius.shape[0], dtype="complex64")
-
     r = grid_radius
-    inv_r = 1.0 / r
 
-    out_gt = (1.0 / xp.sqrt(r**2 - 1.0)) * xp.arccos(inv_r)
-    out_lt = (1.0 / xp.sqrt(1.0 - r**2)) * xp.arccosh(inv_r)
+    greater = r > 1.0
+    less = r < 1.0
 
-    return xp.where(r > 1.0, out_gt, xp.where(r < 1.0, out_lt, f))
+    r_gt = xp.where(greater, r, 2.0)
+    r_lt = xp.where(less, r, 0.5)
+
+    out_gt = xp.arccos(1.0 / r_gt) / xp.sqrt(r_gt**2 - 1.0)
+    out_lt = xp.arccosh(1.0 / r_lt) / xp.sqrt(1.0 - r_lt**2)
+
+    return xp.where(greater, out_gt, xp.where(less, out_lt, xp.ones_like(r)))
 
 
 class AbstractgNFW(MassProfile, DarkProfile):
@@ -163,12 +174,21 @@ class AbstractgNFW(MassProfile, DarkProfile):
         r = xp.real(grid_radius)
         r2 = r**2
 
+        # Each branch divides by (r^2 - 1), which is zero on the scale radius: mask the
+        # denominators into each branch's own domain so the excluded points are never
+        # divided by zero, then select.
+        greater = r > 1.0
+        less = r < 1.0
+
+        r2_gt = xp.where(greater, r2, 2.0)
+        r2_lt = xp.where(less, r2, 0.5)
+
         return xp.where(
-            r > 1.0,
-            (1.0 - f_r) / (r2 - 1.0),
+            greater,
+            (1.0 - f_r) / (r2_gt - 1.0),
             xp.where(
-                r < 1.0,
-                (f_r - 1.0) / (1.0 - r2),
+                less,
+                (f_r - 1.0) / (1.0 - r2_lt),
                 1.0 / 3.0,
             ),
         )
