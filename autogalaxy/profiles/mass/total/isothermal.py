@@ -110,28 +110,20 @@ class Isothermal(PowerLaw):
             The grid of (y,x) arc-second coordinates the deflection angles are computed on.
         """
 
+        axis_ratio = self.axis_ratio(xp)
+        sqrt_one_minus_q2 = xp.sqrt(1 - axis_ratio**2)
+
         factor = (
-            2.0
-            * self.einstein_radius_rescaled(xp)
-            * self.axis_ratio(xp)
-            / xp.sqrt(1 - self.axis_ratio(xp) ** 2)
+            2.0 * self.einstein_radius_rescaled(xp) * axis_ratio / sqrt_one_minus_q2
         )
 
-        psi = psi_from(
-            grid=grid, axis_ratio=self.axis_ratio(xp), core_radius=0.0, xp=xp
-        )
+        psi = psi_from(grid=grid, axis_ratio=axis_ratio, core_radius=0.0, xp=xp)
 
         deflection_y = xp.arctanh(
-            xp.divide(
-                xp.multiply(xp.sqrt(1 - self.axis_ratio(xp) ** 2), grid.array[:, 0]),
-                psi,
-            )
+            xp.divide(xp.multiply(sqrt_one_minus_q2, grid.array[:, 0]), psi)
         )
         deflection_x = xp.arctan(
-            xp.divide(
-                xp.multiply(xp.sqrt(1 - self.axis_ratio(xp) ** 2), grid.array[:, 1]),
-                psi,
-            )
+            xp.divide(xp.multiply(sqrt_one_minus_q2, grid.array[:, 1]), psi)
         )
         return xp.multiply(factor, xp.vstack((deflection_y, deflection_x)).T)
 

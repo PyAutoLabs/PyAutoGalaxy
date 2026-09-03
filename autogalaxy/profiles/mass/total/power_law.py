@@ -1,9 +1,88 @@
+import math
 import numpy as np
 from typing import Tuple
 
 import autoarray as aa
 
 from autogalaxy.profiles.mass.total.power_law_core import PowerLawCore
+
+# Relative truncation error of the numpy omega series, as a bound on the geometric tail
+# sum_{n >= N} f^n = f^N / (1 - f) with f the second flattening (1 - q) / (1 + q). Two orders
+# of magnitude tighter than the rtol 1e-6 the deflection pins are checked at, so the series
+# is at least as accurate as the complex `hyp2f1` it replaces on every physical axis ratio.
+_OMEGA_SERIES_RTOL = 1e-10
+
+
+def _omega_n_terms_from(factor: float, rtol: float = _OMEGA_SERIES_RTOL) -> int:
+    """
+    The number of terms of the Tessore & Metcalf (2015, eq. 29) omega series needed for its
+    truncation error to be below `rtol`, as a plain Python int.
+
+    Every term of the recurrence is bounded by `factor ** n` in magnitude (the ratio
+    `(2n - (2 - t)) / (2n + (2 - t))` is below one for all slopes `t` in (0, 2)), so the tail
+    after `N` terms is at most `factor ** N / (1 - factor)`; the smallest `N` with that bound
+    below `rtol` is returned. The count follows the axis ratio: 11 terms at q = 0.8, 39 at
+    q = 0.3, 124 at q = 0.1 (rtol 1e-10). A fixed count fails for q below ~0.25, the recorded
+    hazard `component.power-law.series-vs-hyp2f1-divergence`.
+
+    Parameters
+    ----------
+    factor
+        The second flattening `f = (1 - q) / (1 + q)` of the ellipse with axis ratio `q`.
+    rtol
+        The bound on the relative truncation error of the series.
+    """
+    factor = float(factor)
+    if factor <= 0.0:
+        return 1
+    if factor >= 1.0:
+        raise ValueError(
+            f"The power-law omega series does not converge for factor={factor} "
+            f"(axis_ratio must be > 0)."
+        )
+    return max(2, math.ceil((math.log(rtol) + math.log1p(-factor)) / math.log(factor)))
+
+
+def _omega_series_from(z: np.ndarray, slope: float, factor: float, n_terms: int) -> np.ndarray:
+    """
+    Numpy evaluation of the angular part of the elliptical power-law deflection, the omega
+    series of Tessore & Metcalf (2015, eq. 29) truncated after `n_terms` terms. The same
+    recurrence `jax_utils.omega` evaluates with `jax.lax.scan` on the JAX path, written as a
+    polynomial in `w = -factor * z ** 2` with real coefficients
+
+        omega = z * sum_n a_n w ** n,   a_0 = 1,   a_n = a_{n-1} (2n - (2 - t)) / (2n + (2 - t))
+
+    and evaluated by Horner's rule, which is one complex multiply-add per term over the grid.
+
+    Parameters
+    ----------
+    z
+        `exp(i * phi)` where `phi` is the elliptical angle of every coordinate on the grid.
+    slope
+        The internal power-law slope `t = slope - 1`.
+    factor
+        The second flattening `f = (1 - q) / (1 + q)`.
+    n_terms
+        The number of terms of the series to sum (see `_omega_n_terms_from`).
+    """
+    two_minus_slope = 2.0 - slope
+
+    coefficients = np.empty(n_terms)
+    coefficients[0] = 1.0
+    for n in range(1, n_terms):
+        two_n = 2.0 * n
+        coefficients[n] = (
+            coefficients[n - 1] * (two_n - two_minus_slope) / (two_n + two_minus_slope)
+        )
+
+    w = -factor * z * z
+
+    polynomial = np.full(z.shape, coefficients[-1], dtype=np.complex128)
+    for coefficient in coefficients[-2::-1]:
+        polynomial *= w
+        polynomial += coefficient
+
+    return z * polynomial
 
 
 class PowerLaw(PowerLawCore):
@@ -101,56 +180,56 @@ class PowerLaw(PowerLawCore):
             The grid of (y,x) arc-second coordinates the deflection angles are computed on.
         """
         slope = self.slope - 1.0
+        axis_ratio = self.axis_ratio(xp)
+
         einstein_radius = (
-            2.0 / (self.axis_ratio(xp) ** -0.5 + self.axis_ratio(xp) ** 0.5)
+            2.0 / (axis_ratio**-0.5 + axis_ratio**0.5)
         ) * self.einstein_radius_major_from(xp)
 
-        factor = xp.divide(1.0 - self.axis_ratio(xp), 1.0 + self.axis_ratio(xp))
-        b = xp.multiply(einstein_radius, xp.sqrt(self.axis_ratio(xp)))
-        angle = xp.arctan2(
-            grid.array[:, 0], xp.multiply(self.axis_ratio(xp), grid.array[:, 1])
-        )  # Note, this angle is not the position angle
-        z = xp.add(
-            xp.multiply(xp.cos(angle), 1 + 0j), xp.multiply(xp.sin(angle), 0 + 1j)
-        )
+        factor = (1.0 - axis_ratio) / (1.0 + axis_ratio)
+        b = einstein_radius * xp.sqrt(axis_ratio)
 
-        R = xp.sqrt(
-            (self.axis_ratio(xp) * grid.array[:, 1]) ** 2
-            + grid.array[:, 0] ** 2
-            + 1e-16
-        )
+        y = grid.array[:, 0]
+        qx = axis_ratio * grid.array[:, 1]
+
+        R = xp.sqrt(qx**2 + y**2 + 1e-16)
 
         if xp.__name__.startswith("jax"):
 
             from .jax_utils import omega
 
+            angle = xp.arctan2(y, qx)  # Note, this angle is not the position angle
+            z = xp.add(
+                xp.multiply(xp.cos(angle), 1 + 0j), xp.multiply(xp.sin(angle), 0 + 1j)
+            )
+
             zh = omega(z, slope, factor, n_terms=20, xp=xp)
 
-            complex_angle = (
-                2.0 * b / (1.0 + self.axis_ratio(xp)) * (b / R) ** (slope - 1.0) * zh
-            )
         else:
 
-            from scipy import special
+            # `z = exp(i * angle)` is the unit vector (q x + i y) / |q x + i y|, formed without
+            # the per-coordinate arctan2, cos and sin; the exact centre, where that vector has
+            # no direction, takes z = 1 as arctan2(0, 0) = 0 did.
+            r_ell = np.hypot(qx, y)
+            on_centre = r_ell == 0.0
+            z = (qx + 1j * y) / np.where(on_centre, 1.0, r_ell)
+            z = np.where(on_centre, 1.0 + 0j, z)
 
-            complex_angle = (
-                2.0
-                * b
-                / (1.0 + self.axis_ratio(xp))
-                * (b / R) ** (slope - 1.0)
-                * z
-                * special.hyp2f1(1.0, 0.5 * slope, 2.0 - 0.5 * slope, -factor * z**2)
+            zh = _omega_series_from(
+                z, slope, factor, n_terms=_omega_n_terms_from(factor)
             )
 
-        deflection_y = complex_angle.imag
-        deflection_x = complex_angle.real
+        prefactor = (
+            2.0
+            * b
+            / (1.0 + axis_ratio)
+            * self.ellipticity_rescale(xp) ** (slope - 1.0)
+            * (b / R) ** (slope - 1.0)
+        )
 
-        rescale_factor = (self.ellipticity_rescale(xp)) ** (slope - 1)
+        complex_angle = prefactor * zh
 
-        deflection_y *= rescale_factor
-        deflection_x *= rescale_factor
-
-        return xp.vstack((deflection_y, deflection_x)).T
+        return xp.vstack((complex_angle.imag, complex_angle.real)).T
 
     def convergence_func(self, grid_radius: float, xp=np) -> float:
         return self.einstein_radius_rescaled(xp) * grid_radius.array ** (

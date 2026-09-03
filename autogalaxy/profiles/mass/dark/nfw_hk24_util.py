@@ -42,6 +42,23 @@ def capital_F_from(chi, xp=np):
     less = chi < 1 - eps
     greater = chi > 1 + eps
 
+    if xp is np:
+        # Each branch is evaluated on its own subset of the grid only: the arctanh branch
+        # inside the scale radius and the arctan branch outside it never see each other's
+        # coordinates, so neither the special functions nor the square roots run twice over
+        # the whole grid, and no masked-out input reaches a function it is invalid for.
+        F = np.ones(chi.shape, dtype=np.result_type(chi, 1.0))
+
+        chi_less = chi[less]
+        root_min = np.sqrt(1.0 - chi_less**2)
+        F[less] = np.arctanh(root_min) / root_min
+
+        chi_greater = chi[greater]
+        root_plus = np.sqrt(chi_greater**2 - 1.0)
+        F[greater] = np.arctan(root_plus) / root_plus
+
+        return F
+
     root_min_arg = xp.where(less, 1 - chi**2, 0.0)
     root_min = xp.sqrt(root_min_arg)
     root_min_safe = xp.where(less, root_min, 1.0)

@@ -104,38 +104,45 @@ class NFW(gNFW, MassProfileCSE):
         x1 = grid.array[:, 1] / self.scale_radius
         x2 = grid.array[:, 0] / self.scale_radius
 
-        r2 = x1**2 + x2**2
+        # The deflection at the exact centre is zero by symmetry, but the closed form divides
+        # by the radius there. The centre's inputs are masked to a harmless point on the unit
+        # ellipse before anything is evaluated (so no branch sees a zero radius) and its
+        # deflection is zeroed through the prefactor afterwards.
 
-        # Avoid nans
+        mask = x1**2 + x2**2 > 1e-24
 
-        mask = r2 > 1e-24
+        x1 = xp.where(mask, x1, 1.0)
+        x2 = xp.where(mask, x2, 0.0)
+
+        x1_sq = x1**2
+        x2_sq = x2**2
+        e_sq = e_hk24**2
+        r_sq = x1_sq + x2_sq
 
         prefactor = xp.where(
             mask,
             4
             * self.kappa_s
-            * xp.sqrt(1 - e_hk24**2)
-            / (((x1 - e_hk24) ** 2 + x2**2) * ((x1 + e_hk24) ** 2 + x2**2)),
+            * xp.sqrt(1 - e_sq)
+            / (((x1 - e_hk24) ** 2 + x2_sq) * ((x1 + e_hk24) ** 2 + x2_sq)),
             0.0,
         )
 
-        f1 = xp.where(mask, nfw_hk24_util.small_f_1(x1, x2, e_hk24, xp=xp), 0.0)
-        f2 = xp.where(mask, nfw_hk24_util.small_f_2(x1, x2, e_hk24, xp=xp), 0.0)
-        f3 = xp.where(mask, nfw_hk24_util.small_f_3(x1, x2, e_hk24, xp=xp), 0.0)
+        f1 = nfw_hk24_util.small_f_1(x1, x2, e_hk24, xp=xp)
+        f2 = nfw_hk24_util.small_f_2(x1, x2, e_hk24, xp=xp)
+        f3 = nfw_hk24_util.small_f_3(x1, x2, e_hk24, xp=xp)
 
-        deflection_x = (
-            x1 * ((x1**2 - e_hk24**2) * (1 - e_hk24**2) + x2**2 * (1 + e_hk24**2)) * f1
-            + x1 * (x1**2 + x2**2 - e_hk24**2) * f2
-            - x2 * (x1**2 + x2**2 + e_hk24**2) * f3
+        deflection_x = prefactor * (
+            x1 * ((x1_sq - e_sq) * (1 - e_sq) + x2_sq * (1 + e_sq)) * f1
+            + x1 * (r_sq - e_sq) * f2
+            - x2 * (r_sq + e_sq) * f3
         )
-        deflection_x *= prefactor
 
-        deflection_y = (
-            x2 * (x1**2 * (1 - 2 * e_hk24**2) + x2**2 + e_hk24**2) * f1
-            + x2 * (x1**2 + x2**2 + e_hk24**2) * f2
-            + x1 * (x1**2 + x2**2 - e_hk24**2) * f3
+        deflection_y = prefactor * (
+            x2 * (x1_sq * (1 - 2 * e_sq) + x2_sq + e_sq) * f1
+            + x2 * (r_sq + e_sq) * f2
+            + x1 * (r_sq - e_sq) * f3
         )
-        deflection_y *= prefactor
 
         return xp.multiply(self.scale_radius, xp.vstack((deflection_y, deflection_x)).T)
 
@@ -396,8 +403,10 @@ class NFWSph(NFW):
         )
 
     def deflection_func_sph(self, grid_radius, xp=np):
-        grid_radius = grid_radius + 0j
-        return xp.real(self.coord_func_h(grid_radius=grid_radius, xp=xp))
+        # `coord_func_h` is real for a real radius: `coord_func_f_from` evaluates each of its
+        # branches on masked real inputs, so there is no complex promotion to take the real
+        # part of.
+        return self.coord_func_h(grid_radius=grid_radius, xp=xp)
 
     @aa.over_sample
     @aa.decorators.to_array
