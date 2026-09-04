@@ -20,10 +20,6 @@ substitutions:
 
 # Getting Started
 
-## PyAutoGalaxy AI Assistant
-
-The [**PyAutoGalaxy AI Assistant**](https://github.com/PyAutoLabs/autogalaxy_assistant) supports conversation agents such as ChatGPT and coding agents such as Claude Code and Codex. You can get started simply by asking it a question about galaxy structure or describing the task you would like to perform with **PyAutoGalaxy**. See the assistant for its full scope and instructions.
-
 ## Human-Readable Documentation and Examples
 
 The following human-readable documentation and examples are also useful for new starters:
@@ -32,6 +28,12 @@ The following human-readable documentation and examples are also useful for new 
 - [The introduction Jupyter Notebook on Colab](https://colab.research.google.com/github/PyAutoLabs/autogalaxy_workspace/blob/2026.8.29.1/start_here.ipynb), where you can try **PyAutoGalaxy** in a web browser (without installation).
 - [The autogalaxy_workspace GitHub repository](https://github.com/PyAutoLabs/autogalaxy_workspace): example scripts covering every **PyAutoGalaxy** use case.
 - [The HowToGalaxy GitHub repository](https://github.com/PyAutoLabs/HowToGalaxy): a Jupyter notebook lecture series teaching galaxy modeling from the ground up.
+
+## PyAutoGalaxy AI Assistant
+
+The [**PyAutoGalaxy AI Assistant**](https://github.com/PyAutoLabs/autogalaxy_assistant) supports conversation agents such as ChatGPT and coding agents such as Claude Code and Codex. You can get started simply by asking it a question about galaxy structure or describing the task you would like to perform with **PyAutoGalaxy**. See the assistant for its full scope and instructions.
+
+**The PyAutoGalaxy AI Assistant currently only supports AI coding agents which require a paid subscription, either Claude Code or Codex. Work is ongoing to support free AI coding agents and conversation agents like ChatGPT.**
 
 # Core Aims
 

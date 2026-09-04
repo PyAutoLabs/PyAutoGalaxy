@@ -2,10 +2,6 @@
 
 # Start Here
 
-## PyAutoGalaxy AI Assistant
-
-The [**PyAutoGalaxy AI Assistant**](https://github.com/PyAutoLabs/autogalaxy_assistant) supports conversation agents such as ChatGPT and coding agents such as Claude Code and Codex. You can get started simply by asking it a question about galaxy structure or describing the task you would like to perform with **PyAutoGalaxy**. See the assistant for its full scope and instructions.
-
 ## Human-Readable Overview
 
 **PyAutoGalaxy** is software for analysing the morphologies and structures of galaxies:
@@ -22,6 +18,12 @@ The [**PyAutoGalaxy AI Assistant**](https://github.com/PyAutoLabs/autogalaxy_ass
 - **Data Variety**: Support for many data types (e.g. CCD imaging, interferometry, multi-band imaging) which can be fitted independently or simultaneously.
 
 This overview gives an overview of **PyAutoGalaxy**'s API, core features and details of the autogalaxy_workspace.
+
+## PyAutoGalaxy AI Assistant
+
+The [**PyAutoGalaxy AI Assistant**](https://github.com/PyAutoLabs/autogalaxy_assistant) supports conversation agents such as ChatGPT and coding agents such as Claude Code and Codex. You can get started simply by asking it a question about galaxy structure or describing the task you would like to perform with **PyAutoGalaxy**. See the assistant for its full scope and instructions.
+
+**The PyAutoGalaxy AI Assistant currently only supports AI coding agents which require a paid subscription, either Claude Code or Codex. Work is ongoing to support free AI coding agents and conversation agents like ChatGPT.**
 
 ## Imports
 
