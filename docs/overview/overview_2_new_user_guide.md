@@ -2,10 +2,6 @@
 
 # New User Guide
 
-## PyAutoGalaxy AI Assistant
-
-The [**PyAutoGalaxy AI Assistant**](https://github.com/PyAutoLabs/autogalaxy_assistant) supports conversation agents such as ChatGPT and coding agents such as Claude Code and Codex. You can get started simply by asking it a question about galaxy structure or describing the task you would like to perform with **PyAutoGalaxy**. See the assistant for its full scope and instructions.
-
 ## Human-Readable Guide
 
 **PyAutoGalaxy** can analyse galaxies for different types of data (e.g. CCD imaging and interferometer observations)
@@ -14,6 +10,12 @@ Depending on the data you use and the scale of your system, the analysis you per
 
 The autogalaxy_workspace contains a suite of example Jupyter Notebooks, organised by dataset type and system scale.
 To help you find the most appropriate starting point, answer two simple questions:
+
+## PyAutoGalaxy AI Assistant
+
+The [**PyAutoGalaxy AI Assistant**](https://github.com/PyAutoLabs/autogalaxy_assistant) supports conversation agents such as ChatGPT and coding agents such as Claude Code and Codex. You can get started simply by asking it a question about galaxy structure or describing the task you would like to perform with **PyAutoGalaxy**. See the assistant for its full scope and instructions.
+
+**The PyAutoGalaxy AI Assistant currently only supports AI coding agents which require a paid subscription, either Claude Code or Codex. Work is ongoing to support free AI coding agents and conversation agents like ChatGPT.**
 
 ## What Scale System?
 
