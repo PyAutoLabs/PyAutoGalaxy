@@ -70,6 +70,13 @@ class LightProfileLinear(LightProfile):
     _pytree_token_counter = itertools.count()
     __exclude_identifier_fields__ = ("pytree_token",)
 
+    # The `intensity` of a linear light profile is solved for by the inversion, not
+    # sampled by the non-linear search, so it has no prior and never appears in
+    # `model.info`. PyAutoFit's `graph_spec` reads this class attribute (the
+    # `__solved_parameters__` protocol) to draw `intensity` as a `solved` row in
+    # model figures. Subclasses (e.g. `lp_linear.Sersic`) inherit it.
+    __solved_parameters__ = ("intensity",)
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.pytree_token = next(LightProfileLinear._pytree_token_counter)
@@ -259,12 +266,14 @@ class LightProfileLinearObjFuncList(aa.AbstractLinearObjFuncList):
         """
         for light_profile in light_profile_list:
             if not isinstance(light_profile, LightProfileLinear):
-                raise exc.ProfileException("""
+                raise exc.ProfileException(
+                    """
                     A light profile that is not a LightProfileLinear object has been input into the
                     LightProfileLinearObjFuncList object.
 
                     Only children of the LightProfileLinear class can be used in a linear inversion.
-                    """)
+                    """
+                )
 
         super().__init__(
             grid=grid, regularization=regularization, settings=settings, xp=xp

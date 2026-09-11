@@ -92,6 +92,14 @@ An MGE decomposes the light of a galaxy into tens or hundreds of two dimensional
 In the image above, 30 Gaussians are shown, where their sizes go from below the pixel scale (in order to resolve
 point emission) to beyond the size of the galaxy (to capture its extended emission).
 
+The model this composes is drawn below: the 60 Gaussians of its two bases collapse into two plates badged
+`30 components`, whose `intensity` parameters are solved for by the inversion rather than sampled.
+
+```{image} https://raw.githubusercontent.com/PyAutoLabs/PyAutoGalaxy/main/docs/overview/images/overview_3/mge_model.png
+:alt: The MGE galaxy model, whose sixty Gaussians are drawn as two plates of thirty components.
+:width: 600
+```
+
 Scientific Applications include capturing departures from elliptical symmetry in the light of galaxies, providing a
 flexible model to deblend the emission of point sources (e.g. quasars) from the emission of their host galaxy and
 deprojecting the light of a galaxy from 2D to 3D.

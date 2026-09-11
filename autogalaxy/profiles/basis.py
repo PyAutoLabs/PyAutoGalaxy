@@ -8,6 +8,10 @@ a shapelet decomposition. Each component of the basis captures a distinct spatia
 When linear light profiles are used in a basis, their individual intensities are solved simultaneously via a
 linear inversion (a single matrix solve), making the inference highly efficient regardless of how many basis
 components are included.
+
+A `Basis` declares no solved amplitude of its own (it has no `__solved_parameters__`):
+the solved intensities belong to its linear member profiles, one per member, so a model
+figure draws a `solved` `intensity` inside each member and none on the `Basis` itself.
 """
 
 import numpy as np
