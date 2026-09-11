@@ -32,4 +32,8 @@ class PointSolved:
     and `autolens.point.fit.fluxes`).
     """
 
-    pass
+    # The `centre` is solved for analytically by the `*Solved` fit classes, not sampled
+    # by the non-linear search, so it has no prior and never appears in `model.info`.
+    # PyAutoFit's `graph_spec` reads this class attribute (the `__solved_parameters__`
+    # protocol) to draw `centre` as a `solved` row in model figures.
+    __solved_parameters__ = ("centre",)
