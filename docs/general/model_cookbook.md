@@ -58,7 +58,12 @@ galaxies
             sersic_index                                                        UniformPrior [5], lower_limit = 0.8, upper_limit = 5.0
 ```
 
-The same model can be drawn as a figure, which shows its structure at a glance:
+The same model can also be visualized as a figure, making its structure easier to understand at a glance.
+
+The figure shows how the model is organized: which parameters belong to each component, and whether they are free,
+fixed, shared, linked by an expression, solved during the fit, or not configured. `model.info` provides the
+corresponding numerical details, including the prior assigned to each free parameter and the value of each fixed
+parameter.
 
 ```python
 af.ModelPlotter(model).figure()
@@ -69,8 +74,10 @@ af.ModelPlotter(model).figure()
 :width: 600
 ```
 
-The dashed `intensity · solved` pill is the parameter that `model.info` above does not print, because it is not part
-of the model: it is solved for during the fit. See `Reading the figure` at the end of this cookbook.
+The `intensity` of a linear light profile (`ag.lp_linear.*`, and every member of an `ag.lp_basis.Basis` built from
+them) is not a sampled parameter of the model: it is solved for by the inversion at every likelihood evaluation, so it
+has no prior and has no counterpart in `model.info`. A `Basis` has no solved amplitude of its own — the solved
+intensities belong to its member profiles, one per member.
 
 ## More Complex Models
 
@@ -136,9 +143,8 @@ af.ModelPlotter(model).figure()
 :width: 600
 ```
 
-The two galaxies are identical in structure, so the figure draws them once inside a dashed plate badged
-`2 components` rather than twice. Their parameters are badged `independent`: two separate priors with the same
-configuration, which is not the same thing as one shared prior.
+The two galaxies are identical in structure, but their parameters are independent: two separate priors with the
+same configuration, which is not the same thing as one shared prior.
 
 ## Concise API
 
@@ -249,30 +255,9 @@ af.ModelPlotter(model).figure()
 :width: 600
 ```
 
-This is the stage where the figure earns its keep: the paired `centre` is drawn once on its owner with a badge and a
-link from the component that reuses it, the fixed `sersic_index` is a grey pill, the offset `effective_radius` carries
-its defining expression, and each assertion is a compact label naming both of its operands.
-
-## Reading the figure
-
-The figure is the **map**; `model.info` is the **legend**. The map shows the shape of the model — which components
-contain which, which parameters are shared, fixed, related or solved — and the legend gives the numbers: the prior on
-every parameter, and the exact value of every fixed one.
-
-The contract between them is explicit: every displayed model element resolves to its corresponding path or grouped
-paths in `model.info`, and every omission and every added annotation (`solved`, `missing`) is called out on the figure
-itself. It is deliberately not a line-for-line correspondence — the figure partitions by *component*, while
-`model.info` groups per *parameter*, so one plate of thirty components can correspond to a single `0 - 29` block in the
-text.
-
-A `solved` pill has no counterpart in `model.info` at all: it is additional information. The `intensity` of a linear
-light profile (`ag.lp_linear.*`, and every member of an `ag.lp_basis.Basis` built from them) is solved for by the
-inversion at every likelihood evaluation, so it has no prior and is absent from the text. A `Basis` declares no solved
-amplitude of its own — the solved intensities belong to its member profiles, one per member.
-
-The background tints follow **nesting depth only**. They are decorative: they help you see which card sits inside
-which, and they carry no information about the class family of a component. A light profile and a mass profile at the
-same depth are tinted identically.
+The `disk` reuses the `bulge`'s `centre` rather than having one of its own, the `sersic_index` is fixed, the
+`effective_radius` of the disk is defined by an expression offsetting it from the bulge's, and the model carries two
+assertions relating its parameters.
 
 ## Available Model Components
 
