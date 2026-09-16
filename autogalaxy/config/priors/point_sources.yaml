@@ -50,24 +50,3 @@ PointFlux:
     limits:
       lower: 0.0
       upper: inf
-PointSourceChi:
-  centre_0:
-    type: Gaussian
-    mean: 0.0
-    sigma: 0.3
-    width_modifier:
-      type: Absolute
-      value: 0.05
-    limits:
-      lower: -inf
-      upper: inf
-  centre_1:
-    type: Gaussian
-    mean: 0.0
-    sigma: 0.3
-    width_modifier:
-      type: Absolute
-      value: 0.05
-    limits:
-      lower: -inf
-      upper: inf
