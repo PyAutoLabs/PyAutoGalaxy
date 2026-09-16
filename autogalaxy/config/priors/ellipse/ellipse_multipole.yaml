@@ -20,7 +20,7 @@ EllipseMultipole:
       lower: -inf
       upper: inf
 
-EllipseMultipoleRelative:
+EllipseMultipoleScaled:
   scaled_multipole_comps_0:
     type: Uniform
     lower_limit: -0.1
@@ -28,7 +28,7 @@ EllipseMultipoleRelative:
     width_modifier:
       type: Absolute
       value: 0.05
-    gaussian_limits:
+    limits:
       lower: -inf
       upper: inf
   scaled_multipole_comps_1:
@@ -38,6 +38,6 @@ EllipseMultipoleRelative:
     width_modifier:
       type: Absolute
       value: 0.05
-    gaussian_limits:
+    limits:
       lower: -inf
       upper: inf

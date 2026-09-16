@@ -1,4 +1,4 @@
-NFWTruncatedMCRDuffySph:
+NFWTruncatedMCRScatterLudlowSph:
   centre_0:
     type: Gaussian
     mean: 0.0
@@ -49,54 +49,13 @@ NFWTruncatedMCRDuffySph:
     limits:
       lower: 0.0
       upper: inf
-NFWTruncatedMCRLudlowSph:
-  centre_0:
+  scatter_sigma:
     type: Gaussian
     mean: 0.0
-    sigma: 0.1
+    sigma: 3.0
     width_modifier:
       type: Absolute
-      value: 0.05
+      value: 1.0
     limits:
       lower: -inf
-      upper: inf
-  centre_1:
-    type: Gaussian
-    mean: 0.0
-    sigma: 0.1
-    width_modifier:
-      type: Absolute
-      value: 0.05
-    limits:
-      lower: -inf
-      upper: inf
-  mass_at_200:
-    type: LogUniform
-    lower_limit: 100000000.0
-    upper_limit: 1000000000000000.0
-    width_modifier:
-      type: Relative
-      value: 0.5
-    limits:
-      lower: 0.0
-      upper: inf
-  redshift_object:
-    type: Uniform
-    lower_limit: 0.0
-    upper_limit: 1.0
-    width_modifier:
-      type: Relative
-      value: 0.5
-    limits:
-      lower: 0.0
-      upper: inf
-  redshift_source:
-    type: Uniform
-    lower_limit: 0.0
-    upper_limit: 1.0
-    width_modifier:
-      type: Relative
-      value: 0.5
-    limits:
-      lower: 0.0
       upper: inf

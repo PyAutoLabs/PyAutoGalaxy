@@ -53,13 +53,3 @@ Gaussian:
     limits:
       lower: -1.0
       upper: 1.0
-  intensity:
-    type: LogUniform
-    lower_limit: 1.0e-06
-    upper_limit: 1000000.0
-    width_modifier:
-      type: Relative
-      value: 0.5
-    limits:
-      lower: 0.0
-      upper: inf
