@@ -189,6 +189,28 @@ aplt.plot_array(array=galaxies.image_2d_from(grid=grid), title="Galaxies Image")
 :width: 600
 ```
 
+## External Fields
+
+Not all of the mass that deflects light belongs to the galaxies being modelled: line-of-sight structure and the
+group or cluster environment a galaxy sits in also contribute. A `MassField` is the home for those components. It
+takes a `redshift` and any number of named mass profiles — typically `ExternalShear`, `MassSheet` or
+`ExternalPotential` — and nothing else, because an external field has mass but no light. A `Galaxies` object holds
+a `MassField` beside its galaxies, where it adds to every mass quantity (`deflections_yx_2d_from`,
+`convergence_2d_from`, `potential_2d_from`) and contributes zeros to every image. Use one when the external field
+is physically distinct from the galaxies you are fitting, so that it is not attached to a galaxy whose light and
+mass describe something else. Attaching the shear directly to a galaxy, as in
+`ag.Galaxy(redshift=0.5, shear=ag.mp.ExternalShear(gamma_1=0.05, gamma_2=0.05))`, remains fully supported and is
+not deprecated.
+
+```python
+field = ag.MassField(
+    redshift=0.5,
+    shear=ag.mp.ExternalShear(gamma_1=0.05, gamma_2=0.05),
+)
+
+galaxies = ag.Galaxies(galaxies=[galaxy, field])
+```
+
 ## Units
 
 The units used throughout the galaxy structure literature vary, therefore lets quickly describe the units used in
