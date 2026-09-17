@@ -29,6 +29,10 @@ def register_galaxies_classes(galaxies) -> bool:
     subclass needs), then walks each galaxy and registers ``Galaxy`` plus every
     light / mass profile class encountered.
 
+    The walk registers whatever the list holds, so a ``MassField`` held in the
+    ``Galaxies`` beside its galaxies is registered exactly like a ``Galaxy``,
+    along with the external mass profiles it carries. No special case is needed.
+
     Both halves are required. Registering ``Galaxies`` alone still fails with
     ``TypeError: ... problematic value is of type Galaxy ... at path
     galaxies[0]`` the first time a jitted function is handed a ``Galaxies``.

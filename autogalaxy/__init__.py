@@ -84,6 +84,7 @@ from .interferometer.model.analysis import AnalysisInterferometer
 
 from .galaxy.galaxy import Galaxy
 from .galaxy.galaxies import Galaxies
+from .galaxy.mass_field import MassField
 from .galaxy.galaxy_table import GalaxyTable
 from .galaxy.galaxy_table import galaxy_table_from_csv
 from .galaxy.galaxy_table import galaxy_table_to_csv
