@@ -1449,8 +1449,10 @@ class LensCalc:
             "jax_zero_contour", "critical_curve_list_via_zero_contour"
         ):
             return []
-        from jax_zero_contour import ZeroSolver
+        from autogalaxy.operate._zero_contour import zero_solver_type
         import jax.numpy as jnp
+
+        ZeroSolver = zero_solver_type()
 
         if init_guess is None:
             try:
@@ -1881,8 +1883,10 @@ class LensCalc:
             "jax_zero_contour", "einstein_radius_jit_from"
         ):
             return float("nan")
-        from jax_zero_contour import ZeroSolver
+        from autogalaxy.operate._zero_contour import zero_solver_type
         import jax.numpy as jnp
+
+        ZeroSolver = zero_solver_type()
 
         if init_guess is None:
             init_guess = self._seed_via_coarse_grid_argmin(
