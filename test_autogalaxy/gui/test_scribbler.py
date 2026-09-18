@@ -198,3 +198,50 @@ class TestBrush:
 
             s.on_mouse_motion(_event(s, 4.0, 6.0))
             draw_idle.assert_called_once()
+
+
+class TestSideBySidePanels:
+    def test__display_holds_two_panels_and_strokes_fold_onto_image_grid(self):
+        s = _scribbler(
+            shape=(20, 20), brush_width=0.1, subtract_radial=True, panel_gap=6
+        )
+
+        assert s.n_panels == 2
+        assert s.panel_names == ["radial-subtracted", "as-observed"]
+        assert s.display.shape == (20, 46)
+        assert float(s.display.min()) >= 0.0 and float(s.display.max()) <= 1.0
+
+        s.add_circle_to_scribble((5.0, 10.0))  # left panel
+        s.add_circle_to_scribble((26.0 + 15.0, 3.0))  # right panel, column 15
+
+        masks = s.get_scribble_masks()
+        assert masks["1"].shape == (20, 20)
+        assert masks["1"][10, 5] and masks["1"][3, 15]
+        assert s.mask_from().shape == (20, 20)
+
+    def test__proposal_and_erase_work_on_the_right_panel(self):
+        proposal = np.zeros((20, 20), dtype=bool)
+        proposal[8:12, 8:12] = True
+        s = _scribbler(
+            shape=(20, 20), brush_width=0.1, subtract_radial=True, proposal=proposal
+        )
+
+        s.set_active_segment(1)
+        s.add_circle_to_scribble((26.0 + 10.0, 10.0))  # erase the centre, right panel
+
+        mask = s.mask_from()
+        assert not mask[10, 10]
+        assert mask[8, 8]
+
+    def test__subtract_radial_alone_gives_one_panel(self):
+        s = _scribbler(shape=(20, 20), subtract_radial=True, side_by_side=False)
+
+        assert s.n_panels == 1
+        assert s.panel_names == ["radial-subtracted"]
+        assert s.display.shape == (20, 20)
+
+    def test__single_panel_display_is_the_image(self):
+        s = _scribbler(shape=(12, 14))
+
+        assert s.n_panels == 1
+        assert s.display.shape == (12, 14)
