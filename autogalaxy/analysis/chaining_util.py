@@ -62,6 +62,37 @@ def mass_from(mass, mass_result, unfix_mass_centre: bool = False) -> af.Model:
     return mass
 
 
+def mass_and_fields_from(
+    mass,
+    mass_result,
+    *,
+    fields_result,
+    unfix_mass_centre: bool = False,
+):
+    """Carry a previous stage's external field alongside an updated mass model.
+
+    ``mass_from`` keeps its mass-only return contract. Use this companion when a
+    chained lens model has a top-level ``fields`` slot. Pass
+    ``result.model.fields`` to keep the field free with posterior priors, or
+    ``result.instance.fields`` to fix it at the previous fit's values. The
+    caller puts the returned field in the next model's ``fields=`` slot.
+
+    ``fields_result`` is required so a field-aware caller cannot silently
+    leave the field out of the next stage.
+    """
+    if fields_result is None:
+        raise ValueError("fields_result must contain the previous stage's field")
+
+    return (
+        mass_from(
+            mass=mass,
+            mass_result=mass_result,
+            unfix_mass_centre=unfix_mass_centre,
+        ),
+        fields_result,
+    )
+
+
 def source_custom_model_from(result: Result, source_is_model: bool = False) -> af.Model:
     """
     Setup the source model using the previous pipeline's source result.
