@@ -41,6 +41,8 @@ class Scribbler:
         subtract_radial: bool = False,
         side_by_side: bool = True,
         panel_gap: int = 6,
+        positions=None,
+        position_marker_size: int = 6,
         block: bool = True,
     ):
         """
@@ -77,6 +79,15 @@ class Scribbler:
         right masks the same pixels as painting on the left. Each panel is colour-scaled
         independently. This is a display transform only: the mask is read back from brush
         positions, so it cannot change what a stroke masks.
+
+        **Marking known positions.** Pass `positions` (a list of (y, x) scaled coordinates
+        or a `Grid2DIrregular`, e.g. the multiple-image positions clicked in the
+        `positions.py` GUI) to mark each one with a dark cross while you paint. A cross,
+        not a ring: the proposal outline and the mask-overlay edge are closed boundaries,
+        and a third closed shape reads as one more region being masked. The arms stop
+        short of the centre so the marked pixel itself is never covered, and they are dark
+        because a bright marker would be indistinguishable from the arc flux it points at.
+        Markers are repeated on every panel and are display only.
 
         **Reading the result.** `mask_from()` returns the combined mask described above
         (with no proposal, simply `added & ~erased`); `show_mask()` returns the ADD segment
@@ -126,6 +137,11 @@ class Scribbler:
             With `subtract_radial`, also show the as-observed image in a second panel.
         panel_gap
             The width in pixels of the blank gutter between side-by-side panels.
+        positions
+            (y, x) scaled coordinates to mark with a cross, see above. Requires `image` to
+            carry its geometry (an `Array2D` in native form).
+        position_marker_size
+            The arm length of each cross in pixels.
         block
             If `True` (the default) the constructor opens the window and blocks until it is
             closed. If `False` the figure is built but the event loop is not started; call
@@ -179,6 +195,19 @@ class Scribbler:
         self.panel_gap = panel_gap
         self.panel_names: List[str] = []
         self.display = None
+
+        # position markers
+        self.positions = (
+            None if positions is None else np.asarray(positions, dtype=float)
+        )
+        if self.positions is not None and self.positions.size:
+            self.positions = self.positions.reshape(-1, 2)
+            if not hasattr(image, "pixel_scales"):
+                raise ValueError(
+                    "positions need the image's geometry: pass an Array2D in native form"
+                )
+        self.position_marker_size = position_marker_size
+        self.position_markers = []
 
         # brush
         self.brush_radius = max(int(self.image_shape[0] * brush_width), min_radius)
@@ -261,6 +290,45 @@ class Scribbler:
         if mpl_norm is None:
             mpl_norm = matplotlib.colors.Normalize()
         return np.ma.filled(mpl_norm(np.nan_to_num(values)), 0.0)
+
+    def positions_pixels(self) -> np.ndarray:
+        """
+        The (row, column) pixel coordinates of `positions` on the image's grid (floats;
+        the pixel centre of row 0 is the most positive y).
+        """
+        if self.positions is None or not self.positions.size:
+            return np.zeros((0, 2))
+        pixel_scales = self.im.pixel_scales
+        origin = self.im.origin
+        n_y, n_x = self.image_shape
+        rows = (n_y - 1) / 2.0 - (self.positions[:, 0] - origin[0]) / pixel_scales[0]
+        cols = (n_x - 1) / 2.0 + (self.positions[:, 1] - origin[1]) / pixel_scales[1]
+        return np.stack([rows, cols], axis=1)
+
+    def _draw_position_markers(self, gap_px: float = 2.0):
+        """
+        Draw each position as four dark ticks (a cross with its centre left open) on
+        every panel; the `Line2D`s are kept in `position_markers`.
+        """
+        arm = float(self.position_marker_size)
+        for row, col in self.positions_pixels():
+            for i in range(self.n_panels):
+                x = col + i * (self.image_shape[1] + self.panel_gap)
+                for xs, ys in (
+                    ([x, x], [row - arm, row - gap_px]),
+                    ([x, x], [row + gap_px, row + arm]),
+                    ([x - arm, x - gap_px], [row, row]),
+                    ([x + gap_px, x + arm], [row, row]),
+                ):
+                    (line,) = self.ax.plot(
+                        xs,
+                        ys,
+                        color="k",
+                        linewidth=1.5,
+                        solid_capstyle="butt",
+                        zorder=1e5,
+                    )
+                    self.position_markers.append(line)
 
     def _build_figure(self, cmap, norm, vmin, vmax, mask_overlay, rgb_image):
         """
@@ -361,6 +429,9 @@ class Scribbler:
                 colors="w",
                 linewidths=1.0,
             )
+
+        if self.positions is not None and self.positions.size:
+            self._draw_position_markers()
 
         title = self.KEY_LEGEND
         if self.n_panels > 1:

@@ -245,3 +245,43 @@ class TestSideBySidePanels:
 
         assert s.n_panels == 1
         assert s.display.shape == (12, 14)
+
+
+class TestPositionMarkers:
+    def test__positions_convert_to_pixels_and_draw_four_ticks_each(self):
+        # 20 px at 0.1"/px: (y, x) = (+0.5", -0.5") -> row 4.5, column 4.5
+        s = _scribbler(shape=(20, 20), positions=[(0.5, -0.5), (0.0, 0.0)])
+
+        pixels = s.positions_pixels()
+        assert pixels[0] == pytest.approx([4.5, 4.5])
+        assert pixels[1] == pytest.approx([9.5, 9.5])
+        assert len(s.position_markers) == 8
+
+        xs, ys = s.position_markers[0].get_data()  # tick above the first position
+        assert list(xs) == pytest.approx([4.5, 4.5])
+        assert list(ys) == pytest.approx([4.5 - 6, 4.5 - 2])
+
+    def test__markers_repeat_on_every_panel_and_never_enter_the_mask(self):
+        s = _scribbler(shape=(20, 20), positions=[(0.0, 0.0)], subtract_radial=True)
+
+        assert len(s.position_markers) == 8
+        xs, _ = s.position_markers[4].get_data()  # first tick of the right-hand copy
+        assert list(xs) == pytest.approx([9.5 + 26, 9.5 + 26])
+        assert not s.mask_from().any()
+
+    def test__grid_irregular_and_origin_are_honoured(self):
+        image = aa.Array2D.no_mask(
+            values=np.zeros((10, 10)), pixel_scales=0.2, origin=(1.0, -1.0)
+        )
+        s = ag.Scribbler(
+            image=image.native,
+            backend="Agg",
+            block=False,
+            positions=aa.Grid2DIrregular(values=[(1.0, -1.0)]),
+        )
+
+        assert s.positions_pixels()[0] == pytest.approx([4.5, 4.5])
+
+    def test__no_positions_draws_nothing(self):
+        assert _scribbler().position_markers == []
+        assert _scribbler(positions=[]).position_markers == []
