@@ -56,19 +56,25 @@ def _has_light_profile_non_linear(galaxies: List[Galaxy]) -> bool:
 def sparse_dirty_image_from(
     dataset: aa.Interferometer,
     galaxies: List[Galaxy],
-    visibilities: aa.Visibilities,
-    noise_map: aa.VisibilitiesNoiseMap,
+    image: aa.Array2D,
     xp=np,
 ) -> Optional[np.ndarray]:
     """
     Returns the dirty image the sparse (w-tilde) inversion of an interferometer fit must use to form its data
     vector, or `None` if the dirty image cached on the dataset's `sparse_operator` is already the correct one.
 
-    The `sparse_operator` caches the noise-weighted dirty image `Re(Fᴴ W d)` of the dataset's visibilities,
-    as computed by `Interferometer.apply_sparse_operator`. A fit with ordinary (non-linear) light profiles
-    inverts the `profile_subtracted_visibilities` instead, so the cached image would give a data vector
-    inconsistent with the data the chi-squared is computed from. This function computes the dirty image of
-    the input (profile-subtracted) visibilities with the same weighting (one adjoint NUFFT / DFT).
+    The `sparse_operator` caches the noise-weighted dirty image `d~ = Re(Fᴴ W d)` of the dataset's visibilities
+    `d`, as computed by `Interferometer.apply_sparse_operator`. A fit with ordinary (non-linear) light profiles
+    inverts the profile-subtracted visibilities `d - F i_p` instead, where `i_p` is the image of those light
+    profiles, so the cached image would give a data vector inconsistent with the data the chi-squared is
+    computed from. By linearity, the dirty image of the profile-subtracted visibilities is:
+
+        Re(Fᴴ W (d - F i_p)) = d~ - W~ i_p
+
+    where `W~ = Re(Fᴴ W F)` is the operator the sparse inversion already uses for its curvature matrix. Applying
+    `W~` is one FFT convolution on the real-space grid, far cheaper than an adjoint NUFFT / DFT over every
+    visibility, and it relies on no assumption the sparse curvature matrix does not already make (equal real and
+    imaginary noise, enforced by `Interferometer.apply_sparse_operator`).
 
     Whether this is needed is decided structurally (is there a sparse operator, do any galaxies have an
     ordinary light profile), so the branch is fixed at trace time and is safe under `jax.jit`. Fits whose
@@ -77,13 +83,12 @@ def sparse_dirty_image_from(
     Parameters
     ----------
     dataset
-        The interferometer dataset being fitted, whose `sparse_operator` and `transformer` are used.
+        The interferometer dataset being fitted, whose `sparse_operator` is used.
     galaxies
         The galaxies of the fit, checked for ordinary light profiles.
-    visibilities
-        The visibilities fitted by the inversion (the profile-subtracted visibilities).
-    noise_map
-        The noise-map of the visibilities, whose real and imaginary parts weight the dirty image.
+    image
+        The image `i_p` of the ordinary light profiles on the fit's `grids.lp`, which is exactly the image that
+        is Fourier transformed to the fit's `profile_visibilities`.
     xp
         The array module (`numpy` or `jax.numpy`).
     """
@@ -93,16 +98,15 @@ def sparse_dirty_image_from(
     if not _has_light_profile_non_linear(galaxies=galaxies):
         return None
 
-    visibilities = getattr(visibilities, "array", visibilities)
-    noise_map = getattr(noise_map, "array", noise_map)
+    image = getattr(image, "array", image)
 
-    return dataset.transformer.image_from(
-        visibilities=aa.Visibilities(
-            visibilities=visibilities.real * noise_map.real**-2.0
-            + 1j * visibilities.imag * noise_map.imag**-2.0
-        ),
+    operated_image = dataset.sparse_operator.operated_matrix_slim_from(
+        matrix_slim=image[:, None],
+        extent_index_for_masked_pixel=dataset.real_space_mask.extent_index_for_masked_pixel,
         xp=xp,
-    ).array
+    )[:, 0]
+
+    return xp.asarray(dataset.sparse_operator.dirty_image) - operated_image
 
 
 class FitInterferometer(aa.FitInterferometer, AbstractFitInversion):
@@ -171,13 +175,26 @@ class FitInterferometer(aa.FitInterferometer, AbstractFitInversion):
         self.settings = settings or aa.Settings()
 
     @functools.cached_property
+    def profile_image(self) -> aa.Array2D:
+        """
+        Returns the summed image of every ordinary (non-linear) light profile of every galaxy, which is Fourier
+        transformed to the `profile_visibilities`.
+        """
+        return self.galaxies.image_2d_from(grid=self.grids.lp, xp=self._xp)
+
+    @functools.cached_property
     def profile_visibilities(self) -> aa.Visibilities:
         """
         Returns the visibilities of every light profile of every galaxy, which are computed by performing
         a Fourier transform to the sum of light profile images.
         """
-        return self.galaxies.visibilities_from(
-            grid=self.grids.lp, transformer=self.dataset.transformer, xp=self._xp
+        if self.galaxies.has(cls=LightProfile):
+            return self.dataset.transformer.visibilities_from(
+                image=self.profile_image, xp=self._xp
+            )
+
+        return aa.Visibilities.zeros(
+            shape_slim=(self.dataset.transformer.uv_wavelengths.shape[0],)
         )
 
     @functools.cached_property
@@ -198,8 +215,7 @@ class FitInterferometer(aa.FitInterferometer, AbstractFitInversion):
             sparse_dirty_image=sparse_dirty_image_from(
                 dataset=self.dataset,
                 galaxies=self.galaxies,
-                visibilities=self.profile_subtracted_visibilities,
-                noise_map=self.noise_map,
+                image=self.profile_image,
                 xp=self._xp,
             ),
         )
