@@ -622,3 +622,49 @@ def test__fit_figure_of_merit__sparse_operator__light_profile_and_linear_light__
         fit_sparse = ag.FitInterferometer(dataset=dataset_sparse, galaxies=galaxies)
 
         assert fit_sparse.inversion.dataset.sparse_dirty_image is not None
+
+
+def test__profile_visibilities__linear_light_only__zeros_without_fourier_transform(
+    interferometer_7, monkeypatch
+):
+    """
+    A fit whose light is entirely linear (e.g. an MGE `Basis` of linear Gaussians) has an all-zero ordinary
+    light image, so `profile_visibilities` must be zeros without performing a Fourier transform.
+    """
+    calls = []
+
+    visibilities_from = interferometer_7.transformer.visibilities_from
+
+    def spy(*args, **kwargs):
+        calls.append(1)
+        return visibilities_from(*args, **kwargs)
+
+    monkeypatch.setattr(interferometer_7.transformer, "visibilities_from", spy)
+
+    galaxies = [
+        ag.Galaxy(
+            redshift=0.5,
+            bulge=ag.lp_basis.Basis(
+                profile_list=[
+                    ag.lp_linear.Gaussian(sigma=0.5, centre=(0.05, 0.05)),
+                    ag.lp_linear.Gaussian(sigma=1.5, centre=(0.05, 0.05)),
+                ]
+            ),
+        )
+    ]
+
+    fit = ag.FitInterferometer(dataset=interferometer_7, galaxies=galaxies)
+
+    profile_visibilities = fit.profile_visibilities
+
+    assert calls == []
+    assert profile_visibilities.shape == interferometer_7.data.shape
+    assert np.all(profile_visibilities.array == 0.0)
+
+    # With an ordinary light profile added, the transform is performed.
+    galaxies[0].disk = ag.lp.Sersic(intensity=0.1, centre=(0.05, 0.05))
+
+    fit = ag.FitInterferometer(dataset=interferometer_7, galaxies=galaxies)
+
+    assert np.any(fit.profile_visibilities.array != 0.0)
+    assert len(calls) == 1

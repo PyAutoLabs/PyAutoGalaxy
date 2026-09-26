@@ -187,8 +187,12 @@ class FitInterferometer(aa.FitInterferometer, AbstractFitInversion):
         """
         Returns the visibilities of every light profile of every galaxy, which are computed by performing
         a Fourier transform to the sum of light profile images.
+
+        If the galaxies have no ordinary (non-linear) light profile (e.g. their light is entirely an MGE of
+        linear Gaussians), the image is all zeros and the Fourier transform is skipped. This is decided
+        structurally, so it is safe under `jax.jit`.
         """
-        if self.galaxies.has(cls=LightProfile):
+        if _has_light_profile_non_linear(galaxies=self.galaxies):
             return self.dataset.transformer.visibilities_from(
                 image=self.profile_image, xp=self._xp
             )
