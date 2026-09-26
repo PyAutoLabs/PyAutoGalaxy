@@ -24,6 +24,85 @@ from autogalaxy.analysis.adapt_images.adapt_images import AdaptImages
 from autogalaxy.galaxy.galaxy import Galaxy
 from autogalaxy.galaxy.galaxies import Galaxies
 from autogalaxy.galaxy.to_inversion import GalaxiesToInversion
+from autogalaxy.profiles.basis import Basis
+from autogalaxy.profiles.light.abstract import LightProfile
+from autogalaxy.profiles.light.linear import LightProfileLinear
+
+
+def _has_light_profile_non_linear(galaxies: List[Galaxy]) -> bool:
+    """
+    Returns whether any galaxy has an ordinary (non-linear) light profile, whose visibilities are subtracted
+    from the data before an inversion.
+
+    A `Basis` is itself a (non-linear) `LightProfile` class, so its contents are checked: a basis made only of
+    linear light profiles (e.g. an MGE) contributes nothing to the subtracted visibilities.
+    """
+    for galaxy in galaxies:
+        for light_profile in galaxy.cls_list_from(
+            cls=LightProfile, cls_filtered=LightProfileLinear
+        ):
+            if not isinstance(light_profile, Basis):
+                return True
+
+            if any(
+                not isinstance(profile, LightProfileLinear)
+                for profile in light_profile.light_profile_list
+            ):
+                return True
+
+    return False
+
+
+def sparse_dirty_image_from(
+    dataset: aa.Interferometer,
+    galaxies: List[Galaxy],
+    visibilities: aa.Visibilities,
+    noise_map: aa.VisibilitiesNoiseMap,
+    xp=np,
+) -> Optional[np.ndarray]:
+    """
+    Returns the dirty image the sparse (w-tilde) inversion of an interferometer fit must use to form its data
+    vector, or `None` if the dirty image cached on the dataset's `sparse_operator` is already the correct one.
+
+    The `sparse_operator` caches the noise-weighted dirty image `Re(Fᴴ W d)` of the dataset's visibilities,
+    as computed by `Interferometer.apply_sparse_operator`. A fit with ordinary (non-linear) light profiles
+    inverts the `profile_subtracted_visibilities` instead, so the cached image would give a data vector
+    inconsistent with the data the chi-squared is computed from. This function computes the dirty image of
+    the input (profile-subtracted) visibilities with the same weighting (one adjoint NUFFT / DFT).
+
+    Whether this is needed is decided structurally (is there a sparse operator, do any galaxies have an
+    ordinary light profile), so the branch is fixed at trace time and is safe under `jax.jit`. Fits whose
+    light is entirely linear return `None` and pay no extra cost.
+
+    Parameters
+    ----------
+    dataset
+        The interferometer dataset being fitted, whose `sparse_operator` and `transformer` are used.
+    galaxies
+        The galaxies of the fit, checked for ordinary light profiles.
+    visibilities
+        The visibilities fitted by the inversion (the profile-subtracted visibilities).
+    noise_map
+        The noise-map of the visibilities, whose real and imaginary parts weight the dirty image.
+    xp
+        The array module (`numpy` or `jax.numpy`).
+    """
+    if dataset.sparse_operator is None:
+        return None
+
+    if not _has_light_profile_non_linear(galaxies=galaxies):
+        return None
+
+    visibilities = getattr(visibilities, "array", visibilities)
+    noise_map = getattr(noise_map, "array", noise_map)
+
+    return dataset.transformer.image_from(
+        visibilities=aa.Visibilities(
+            visibilities=visibilities.real * noise_map.real**-2.0
+            + 1j * visibilities.imag * noise_map.imag**-2.0
+        ),
+        xp=xp,
+    ).array
 
 
 class FitInterferometer(aa.FitInterferometer, AbstractFitInversion):
@@ -116,6 +195,13 @@ class FitInterferometer(aa.FitInterferometer, AbstractFitInversion):
             grids=self.grids,
             transformer=self.dataset.transformer,
             sparse_operator=self.dataset.sparse_operator,
+            sparse_dirty_image=sparse_dirty_image_from(
+                dataset=self.dataset,
+                galaxies=self.galaxies,
+                visibilities=self.profile_subtracted_visibilities,
+                noise_map=self.noise_map,
+                xp=self._xp,
+            ),
         )
 
         return GalaxiesToInversion(

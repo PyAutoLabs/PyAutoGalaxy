@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
 
+import autoarray as aa
 import autogalaxy as ag
 
 
@@ -509,3 +510,94 @@ def test__model_visibilities_of_galaxies_list__matches_galaxy_model_visibilities
     assert fit.model_visibilities_of_galaxies_list[2].array == pytest.approx(
         fit.galaxy_model_visibilities_dict[galaxy_pix].array, 1.0e-4
     )
+
+
+def _assert_sparse_fit_matches_dense(dataset, dataset_sparse, galaxies):
+    fit = ag.FitInterferometer(dataset=dataset, galaxies=galaxies)
+    fit_sparse = ag.FitInterferometer(dataset=dataset_sparse, galaxies=galaxies)
+
+    assert isinstance(fit.inversion, aa.InversionInterferometerMapping)
+    assert isinstance(fit_sparse.inversion, aa.InversionInterferometerSparse)
+
+    assert fit_sparse.log_likelihood == pytest.approx(fit.log_likelihood, rel=1.0e-8)
+    assert fit_sparse.log_evidence == pytest.approx(fit.log_evidence, rel=1.0e-8)
+
+
+def test__fit_figure_of_merit__sparse_operator__linear_light_only__matches_dense(
+    interferometer_7,
+):
+    """
+    A fit whose light is entirely linear (e.g. an MGE) inverts the unsubtracted visibilities, so the dirty
+    image cached on the sparse operator is used as-is and the sparse fit reproduces the dense one.
+    """
+    dataset_sparse = interferometer_7.apply_sparse_operator(use_jax=False)
+
+    galaxies = [
+        ag.Galaxy(
+            redshift=0.5,
+            bulge=ag.lp_linear.Gaussian(sigma=0.5, centre=(0.05, 0.05)),
+            disk=ag.lp_linear.Gaussian(sigma=1.5, centre=(0.05, 0.05)),
+        )
+    ]
+
+    galaxies_basis = [
+        ag.Galaxy(
+            redshift=0.5,
+            bulge=ag.lp_basis.Basis(
+                profile_list=[
+                    ag.lp_linear.Gaussian(sigma=0.5, centre=(0.05, 0.05)),
+                    ag.lp_linear.Gaussian(sigma=1.5, centre=(0.05, 0.05)),
+                ]
+            ),
+        )
+    ]
+
+    for galaxies in (galaxies, galaxies_basis):
+        fit_sparse = ag.FitInterferometer(dataset=dataset_sparse, galaxies=galaxies)
+
+        assert fit_sparse.inversion.dataset.sparse_dirty_image is None
+
+        _assert_sparse_fit_matches_dense(
+            dataset=interferometer_7, dataset_sparse=dataset_sparse, galaxies=galaxies
+        )
+
+
+def test__fit_figure_of_merit__sparse_operator__light_profile_and_linear_light__matches_dense(
+    interferometer_7,
+):
+    """
+    An ordinary light profile's visibilities are subtracted before the inversion, so the sparse data vector
+    must be formed from the dirty image of the profile-subtracted visibilities rather than the one cached on
+    the sparse operator (which is of the unsubtracted visibilities).
+    """
+    dataset_sparse = interferometer_7.apply_sparse_operator(use_jax=False)
+
+    galaxies = [
+        ag.Galaxy(
+            redshift=0.5,
+            bulge=ag.lp.Sersic(intensity=0.1, centre=(0.05, 0.05)),
+            disk=ag.lp_linear.Gaussian(sigma=1.0, centre=(0.05, 0.05)),
+        )
+    ]
+
+    # The same ordinary light profile inside a `Basis` alongside linear ones.
+    galaxies_basis = [
+        ag.Galaxy(
+            redshift=0.5,
+            bulge=ag.lp_basis.Basis(
+                profile_list=[
+                    ag.lp.Sersic(intensity=0.1, centre=(0.05, 0.05)),
+                    ag.lp_linear.Gaussian(sigma=1.0, centre=(0.05, 0.05)),
+                ]
+            ),
+        )
+    ]
+
+    for galaxies in (galaxies, galaxies_basis):
+        fit_sparse = ag.FitInterferometer(dataset=dataset_sparse, galaxies=galaxies)
+
+        assert fit_sparse.inversion.dataset.sparse_dirty_image is not None
+
+        _assert_sparse_fit_matches_dense(
+            dataset=interferometer_7, dataset_sparse=dataset_sparse, galaxies=galaxies
+        )
