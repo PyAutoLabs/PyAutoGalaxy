@@ -1,3 +1,5 @@
+import inspect
+
 import numpy as np
 import pytest
 
@@ -98,6 +100,49 @@ def test__convergence_2d_from__elliptical_vs_spherical():
     assert elliptical.convergence_2d_from(grid=grid).array == pytest.approx(
         spherical.convergence_2d_from(grid=grid).array, 1e-4
     )
+
+
+
+def test__convergence_2d_from__forwards_xp_to_convergence_func(monkeypatch):
+    """
+    ``convergence_2d_from`` must pass its ``xp`` through to ``convergence_func``; dropping it makes
+    ``axis_ratio`` fall back to NumPy, which breaks ``jax.jit`` when ``ell_comps`` are tracers.
+
+    The array decorators swap any non-NumPy ``xp`` for ``jax.numpy``, so the undecorated method is called
+    with a NumPy-delegating spy module (keeping this test jax-free) and the decorated elliptical radii are
+    stubbed.
+    """
+
+    class SpyXp:
+        def __getattr__(self, name):
+            return getattr(np, name)
+
+    spy_xp = SpyXp()
+
+    mp = ag.mp.Isothermal(
+        centre=(0.0, 0.0), ell_comps=(0.0, 0.333333), einstein_radius=1.0
+    )
+
+    received_xp = []
+    convergence_func = mp.convergence_func
+
+    def spy_convergence_func(grid_radius, xp=np):
+        received_xp.append(xp)
+        return convergence_func(grid_radius=grid_radius, xp=xp)
+
+    monkeypatch.setattr(mp, "convergence_func", spy_convergence_func)
+    grid_eta = ag.ArrayIrregular(values=[1.0])
+
+    monkeypatch.setattr(
+        mp, "elliptical_radii_grid_from", lambda grid, xp=np, **kwargs: grid_eta
+    )
+
+    convergence_2d_from = inspect.unwrap(ag.mp.Isothermal.convergence_2d_from)
+
+    convergence = convergence_2d_from(mp, grid=ag.Grid2DIrregular([[0.0, 1.0]]), xp=spy_xp)
+
+    assert received_xp == [spy_xp]
+    assert convergence == pytest.approx(0.66666, 1e-3)
 
 
 def test__potential_2d_from__isothermal_sph():
