@@ -236,3 +236,18 @@ def test__ellipse_multipole_scaled_model_resolves():
     assert model.prior_count == 2
 
     model.instance_from_prior_medians()
+
+
+def test__delaunay_mesh_model_has_no_missing_prior():
+    # `areas_factor` is a float `__init__` argument, so without a configured
+    # prior `af.Model` reports it as "Prior Missing" (the packaged file was a
+    # bare `Delaunay:`); it is a fixed Constant at the class default.
+    model = af.Model(ag.mesh.Delaunay, pixels=100)
+
+    assert "Prior Missing" not in model.info
+    assert model.prior_count == 0
+    assert model.areas_factor == 0.5
+
+    instance = model.instance_from_prior_medians()
+
+    assert instance.areas_factor == 0.5

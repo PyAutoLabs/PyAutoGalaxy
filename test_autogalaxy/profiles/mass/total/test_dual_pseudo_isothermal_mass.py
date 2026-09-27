@@ -317,6 +317,22 @@ def test__default_class__supports_model_composition():
     assert model_sph.prior_count == 9
 
 
+def test__ra_rs_have_notation_labels_not_the_first_letter_fallback():
+    # With no notation entry autofit labels a parameter by its first letter,
+    # which renders both `ra` and `rs` as "r" in corner plots and tables.
+    import autofit as af
+
+    labels = dict(
+        zip(
+            af.Model(ag.mp.dPIEPotential).parameter_names,
+            af.Model(ag.mp.dPIEPotential).parameter_labels,
+        )
+    )
+
+    assert labels["ra"] == r"r_{\rm a}"
+    assert labels["rs"] == r"r_{\rm s}"
+
+
 def test__from_b0__returns_internal_parameterization():
     # The non-standard construction path: dPIEMass.from_b0 / dPIEMassSph.from_b0
     # return the internal (ra, rs, b0) classes with the inputs passed through.
