@@ -248,3 +248,80 @@ def test__shear_yx_2d_from__matches_via_hessian():
     np.testing.assert_allclose(
         np.asarray(shear_analytic), np.asarray(shear_via_hessian), rtol=1e-3, atol=1e-6
     )
+
+
+def _deflections_old_closed_form(mass, grid):
+    """
+    The pre-series closed-form SIE deflections (Kormann et al. 1994), evaluated with the profile's own axis ratio
+    for an unrotated profile centred on the origin. Well conditioned for every q < 1 used below.
+    """
+    q = mass.axis_ratio()
+    s = np.sqrt(1.0 - q**2)
+    factor = 2.0 * mass.einstein_radius_rescaled() * q / s
+    y, x = grid.array[:, 0], grid.array[:, 1]
+    psi = np.sqrt(q**2 * x**2 + y**2 + 1e-16)
+    return np.vstack((factor * np.arctanh(s * y / psi), factor * np.arctan(s * x / psi))).T
+
+
+@pytest.mark.parametrize("axis_ratio", [0.5, 0.9, 0.9999, 1.0 - 1.0e-7])
+def test__deflections_yx_2d_from__matches_closed_form_up_to_circular_limit(axis_ratio):
+    mass = ag.mp.Isothermal(
+        centre=(0.0, 0.0),
+        ell_comps=ag.convert.ell_comps_from(axis_ratio=axis_ratio, angle=0.0),
+        einstein_radius=1.3,
+    )
+
+    assert mass.axis_ratio() == pytest.approx(axis_ratio, rel=1.0e-12)
+
+    deflections = mass.deflections_yx_2d_from(grid=grid)
+
+    assert deflections.array == pytest.approx(
+        _deflections_old_closed_form(mass, grid), rel=1.0e-12
+    )
+
+
+def test__deflections_yx_2d_from__circular_limit_equals_isothermal_sph():
+    ell = ag.mp.Isothermal(centre=(0.1, -0.2), ell_comps=(0.0, 0.0), einstein_radius=1.3)
+    sph = ag.mp.IsothermalSph(centre=(0.1, -0.2), einstein_radius=1.3)
+
+    assert ell.deflections_yx_2d_from(grid=grid).array == pytest.approx(
+        sph.deflections_yx_2d_from(grid=grid).array, rel=1.0e-12
+    )
+
+
+@pytest.mark.parametrize("ell_comps", [(0.0, 0.0), (3.0e-6, -2.0e-6)])
+def test__deflections_yx_2d_from__jax_grad_ell_comps_near_circular_matches_finite_difference(
+    ell_comps,
+):
+    """
+    At and near ell_comps = (0, 0) the gradient of the deflections with respect to the ellipticity components must
+    be the true one, not zero (an axis-ratio clamp) or NaN (the polar conversion at the origin).
+    """
+    jax = pytest.importorskip("jax")
+    import jax.numpy as jnp
+
+    with jax.enable_x64(True):
+        small_grid = ag.Grid2D.uniform(shape_native=(3, 3), pixel_scales=0.3)
+        weights = jnp.asarray(np.random.default_rng(1).normal(size=(9, 2)))
+
+        def f(e):
+            mass = ag.mp.Isothermal(
+                centre=(0.01, 0.02), ell_comps=(e[0], e[1]), einstein_radius=1.0
+            )
+            return jnp.sum(
+                mass.deflections_yx_2d_from(grid=small_grid, xp=jnp).array * weights
+            )
+
+        e = jnp.array(ell_comps)
+        grad = np.asarray(jax.grad(f)(e))
+
+        h = 1.0e-4
+        fd = np.array(
+            [
+                (f(e + jnp.array([h, 0.0])) - f(e - jnp.array([h, 0.0]))) / (2 * h),
+                (f(e + jnp.array([0.0, h])) - f(e - jnp.array([0.0, h]))) / (2 * h),
+            ]
+        )
+
+        assert np.all(np.isfinite(grad))
+        assert grad == pytest.approx(fd, abs=1.0e-6)

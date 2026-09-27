@@ -118,9 +118,9 @@ def _isothermal_from(parameters: Dict) -> Isothermal:
     einstein_radius = float(
         einstein_radius_ag_from(theta_E=parameters["theta_E"], axis_ratio=q, slope=2.0)
     )
-    # An exactly-round COOLEST profile maps to the spherical class — the
-    # elliptical Isothermal clips its axis ratio to 0.99999 for the stability
-    # of its analytic deflections, so it is not numerically exact at q = 1.
+    # An exactly-round COOLEST profile maps to the spherical class, the
+    # dedicated q = 1 profile (the elliptical Isothermal agrees with it there to
+    # fp64 round-off, but the spherical class states the intent).
     if q == 1.0:
         return IsothermalSph(centre=centre, einstein_radius=einstein_radius)
     return Isothermal(
