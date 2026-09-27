@@ -180,25 +180,28 @@ def test__point_centre_is_a_free_tuple():
 
 
 # ----------------------------------------------------------------------------
-# the `missing` state -- unset configuration on a `Delaunay` mesh
+# the `missing` state -- unset configuration on a real class
 # ----------------------------------------------------------------------------
 
 
-def test__delaunay_areas_factor_has_no_prior_configured_and_is_missing():
-    spec = af.GraphSpec.from_model(af.Model(ag.mesh.Delaunay))
+def test__curvature_mask_coefficient_has_no_prior_configured_and_is_missing():
+    # `CurvatureMask` ships no prior for `coefficient`, so it is the real-class
+    # witness of the `missing` state (it was `Delaunay.areas_factor` until that
+    # was configured as a Constant).
+    spec = af.GraphSpec.from_model(af.Model(ag.reg.CurvatureMask))
 
-    row = rows_of(spec)["areas_factor"]
+    row = rows_of(spec)["coefficient"]
 
     assert row.sampling == "missing"
     assert row.prior_cls_name == "ConfigException"
     assert spec.counts["missing"] == 1
 
-    presentation = af.ModelPlotter(af.Model(ag.mesh.Delaunay)).presentation()
+    presentation = af.ModelPlotter(af.Model(ag.reg.CurvatureMask)).presentation()
 
-    assert "areas_factor · missing" in pill_texts(presentation)
+    assert "coefficient · missing" in pill_texts(presentation)
 
 
-def test__delaunay_pixels_and_zeroed_pixels_are_fixed_not_missing():
+def test__delaunay_pixels_zeroed_pixels_and_areas_factor_are_fixed_not_missing():
     """
     Measured, not assumed.
 
@@ -206,16 +209,20 @@ def test__delaunay_pixels_and_zeroed_pixels_are_fixed_not_missing():
     to be three ``missing`` rows.  They are not: ``pixels: int`` has no default,
     so ``af.Model`` fills the slot with ``af.Model(int)`` -- a *fixed* row by
     rule R7, never a ``ConfigException`` -- and ``zeroed_pixels: Optional[int] =
-    0`` simply takes its default.  Only ``areas_factor`` is genuinely unset
-    configuration.  This test pins that distinction so the figure cannot start
-    calling an unset int "missing" without someone noticing.
+    0`` simply takes its default.  ``areas_factor`` is configured as a
+    ``Constant`` (``priors/mesh/delaunay.yaml``), so it is fixed too.  This test
+    pins that distinction so the figure cannot start calling an unset int
+    "missing" without someone noticing.
     """
     spec = af.GraphSpec.from_model(af.Model(ag.mesh.Delaunay))
 
     rows = rows_of(spec)
 
     assert rows["pixels"].sampling == "fixed"
+    assert rows["areas_factor"].sampling == "fixed"
+    assert rows["areas_factor"].prior_cls_name == "Constant"
     assert [row.name for row in spec.root.rows] == ["pixels", "areas_factor"]
+    assert spec.counts["missing"] == 0
 
     set_spec = af.GraphSpec.from_model(
         af.Model(ag.mesh.Delaunay, pixels=500, zeroed_pixels=0)
@@ -223,8 +230,8 @@ def test__delaunay_pixels_and_zeroed_pixels_are_fixed_not_missing():
     set_rows = set_spec.root.rows
 
     assert [row.name for row in set_rows] == ["pixels", "zeroed_pixels", "areas_factor"]
-    assert [row.sampling for row in set_rows] == ["fixed", "fixed", "missing"]
-    assert set_spec.counts["missing"] == 1
+    assert [row.sampling for row in set_rows] == ["fixed", "fixed", "fixed"]
+    assert set_spec.counts["missing"] == 0
 
 
 # ----------------------------------------------------------------------------

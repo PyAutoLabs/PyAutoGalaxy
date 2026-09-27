@@ -47,10 +47,12 @@ label:
     outer_slope: t_{\rm 2}
     overdens: \Delta_{\rm vir}
     pixels: N_{\rm pix}
+    ra: r_{\rm a}
     radius_break: R_{\rm b}
     redshift: z
     redshift_object: z_{\rm obj}
     redshift_source: z_{\rm src}
+    rs: r_{\rm s}
     scale_radius: R_{\rm s}
     scatter: \sigma
     separation: s
@@ -128,12 +130,14 @@ label_format:
     outer_slope: '{:.4f}'
     overdens: '{:.4f}'
     pixels: '{:.4f}'
+    ra: '{:.4f}'
     radius: '{:.4f}'
     radius_break: '{:.4f}'
     redshift: '{:.4f}'
     redshift_object: '{:.4f}'
     redshift_source: '{:.4f}'
     rho: '{:.4f}'
+    rs: '{:.4f}'
     scale_radius: '{:.4f}'
     separation: '{:.4f}'
     sersic_index: '{:.4f}'
