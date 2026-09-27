@@ -170,3 +170,109 @@ def test__multipole_comps_from():
     multipole_comps = ag.convert.multipole_comps_from(k_m=0.14142135, phi_m=112.5, m=2)
 
     assert multipole_comps == pytest.approx((-0.1, -0.1), abs=1e-3)
+
+
+def test__polar_conversions__numpy_origin_values_unchanged():
+    axis_ratio, angle = ag.convert.axis_ratio_and_angle_from(ell_comps=(0.0, 0.0))
+
+    assert axis_ratio == 1.0
+    assert angle == 0.0
+
+    magnitude, angle = ag.convert.shear_magnitude_and_angle_from(
+        gamma_1=0.0, gamma_2=0.0
+    )
+
+    assert magnitude == 0.0
+    assert angle == 0.0
+
+    k_m, phi_m = ag.convert.multipole_k_m_and_phi_m_from(
+        multipole_comps=(0.0, 0.0), m=4
+    )
+
+    assert k_m == 0.0
+    assert phi_m == 0.0
+
+
+def _deflection_objectives():
+    """
+    Scalar objectives (weighted sums of deflections on a tiny grid) of the profiles whose polar conversions take a
+    square root of their components, as functions of those two components.
+    """
+    import jax.numpy as jnp
+    import numpy as np
+
+    grid = ag.Grid2D.uniform(shape_native=(3, 3), pixel_scales=0.3)
+    weights = jnp.asarray(np.random.default_rng(1).normal(size=(9, 2)))
+
+    def shear(c):
+        mass = ag.mp.ExternalShear(gamma_1=c[0], gamma_2=c[1])
+        return jnp.sum(mass.deflections_yx_2d_from(grid=grid, xp=jnp).array * weights)
+
+    def multipole(c):
+        mass = ag.mp.PowerLawMultipole(
+            centre=(0.01, 0.02),
+            einstein_radius=1.0,
+            slope=2.0,
+            m=4,
+            multipole_comps=(c[0], c[1]),
+        )
+        return jnp.sum(mass.deflections_yx_2d_from(grid=grid, xp=jnp).array * weights)
+
+    def isothermal(c):
+        mass = ag.mp.Isothermal(
+            centre=(0.01, 0.02), ell_comps=(c[0], c[1]), einstein_radius=1.0
+        )
+        return jnp.sum(mass.deflections_yx_2d_from(grid=grid, xp=jnp).array * weights)
+
+    return {"shear": shear, "multipole": multipole, "isothermal": isothermal}
+
+
+@pytest.mark.parametrize("name", ["shear", "multipole"])
+def test__polar_conversions__jax_grad_finite_at_origin_fp64(name):
+    jax = pytest.importorskip("jax")
+    import jax.numpy as jnp
+    import numpy as np
+
+    with jax.enable_x64(True):
+        f = _deflection_objectives()[name]
+        grad = jax.grad(f)(jnp.zeros(2))
+
+        assert np.all(np.isfinite(np.asarray(grad)))
+
+
+@pytest.mark.parametrize("name", ["shear", "multipole", "isothermal"])
+def test__polar_conversions__jax_grad_finite_at_origin_fp32(name):
+    jax = pytest.importorskip("jax")
+    import jax.numpy as jnp
+    import numpy as np
+
+    with jax.enable_x64(False):
+        f = _deflection_objectives()[name]
+        grad = jax.grad(f)(jnp.zeros(2, dtype=jnp.float32))
+
+        assert np.all(np.isfinite(np.asarray(grad)))
+
+
+@pytest.mark.parametrize("name", ["shear", "multipole"])
+def test__polar_conversions__jax_grad_at_origin_matches_finite_difference(name):
+    """
+    Shear and multipole deflections are linear in their components, so the gradient at the origin is well defined
+    and equal to the central finite difference there.
+    """
+    jax = pytest.importorskip("jax")
+    import jax.numpy as jnp
+    import numpy as np
+
+    with jax.enable_x64(True):
+        f = _deflection_objectives()[name]
+        grad = np.asarray(jax.grad(f)(jnp.zeros(2)))
+
+        h = 1.0e-5
+        fd = np.array(
+            [
+                (f(jnp.array([h, 0.0])) - f(jnp.array([-h, 0.0]))) / (2 * h),
+                (f(jnp.array([0.0, h])) - f(jnp.array([0.0, -h]))) / (2 * h),
+            ]
+        )
+
+        assert grad == pytest.approx(fd, abs=1.0e-6)

@@ -94,15 +94,17 @@ class Isothermal(PowerLaw):
             slope=2.0,
         )
 
-    def axis_ratio(self, xp=np):
-        axis_ratio = super().axis_ratio(xp=xp)
-        return xp.minimum(axis_ratio, 0.99999)
-
     @aa.decorators.to_vector_yx
     @aa.decorators.transform(rotate_back=True)
     def deflections_yx_2d_from(self, grid: aa.type.Grid2DLike, xp=np, **kwargs):
-        """
+        r"""
         Calculate the deflection angles on a grid of (y,x) arc-second coordinates.
+
+        With :math:`s^2 = 1 - q^2`, :math:`t_x = x / \Psi` and :math:`t_y = y / \Psi` the deflections are
+        :math:`2 b q \arctan(s t_x) / s` and :math:`2 b q \,{\rm arctanh}(s t_y) / s`. Both ratios tend to
+        :math:`t` as :math:`q \to 1`, but the closed form is 0/0 there, so near the circular limit they are
+        evaluated as their Taylor series in :math:`s^2`. This makes the deflections, and their gradient with respect
+        to the ellipticity components, correct all the way to :math:`q = 1`.
 
         Parameters
         ----------
@@ -111,7 +113,16 @@ class Isothermal(PowerLaw):
         """
 
         axis_ratio = self.axis_ratio(xp)
-        sqrt_one_minus_q2 = xp.sqrt(1 - axis_ratio**2)
+        one_minus_q2 = 1 - axis_ratio**2
+
+        # Below this s^2 the series is used. It is truncated after the s^6 t^7 term, so for |t_y| <= 1 and
+        # |t_x| <= 1 / q ~ 1 (as Psi >= |y| and Psi >= q |x|) its relative error is below s^8 / 9 ~ 1e-17 at the
+        # threshold, under fp64 round-off. Above it the closed form is well conditioned: s >= 1e-2.
+        small = one_minus_q2 < 1.0e-4
+
+        # Double-where: the closed form is evaluated at a safe s^2 wherever the series is used, so its unused branch
+        # never produces an inf / NaN value or gradient at q = 1.
+        sqrt_one_minus_q2 = xp.sqrt(xp.where(small, 1.0, one_minus_q2))
 
         factor = (
             2.0 * self.einstein_radius_rescaled(xp) * axis_ratio / sqrt_one_minus_q2
@@ -125,7 +136,24 @@ class Isothermal(PowerLaw):
         deflection_x = xp.arctan(
             xp.divide(xp.multiply(sqrt_one_minus_q2, grid.array[:, 1]), psi)
         )
-        return xp.multiply(factor, xp.vstack((deflection_y, deflection_x)).T)
+        deflections = xp.multiply(factor, xp.vstack((deflection_y, deflection_x)).T)
+
+        t_y = grid.array[:, 0] / psi
+        t_x = grid.array[:, 1] / psi
+
+        # arctanh(s t) / s = t + s^2 t^3 / 3 + s^4 t^5 / 5 + s^6 t^7 / 7 + ...
+        # arctan(s t) / s  = t - s^2 t^3 / 3 + s^4 t^5 / 5 - s^6 t^7 / 7 + ...
+        u_y = one_minus_q2 * t_y**2
+        u_x = -one_minus_q2 * t_x**2
+        series_y = t_y * (1.0 + u_y * (1.0 / 3.0 + u_y * (1.0 / 5.0 + u_y / 7.0)))
+        series_x = t_x * (1.0 + u_x * (1.0 / 3.0 + u_x * (1.0 / 5.0 + u_x / 7.0)))
+
+        deflections_series = xp.multiply(
+            2.0 * self.einstein_radius_rescaled(xp) * axis_ratio,
+            xp.vstack((series_y, series_x)).T,
+        )
+
+        return xp.where(small, deflections_series, deflections)
 
     @aa.decorators.to_vector_yx
     @aa.decorators.transform

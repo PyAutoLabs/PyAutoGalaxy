@@ -16,6 +16,37 @@ from typing import Tuple, Optional
 # Stated together here rather than left as unrelated literals in separate files.
 ELL_COMPS_MAGNITUDE_CLAMP = 0.999
 
+# The amount the x-component of a pair of components is nudged by when both are
+# exactly zero, for traced JAX values only (see `_nudge_off_origin`).
+_ORIGIN_NUDGE = 1e-8
+
+
+def _nudge_off_origin(c0, c1, xp=np):
+    """
+    Returns the x-component `c1` of a pair of components (`ell_comps[1]`, `gamma_1`, `multipole_comps[1]`), nudged
+    by `_ORIGIN_NUDGE` when both components are exactly zero, for traced JAX values only.
+
+    Every polar conversion below computes `sqrt(c0**2 + c1**2)`, whose derivative at the origin is 0/0, so
+    `jax.grad` returns NaN there even though the profiles themselves are smooth through it (shear and multipole
+    deflections are linear in their components, so the gradient at the nudged point is exact). The nudged value is
+    `c1 + nudge`, so the derivative through `c1` is unchanged, and positive, so the angle `arctan2(0, +nudge) = 0`
+    matches the existing guarded value at the origin.
+
+    Only traced values carry a gradient, so NumPy and concrete JAX values are returned unchanged: staging the nudge
+    onto a constant component alters how XLA compiles the downstream arithmetic and moves jitted deflections by an
+    ulp, which flips bit-exact ties in the point solver (`test_static_lattice_jax.py` in PyAutoLens pins one). For
+    the same reason traced values go through `jax.lax.select` rather than `jnp.where` or an additive offset, both of
+    which were measured to shift that pinned tie; away from the origin the traced value is selected unchanged.
+    """
+    if xp.__name__.startswith("jax"):
+        import jax
+
+        if isinstance(c0, jax.core.Tracer) or isinstance(c1, jax.core.Tracer):
+            return jax.lax.select(
+                xp.logical_and(c0 == 0, c1 == 0), c1 + _ORIGIN_NUDGE, c1
+            )
+    return c1
+
 
 def ell_comps_from(axis_ratio: float, angle: float, xp=np) -> Tuple[float, float]:
     """
@@ -75,6 +106,8 @@ def axis_ratio_and_angle_from(
     ell_comps
         The elliptical components of the light or mass profile which are converted to an angle.
     """
+    ell_comps = (ell_comps[0], _nudge_off_origin(ell_comps[0], ell_comps[1], xp=xp))
+
     angle = 0.5 * xp.arctan2(
         ell_comps[0],
         xp.where(xp.logical_and(ell_comps[0] == 0, ell_comps[1] == 0), 1.0, ell_comps[1]),
@@ -215,6 +248,8 @@ def shear_magnitude_and_angle_from(
     gamma_2
         The gamma 2 component of the shear.
     """
+    gamma_1 = _nudge_off_origin(gamma_2, gamma_1, xp=xp)
+
     angle = (
         0.5
         * xp.arctan2(gamma_2, xp.where(xp.logical_and(gamma_1 == 0, gamma_2 == 0), 1.0, gamma_1))
@@ -320,6 +355,11 @@ def multipole_k_m_and_phi_m_from(
     -------
     The normalization and angle parameters of the multipole.
     """
+    multipole_comps = (
+        multipole_comps[0],
+        _nudge_off_origin(multipole_comps[0], multipole_comps[1], xp=xp),
+    )
+
     phi_m = (
         xp.arctan2(
             multipole_comps[0],
