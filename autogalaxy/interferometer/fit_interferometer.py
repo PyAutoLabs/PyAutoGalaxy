@@ -11,6 +11,8 @@ Fit an interferometer (ALMA/JVLA uv-plane) dataset with a model consisting of on
 5. Combine the profile visibilities and inversion reconstruction into ``model_data``.
 6. Compute residuals, chi-squared, and log-likelihood (or log-evidence when an inversion is used).
 """
+
+import copy
 import functools
 import numpy as np
 from typing import Dict, List, Optional
@@ -107,6 +109,52 @@ def sparse_dirty_image_from(
     )[:, 0]
 
     return xp.asarray(dataset.sparse_operator.dirty_image) - operated_image
+
+
+def uses_precomputed_data_term_from(
+    dataset: aa.Interferometer,
+    galaxies: List[Galaxy],
+    data: aa.Visibilities,
+    noise_map: aa.VisibilitiesNoiseMap,
+) -> bool:
+    """
+    Returns whether the inversion of an interferometer fit can read the data term `d^T N^-1 d` of its
+    `fast_chi_squared` from the scalar cached on the dataset's `sparse_operator`, instead of being passed the
+    visibilities and reducing over them on every likelihood call.
+
+    This holds when:
+
+    - The dataset has a `sparse_operator` carrying a precomputed `data_term` (built by
+      `Interferometer.apply_sparse_operator` or `Interferometer.apply_sparse_operator_from_chunks`).
+    - No galaxy has an ordinary (non-linear) light profile, so nothing is subtracted from the visibilities
+      before the inversion and the data it fits are exactly the raw visibilities the operator was built from.
+    - The data and noise-map fitted are the dataset's own (not ones a subclass has modified or scaled), since the
+      cached scalar was computed from them.
+
+    When it holds, the fit passes `data=None` to the inversion's `DatasetInterface`, so the likelihood path
+    allocates and reduces over no visibility-sized array. Every check is structural (object identity / profile
+    types), so the branch is fixed at trace time and is safe under `jax.jit`.
+
+    Parameters
+    ----------
+    dataset
+        The interferometer dataset being fitted.
+    galaxies
+        The galaxies of the fit, checked for ordinary light profiles.
+    data
+        The visibilities the fit is fitting (`fit.data`).
+    noise_map
+        The noise-map the fit uses (`fit.noise_map`).
+    """
+    sparse_operator = getattr(dataset, "sparse_operator", None)
+
+    if getattr(sparse_operator, "data_term", None) is None:
+        return False
+
+    if data is not dataset.data or noise_map is not dataset.noise_map:
+        return False
+
+    return not _has_light_profile_non_linear(galaxies=galaxies)
 
 
 class FitInterferometer(aa.FitInterferometer, AbstractFitInversion):
@@ -209,9 +257,38 @@ class FitInterferometer(aa.FitInterferometer, AbstractFitInversion):
         return self.data - self.profile_visibilities
 
     @property
+    def _uses_precomputed_data_term(self) -> bool:
+        """
+        Whether this fit's inversion reads its data term from the scalar cached on the dataset's
+        `sparse_operator` (see `uses_precomputed_data_term_from`), in which case `galaxies_to_inversion` passes
+        `data=None` and the likelihood never evaluates `profile_visibilities` or
+        `profile_subtracted_visibilities`.
+        """
+        return uses_precomputed_data_term_from(
+            dataset=self.dataset,
+            galaxies=self.galaxies,
+            data=self.data,
+            noise_map=self.noise_map,
+        )
+
+    @property
     def galaxies_to_inversion(self) -> GalaxiesToInversion:
+        """
+        Returns the object which builds this fit's inversion from its galaxies' linear objects.
+
+        The inversion fits the `profile_subtracted_visibilities`, except on the sparse path when no galaxy has an
+        ordinary light profile (`_uses_precomputed_data_term`): nothing is then subtracted, and `data=None` is passed
+        so the sparse inversion takes its data vector from the operator's cached dirty image and the data term of
+        its `fast_chi_squared` from the operator's cached scalar, touching no visibility-sized array. The
+        visibilities remain available to outputs via `fit.data`.
+        """
+        if self._uses_precomputed_data_term:
+            data = None
+        else:
+            data = self.profile_subtracted_visibilities
+
         dataset = aa.DatasetInterface(
-            data=self.profile_subtracted_visibilities,
+            data=data,
             noise_map=self.noise_map,
             grids=self.grids,
             transformer=self.dataset.transformer,
@@ -243,6 +320,34 @@ class FitInterferometer(aa.FitInterferometer, AbstractFitInversion):
         """
         if self.perform_inversion:
             return self.galaxies_to_inversion.inversion
+
+    @property
+    def inversion_with_data(self) -> Optional[aa.AbstractInversion]:
+        """
+        The fit's `inversion`, guaranteed to carry the visibilities it fitted as its dataset's `data`, for
+        output quantities that read them (e.g. `data_subtracted_dict`, plotted by `subplot_of_mapper`).
+
+        On the sparse path with no ordinary light profile (`_uses_precomputed_data_term`) the likelihood's
+        inversion is built with `data=None`, so that it touches no visibility-sized array. Nothing was subtracted
+        from the visibilities in that case, so the data it fitted are `fit.data`: this returns a shallow copy of
+        the inversion (solved first, so it shares the reconstruction and every other cached quantity) whose dataset interface carries
+        `fit.data`. In every other case it returns `inversion` itself.
+        """
+        inversion = self.inversion
+
+        if inversion is None or inversion.dataset.data is not None:
+            return inversion
+
+        # Solve first, so the copy shares the reconstruction (and everything it cached) rather than repeating it.
+        inversion.reconstruction
+
+        dataset = copy.copy(inversion.dataset)
+        dataset.data = self.data
+
+        inversion_with_data = copy.copy(inversion)
+        inversion_with_data.dataset = dataset
+
+        return inversion_with_data
 
     @functools.cached_property
     def model_data(self) -> aa.Visibilities:
