@@ -138,14 +138,9 @@ class Scribbler:
         self.figsize = figsize
         self.extent = extent
 
-        if proposal is not None:
-            proposal = np.asarray(proposal, dtype=bool)
-            if proposal.shape != tuple(image.shape_native):
-                raise ValueError(
-                    f"proposal shape {proposal.shape} does not match the image's native "
-                    f"shape {tuple(image.shape_native)}"
-                )
-        self.proposal = proposal
+        self.proposal = (
+            self._validate_proposal(proposal) if proposal is not None else None
+        )
 
         # brush
         self.brush_radius = max(int(image.shape_native[0] * brush_width), min_radius)
@@ -177,6 +172,20 @@ class Scribbler:
 
         if block:
             self.start()
+
+    def _validate_proposal(self, proposal) -> np.ndarray:
+        """
+        Returns `proposal` as a boolean array, raising a `ValueError` if its shape is not
+        the image's native shape (a broadcastable shape such as `(1, N)` would otherwise
+        silently broadcast in `mask_from()`).
+        """
+        proposal = np.asarray(proposal, dtype=bool)
+        if proposal.shape != tuple(self.im.shape_native):
+            raise ValueError(
+                f"proposal shape {proposal.shape} does not match the image's native "
+                f"shape {tuple(self.im.shape_native)}"
+            )
+        return proposal
 
     def _build_figure(self, cmap, norm, vmin, vmax, mask_overlay, rgb_image):
         """
@@ -233,15 +242,17 @@ class Scribbler:
             grid = mask_overlay.geometry.grid_pixel_centres_2d_from(grid_scaled_2d=grid)
             plt.scatter(y=grid[:, 0], x=grid[:, 1], c="k", marker="x", s=10)
 
+        self._proposal_contour = None
         if self.proposal is not None and self.proposal.any():
             # Outline only: filling the proposal would hide the very pixels its boundary
-            # is being judged against.
-            self.ax.contour(
+            # is being judged against. No `origin=`: without X / Y, contour places Z[0, 0]
+            # at data (0, 0), which is where imshow draws pixel [0, 0] for either origin
+            # (contour's own `origin="upper"` would flip the outline vertically).
+            self._proposal_contour = self.ax.contour(
                 self.proposal.astype(float),
                 levels=[0.5],
                 colors="w",
                 linewidths=1.0,
-                origin=_conf_imshow_origin(),
             )
 
         self.ax.set_title(self.KEY_LEGEND, fontsize=10)
@@ -405,7 +416,8 @@ class Scribbler:
     def mask_from(self, proposal: Optional[np.ndarray] = None) -> np.ndarray:
         """
         Returns the mask the user drew: `(proposal | added) & ~erased`, where `added` and
-        `erased` are the `'1'` and `'2'` scribble segments.
+        `erased` are the first and second scribble segments (`'1'` and `'2'` by default,
+        whatever their names when `segment_names` is given).
 
         Parameters
         ----------
@@ -419,9 +431,11 @@ class Scribbler:
         erased = masks[names[1]] if len(names) > 1 else np.zeros_like(added)
         if proposal is None:
             proposal = self.proposal
+        else:
+            proposal = self._validate_proposal(proposal)
         if proposal is None:
             proposal = np.zeros_like(added)
-        return (np.asarray(proposal, dtype=bool) | added) & ~erased
+        return (proposal | added) & ~erased
 
     def add_circle_to_mask(self, center, radius, mask):
         if center[0] is None or center[1] is None:

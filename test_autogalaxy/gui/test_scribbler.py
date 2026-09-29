@@ -7,15 +7,25 @@ loop runs; the callbacks are then driven directly with synthetic events.
 
 from types import SimpleNamespace
 
+from unittest import mock
+
 import matplotlib
 
 matplotlib.use("Agg")
+
+import matplotlib.pyplot as plt
 
 import numpy as np
 import pytest
 
 import autoarray as aa
 import autogalaxy as ag
+
+
+@pytest.fixture(autouse=True)
+def close_figures():
+    yield
+    plt.close("all")
 
 
 def _scribbler(shape=(20, 20), **kwargs):
@@ -121,6 +131,29 @@ class TestEraseAndProposal:
         with pytest.raises(ValueError):
             _scribbler(proposal=np.zeros((10, 10), dtype=bool))
 
+    def test__mask_from__explicit_proposal_shape_mismatch_raises(self):
+        s = _scribbler()
+
+        with pytest.raises(ValueError):
+            s.mask_from(proposal=np.zeros((1, 20), dtype=bool))
+
+    def test__proposal_outline_aligns_with_imshow_pixels(self):
+        # An asymmetric proposal (rows / cols 2..5) must be outlined over those pixels,
+        # i.e. at data coordinates 1.5..5.5 in both x and y, whatever the imshow origin.
+        proposal = np.zeros((20, 20), dtype=bool)
+        proposal[2:6, 2:6] = True
+        s = _scribbler(proposal=proposal)
+
+        vertices = np.concatenate(
+            [path.vertices for path in s._proposal_contour.get_paths() if len(path)]
+        )
+        x, y = vertices[:, 0], vertices[:, 1]
+
+        assert x.min() == pytest.approx(1.5, abs=1e-6)
+        assert x.max() == pytest.approx(5.5, abs=1e-6)
+        assert y.min() == pytest.approx(1.5, abs=1e-6)
+        assert y.max() == pytest.approx(5.5, abs=1e-6)
+
 
 class TestBrush:
     def test__resize_is_multiplicative_with_floor(self):
@@ -155,3 +188,13 @@ class TestBrush:
 
         s.on_mouse_motion(_event(s, 8.0, 9.0))
         assert s.brush.center == (8.0, 9.0)
+
+    def test__motion_inside_axes_requests_redraw(self):
+        s = _scribbler()
+
+        with mock.patch.object(s.figure.canvas, "draw_idle") as draw_idle:
+            s.on_mouse_motion(_event(s, None, None, inaxes=False))
+            draw_idle.assert_not_called()
+
+            s.on_mouse_motion(_event(s, 4.0, 6.0))
+            draw_idle.assert_called_once()
