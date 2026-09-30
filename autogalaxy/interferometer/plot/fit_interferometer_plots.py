@@ -11,6 +11,52 @@ from autogalaxy.galaxy.plot import galaxies_plots
 from autogalaxy.util.plot_utils import plot_array, _save_subplot
 
 
+def _natural_panels(fit: FitInterferometer, _pf):
+    """
+    The natural-weighted dirty image, dirty model image and dirty residual map panels of a fit on an
+    array-free dataset (``fit.dataset.is_array_free``, built by ``Interferometer.from_stream`` /
+    ``from_sparse_terms``), which has no visibilities, transformer or visibility-space residuals: every
+    quantity is formed from the dataset's sparse terms and the fit's real-space model image.
+    """
+    return [
+        (fit.dataset.dirty_image_natural, _pf("Dirty Image (Natural)")),
+        (fit.dirty_model_image_natural, _pf("Dirty Model Image (Natural)")),
+        (fit.dirty_residual_map_natural, _pf("Dirty Residual Map (Natural)")),
+    ]
+
+
+def _subplot_natural(
+    fit: FitInterferometer,
+    output_path,
+    output_filename,
+    output_format,
+    colormap,
+    use_log10,
+    title_prefix,
+):
+    """
+    Write the 1x3 natural-weighted dirty-image subplot of a fit on an array-free dataset (see
+    ``_natural_panels``) to ``output_filename``.
+    """
+    _pf = (lambda t: f"{title_prefix.rstrip()} {t}") if title_prefix else (lambda t: t)
+    panels = _natural_panels(fit=fit, _pf=_pf)
+    n = len(panels)
+    fig, axes = subplots(1, n, figsize=conf_subplot_figsize(1, n))
+    axes_flat = list(axes.flatten())
+
+    for i, (array, title) in enumerate(panels):
+        plot_array(
+            array=array,
+            title=title,
+            colormap=colormap,
+            use_log10=use_log10 if i < 2 else False,
+            ax=axes_flat[i],
+        )
+
+    tight_layout()
+    _save_subplot(fig, output_path, output_filename, output_format)
+
+
 def subplot_fit(
     fit: FitInterferometer,
     output_path=None,
@@ -41,7 +87,21 @@ def subplot_fit(
         Reserved for future log-stretch support (currently unused).
     residuals_symmetric_cmap : bool
         Reserved for future symmetric-colormap support (currently unused).
+
+    On an array-free dataset (``fit.dataset.is_array_free``) there are no visibility residuals, so the
+    natural-weighted dirty image, dirty model image and dirty residual map are plotted to ``fit`` instead.
     """
+    if fit.dataset.is_array_free:
+        return _subplot_natural(
+            fit=fit,
+            output_path=output_path,
+            output_filename="fit",
+            output_format=output_format,
+            colormap=colormap,
+            use_log10=use_log10,
+            title_prefix=title_prefix,
+        )
+
     _pf = (lambda t: f"{title_prefix.rstrip()} {t}") if title_prefix else (lambda t: t)
     panels = [
         (fit.residual_map, _pf("Residual Map")),
@@ -89,7 +149,21 @@ def subplot_fit_dirty_images(
         Apply a log₁₀ stretch to the plotted values.
     residuals_symmetric_cmap : bool
         Reserved for future symmetric-colormap support (currently unused).
+
+    On an array-free dataset (``fit.dataset.is_array_free``) the unweighted dirty images cannot be formed,
+    so the natural-weighted dirty image, dirty model image and dirty residual map are plotted instead.
     """
+    if fit.dataset.is_array_free:
+        return _subplot_natural(
+            fit=fit,
+            output_path=output_path,
+            output_filename="fit_dirty_images",
+            output_format=output_format,
+            colormap=colormap,
+            use_log10=use_log10,
+            title_prefix=title_prefix,
+        )
+
     _pf = (lambda t: f"{title_prefix.rstrip()} {t}") if title_prefix else (lambda t: t)
     panels = [
         (fit.dirty_image, _pf("Dirty Image"), None),
@@ -135,7 +209,9 @@ def subplot_fit_real_space(
       grid.
     - **With pixelization**: shows three dirty-image panels (dirty image, dirty
       model image, dirty residual map), which are the best real-space
-      representation available when a pixelized source is used.
+      representation available when a pixelized source is used. On an array-free
+      dataset these are the natural-weighted dirty image, dirty model image and
+      dirty residual map.
 
     Parameters
     ----------
@@ -165,11 +241,14 @@ def subplot_fit_real_space(
         )
     else:
         _pf = (lambda t: f"{title_prefix.rstrip()} {t}") if title_prefix else (lambda t: t)
-        panels = [
-            (fit.dirty_image, _pf("Dirty Image")),
-            (fit.dirty_model_image, _pf("Dirty Model Image")),
-            (fit.dirty_residual_map, _pf("Dirty Residual Map")),
-        ]
+        if fit.dataset.is_array_free:
+            panels = _natural_panels(fit=fit, _pf=_pf)
+        else:
+            panels = [
+                (fit.dirty_image, _pf("Dirty Image")),
+                (fit.dirty_model_image, _pf("Dirty Model Image")),
+                (fit.dirty_residual_map, _pf("Dirty Residual Map")),
+            ]
         n = len(panels)
         fig, axes = subplots(1, n, figsize=conf_subplot_figsize(1, n))
         axes_flat = list(axes.flatten())
@@ -212,6 +291,10 @@ def fits_dirty_images(fit: FitInterferometer, output_path) -> None:
     Extensions: ``mask``, ``dirty_image``, ``dirty_noise_map``, ``dirty_model_image``,
     ``dirty_residual_map``, ``dirty_normalized_residual_map``, ``dirty_chi_squared_map``.
 
+    On an array-free dataset (``fit.dataset.is_array_free``) the extensions are instead ``mask``,
+    ``dirty_image_natural``, ``dirty_beam``, ``dirty_model_image_natural`` and
+    ``dirty_residual_map_natural``.
+
     Parameters
     ----------
     fit
@@ -219,6 +302,27 @@ def fits_dirty_images(fit: FitInterferometer, output_path) -> None:
     output_path
         Directory in which to write ``fit_dirty_images.fits``.
     """
+    if fit.dataset.is_array_free:
+        image_list = [
+            fit.dataset.dirty_image_natural.native_for_fits,
+            fit.dataset.dirty_beam.native_for_fits,
+            fit.dirty_model_image_natural.native_for_fits,
+            fit.dirty_residual_map_natural.native_for_fits,
+        ]
+        hdu_list = hdu_list_for_output_from(
+            values_list=[image_list[0].mask.astype("float")] + image_list,
+            ext_name_list=[
+                "mask",
+                "dirty_image_natural",
+                "dirty_beam",
+                "dirty_model_image_natural",
+                "dirty_residual_map_natural",
+            ],
+            header_dict=fit.dataset.real_space_mask.header_dict,
+        )
+        hdu_list.writeto(Path(output_path) / "fit_dirty_images.fits", overwrite=True)
+        return
+
     image_list = [
         fit.dirty_image.native_for_fits,
         fit.dirty_noise_map.native_for_fits,

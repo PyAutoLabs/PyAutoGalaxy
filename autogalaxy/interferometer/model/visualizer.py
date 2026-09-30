@@ -108,5 +108,5 @@ class VisualizerInterferometer(af.Visualizer):
                     inversion=fit.inversion_with_data,
                 )
             except (IndexError, exc.InversionException):
-                logger(exc.invalid_linear_algebra_for_visualization_message())
+                logger.warning(exc.invalid_linear_algebra_for_visualization_message())
                 return
