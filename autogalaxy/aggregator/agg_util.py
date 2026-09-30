@@ -99,9 +99,11 @@ def mask_header_from(fit, name="dataset"):
     """
 
     header = aa.Header(header_sci_obj=fit.value(name=name)[0].header)
+    pixel_scales_y = header.header_sci_obj[Mask2DKeys.PIXSCAY.value]
+    # Files written without a `PIXSCAX` card are assumed to have square pixels.
     pixel_scales = (
-        header.header_sci_obj[Mask2DKeys.PIXSCAY.value],
-        header.header_sci_obj[Mask2DKeys.PIXSCAY.value],
+        pixel_scales_y,
+        header.header_sci_obj.get(Mask2DKeys.PIXSCAX.value, pixel_scales_y),
     )
     origin = (
         header.header_sci_obj[Mask2DKeys.ORIGINY.value],

@@ -20,10 +20,100 @@ from __future__ import annotations
 from functools import partial
 from typing import List
 
+import numpy as np
+
 import autofit as af
 import autoarray as aa
 
 from autogalaxy.aggregator import agg_util
+from autogalaxy.interferometer.model.analysis import (
+    SPARSE_TERMS_HEADER_KEYS,
+    SPARSE_TERMS_SCALARS_ORDER,
+)
+
+# The positions of the HDUs of the legacy in-memory `dataset.fits` layout (mask / data /
+# noise_map / uv_wavelengths), used when a file predates EXTNAMEs being read by name.
+_LEGACY_HDU_INDEX = {"mask": 0, "data": 1, "noise_map": 2, "uv_wavelengths": 3}
+
+
+def _hdu(hdu_list, name: str):
+    """
+    Returns the HDU of `hdu_list` whose EXTNAME is `name` (case-insensitive), falling back to its position
+    in the legacy in-memory `dataset.fits` layout (`_LEGACY_HDU_INDEX`) if no HDU has that EXTNAME.
+    """
+    try:
+        return hdu_list[name.upper()]
+    except KeyError:
+        return hdu_list[_LEGACY_HDU_INDEX[name]]
+
+
+def _has_hdu(hdu_list, name: str) -> bool:
+    """
+    Returns whether `hdu_list` has an HDU whose EXTNAME is `name` (case-insensitive).
+    """
+    try:
+        hdu_list[name.upper()]
+    except KeyError:
+        return False
+
+    return True
+
+
+def _sparse_terms_from(hdu_list, real_space_mask: aa.Mask2D) -> aa.SparseTerms:
+    """
+    Returns the `SparseTerms` of an array-free interferometer dataset from the `dataset.fits` HDU list written
+    by `autogalaxy.interferometer.model.analysis.interferometer_hdu_list_from`.
+
+    The arrays are read from the HDUs named `NUFFT_PRECISION_OPERATOR`, `DIRTY_IMAGE` and `DIRTY_BEAM`, the
+    numeric scalars losslessly from the `SPARSE_TERMS_SCALARS` HDU (order `SPARSE_TERMS_SCALARS_ORDER`),
+    falling back to the primary header cards (`SPARSE_TERMS_HEADER_KEYS`, which truncate exponent-form
+    float64 values) for files written before that HDU existed, the transformer class name from the header,
+    and the mask provenance (shape, pixel scales, origin) from the reloaded real-space mask.
+    """
+    header = hdu_list[0].header
+
+    if _has_hdu(hdu_list, "sparse_terms_scalars"):
+        scalars = dict(
+            zip(
+                SPARSE_TERMS_SCALARS_ORDER,
+                np.asarray(_hdu(hdu_list, "sparse_terms_scalars").data, dtype="float64"),
+            )
+        )
+
+        def header_value(field):
+            if field in scalars:
+                value = scalars[field]
+                return None if np.isnan(value) else value
+            return header.get(SPARSE_TERMS_HEADER_KEYS[field])
+
+    else:
+
+        def header_value(field):
+            return header.get(SPARSE_TERMS_HEADER_KEYS[field])
+
+    eps = header_value("eps")
+    transformer_class_name = header_value("transformer_class_name")
+
+    return aa.SparseTerms(
+        nufft_precision_operator=np.asarray(
+            _hdu(hdu_list, "nufft_precision_operator").data, dtype="float64"
+        ),
+        dirty_image_native=np.asarray(
+            _hdu(hdu_list, "dirty_image").data, dtype="float64"
+        ),
+        dirty_beam_native=np.asarray(_hdu(hdu_list, "dirty_beam").data, dtype="float64"),
+        sum_weights=float(header_value("sum_weights")),
+        data_term=float(header_value("data_term")),
+        noise_normalization=float(header_value("noise_normalization")),
+        n_vis=int(header_value("n_vis")),
+        shape_native=tuple(real_space_mask.shape_native),
+        pixel_scales=tuple(float(value) for value in real_space_mask.pixel_scales),
+        origin=tuple(float(value) for value in real_space_mask.origin),
+        eps=None if eps is None else float(eps),
+        transformer_class_name=(
+            None if transformer_class_name is None else str(transformer_class_name)
+        ),
+    )
 
 
 def _interferometer_from(
@@ -40,6 +130,11 @@ def _interferometer_from(
     - The uv wavelengths as a .fits file (`dataset/uv_wavelengths.fits`).
     - The real space mask defining the grid of the interferometer for the FFT (`dataset/real_space_mask.fits`).
     - The settings of the `Interferometer` data structure used in the fit (`dataset/settings.json`).
+
+    A fit of an array-free dataset (built by `Interferometer.from_stream` / `from_sparse_terms`) stores its
+    `SparseTerms` in `dataset.fits` instead of the visibilities (an HDU named `NUFFT_PRECISION_OPERATOR` is
+    present). It is rebuilt via `Interferometer.from_sparse_terms`, so the returned dataset is array-free with
+    its sparse operator re-attached, and a fit of it reproduces the original `log_evidence`.
 
     Each individual attribute can be loaded from the database via the `fit.value()` method.
 
@@ -64,13 +159,24 @@ def _interferometer_from(
     for fit in fit_list:
         real_space_mask, header = agg_util.mask_header_from(fit=fit)
 
+        hdu_list = fit.value(name="dataset")
+
+        if _has_hdu(hdu_list, "nufft_precision_operator"):
+            dataset_list.append(
+                aa.Interferometer.from_sparse_terms(
+                    _sparse_terms_from(hdu_list, real_space_mask=real_space_mask),
+                    real_space_mask=real_space_mask,
+                )
+            )
+            continue
+
         data = aa.Visibilities(
-            visibilities=fit.value(name="dataset")[1].data.astype("float")
+            visibilities=_hdu(hdu_list, "data").data.astype("float")
         )
         noise_map = aa.VisibilitiesNoiseMap(
-            fit.value(name="dataset")[2].data.astype("float")
+            _hdu(hdu_list, "noise_map").data.astype("float")
         )
-        uv_wavelengths = fit.value(name="dataset")[3].data
+        uv_wavelengths = _hdu(hdu_list, "uv_wavelengths").data
 
         transformer_class = fit.value(name="transformer_class")
 
@@ -101,6 +207,11 @@ class InterferometerAgg:
         - The uv wavelengths as a .fits file (`dataset/uv_wavelengths.fits`).
         - The real space mask defining the grid of the interferometer for the FFT (`dataset/real_space_mask.fits`).
         - The settings of the `Interferometer` data structure used in the fit (`dataset/settings.json`).
+
+    A fit of an array-free dataset (built by `Interferometer.from_stream` / `from_sparse_terms`) stores its
+    `SparseTerms` in `dataset.fits` instead of the visibilities (an HDU named `NUFFT_PRECISION_OPERATOR` is
+    present). It is rebuilt via `Interferometer.from_sparse_terms`, so the returned dataset is array-free with
+    its sparse operator re-attached, and a fit of it reproduces the original `log_evidence`.
 
         The `aggregator` contains the path to each of these files, and they can be loaded individually. This class
         can load them all at once and create an `Interferometer` object via the `_interferometer_from` method.
