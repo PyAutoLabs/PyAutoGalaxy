@@ -233,6 +233,27 @@ class TestSideBySidePanels:
         assert not mask[10, 10]
         assert mask[8, 8]
 
+    def test__proposal_outline_aligns_with_imshow_pixels_on_both_panels(self):
+        # The asymmetric proposal (rows / cols 2..5) is outlined over those pixels in the
+        # left panel and again 20 + 6 = 26 columns to the right in the right panel.
+        proposal = np.zeros((20, 20), dtype=bool)
+        proposal[2:6, 2:6] = True
+        s = _scribbler(subtract_radial=True, panel_gap=6, proposal=proposal)
+
+        vertices = np.concatenate(
+            [path.vertices for path in s._proposal_contour.get_paths() if len(path)]
+        )
+        x, y = vertices[:, 0], vertices[:, 1]
+        left, right = x < 20, x >= 26
+
+        assert left.any() and right.any() and (left | right).all()
+        assert x[left].min() == pytest.approx(1.5, abs=1e-6)
+        assert x[left].max() == pytest.approx(5.5, abs=1e-6)
+        assert x[right].min() == pytest.approx(27.5, abs=1e-6)
+        assert x[right].max() == pytest.approx(31.5, abs=1e-6)
+        assert y.min() == pytest.approx(1.5, abs=1e-6)
+        assert y.max() == pytest.approx(5.5, abs=1e-6)
+
     def test__subtract_radial_alone_gives_one_panel(self):
         s = _scribbler(shape=(20, 20), subtract_radial=True, side_by_side=False)
 
