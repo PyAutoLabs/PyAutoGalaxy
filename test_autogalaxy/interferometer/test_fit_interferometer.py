@@ -855,3 +855,144 @@ def test__fit_figure_of_merit__sparse_operator__pixelization_only__jax_jit_match
     assert float(figure_of_merit_jax) == pytest.approx(
         figure_of_merit_numpy, rel=1.0e-8
     )
+
+
+def _array_free_dataset_from(dataset):
+    """
+    The array-free counterpart of `dataset` (no visibilities, uv-wavelengths or transformer), built by
+    streaming its visibilities through `Interferometer.from_stream` with the same transformer class, so its
+    `SparseTerms` equal those `apply_sparse_operator` forms from the resident arrays.
+    """
+    return aa.Interferometer.from_stream(
+        [(dataset.uv_wavelengths, dataset.data, dataset.noise_map)],
+        real_space_mask=dataset.real_space_mask,
+        transformer_class=type(dataset.transformer),
+    )
+
+
+def test__fit_figure_of_merit__array_free_dataset__pixelization_only__matches_in_memory_sparse(
+    interferometer_7,
+):
+    """
+    A pixelization-only fit on an array-free dataset (built by `Interferometer.from_stream`) reads everything
+    its log evidence needs from the sparse operator, so it equals the fit on the in-memory sparse dataset.
+    """
+    dataset_sparse = interferometer_7.apply_sparse_operator(use_jax=False)
+    dataset_array_free = _array_free_dataset_from(interferometer_7)
+
+    assert dataset_array_free.is_array_free
+    assert dataset_array_free.transformer is None
+
+    galaxies = _pixelization_only_galaxies()
+
+    fit_sparse = ag.FitInterferometer(dataset=dataset_sparse, galaxies=galaxies)
+    fit_array_free = ag.FitInterferometer(
+        dataset=dataset_array_free, galaxies=galaxies
+    )
+
+    assert fit_array_free._uses_precomputed_data_term
+    assert fit_array_free.inversion.dataset.data is None
+    assert isinstance(fit_array_free.inversion, aa.InversionInterferometerSparse)
+
+    assert fit_array_free.figure_of_merit == pytest.approx(
+        fit_sparse.figure_of_merit, rel=1.0e-8
+    )
+    assert fit_array_free.log_evidence == pytest.approx(
+        fit_sparse.log_evidence, rel=1.0e-8
+    )
+
+    # There are no visibilities to compute or carry.
+    assert fit_array_free.profile_visibilities is None
+    assert fit_array_free.profile_subtracted_visibilities is None
+    assert fit_array_free.inversion_with_data is fit_array_free.inversion
+
+
+def test__fit_figure_of_merit__array_free_dataset__pixelization_only__jax_jit_matches_numpy(
+    interferometer_7,
+):
+    jax = pytest.importorskip("jax")
+    import jax.numpy as jnp
+
+    dataset_sparse = interferometer_7.apply_sparse_operator(use_jax=False)
+    dataset_array_free = _array_free_dataset_from(interferometer_7)
+
+    def figure_of_merit_from(coefficient, dataset, xp):
+        fit = ag.FitInterferometer(
+            dataset=dataset,
+            galaxies=_pixelization_only_galaxies(coefficient=coefficient),
+            xp=xp,
+        )
+
+        assert fit.inversion.dataset.data is None
+
+        return fit.figure_of_merit
+
+    figure_of_merit_sparse = figure_of_merit_from(
+        coefficient=1.0, dataset=dataset_sparse, xp=np
+    )
+    figure_of_merit_numpy = figure_of_merit_from(
+        coefficient=1.0, dataset=dataset_array_free, xp=np
+    )
+
+    figure_of_merit_jax = jax.jit(
+        lambda c: figure_of_merit_from(c, dataset=dataset_array_free, xp=jnp)
+    )(1.0)
+
+    assert figure_of_merit_numpy == pytest.approx(figure_of_merit_sparse, rel=1.0e-8)
+    assert float(figure_of_merit_jax) == pytest.approx(
+        figure_of_merit_numpy, rel=1.0e-8
+    )
+
+
+def test__fit_figure_of_merit__array_free_dataset__light_profile__raises(
+    interferometer_7,
+):
+    """
+    Subtracting an ordinary light profile's visibilities needs the visibility arrays, so a fit with one on an
+    array-free dataset raises a typed exception rather than silently fitting the unsubtracted sparse terms.
+    """
+    dataset_array_free = _array_free_dataset_from(interferometer_7)
+
+    galaxies = [
+        ag.Galaxy(
+            redshift=0.5,
+            bulge=ag.lp.Sersic(intensity=0.1, centre=(0.05, 0.05)),
+        ),
+        *_pixelization_only_galaxies(),
+    ]
+
+    fit = ag.FitInterferometer(dataset=dataset_array_free, galaxies=galaxies)
+
+    assert not fit._uses_precomputed_data_term
+
+    with pytest.raises(aa.exc.DatasetException):
+        fit.profile_visibilities
+
+    with pytest.raises(aa.exc.DatasetException):
+        ag.FitInterferometer(
+            dataset=dataset_array_free, galaxies=galaxies
+        ).figure_of_merit
+
+
+def test__fit_figure_of_merit__array_free_dataset__linear_light_only__matches_in_memory_sparse(
+    interferometer_7,
+):
+    dataset_sparse = interferometer_7.apply_sparse_operator(use_jax=False)
+    dataset_array_free = _array_free_dataset_from(interferometer_7)
+
+    galaxies = [
+        ag.Galaxy(
+            redshift=0.5,
+            bulge=ag.lp_linear.Gaussian(sigma=0.5, centre=(0.05, 0.05)),
+        )
+    ]
+
+    fit_array_free = ag.FitInterferometer(
+        dataset=dataset_array_free, galaxies=galaxies
+    )
+
+    assert fit_array_free.inversion.dataset.data is None
+    assert fit_array_free.figure_of_merit == pytest.approx(
+        ag.FitInterferometer(dataset=dataset_sparse, galaxies=galaxies).figure_of_merit,
+        rel=1.0e-8,
+    )

@@ -34,6 +34,124 @@ logger.setLevel(level="INFO")
 _FIT_INTERFEROMETER_PYTREES_REGISTERED = False
 
 
+# The FITS header keys (at most 8 characters, so no `HIERARCH` cards are needed) under which
+# `interferometer_hdu_list_from` stores the scalar fields and recorded provenance of the
+# `SparseTerms` of an array-free dataset, and from which the aggregator reloads them.
+SPARSE_TERMS_HEADER_KEYS = {
+    "sum_weights": "SUMW",
+    "data_term": "DATATERM",
+    "noise_normalization": "NOISENRM",
+    "n_vis": "NVIS",
+    "eps": "EPS",
+    "transformer_class_name": "TRNSFRMR",
+}
+
+# The order of the float64 1-D array in the `SPARSE_TERMS_SCALARS` HDU, the lossless store of the numeric
+# `SparseTerms` scalars. A FITS header card holds at most 20 characters of value, so astropy truncates
+# exponent-form float64 values (e.g. `1.2345678901234567e+20` is written as `1.23456789012345E+20`); the
+# header cards under `SPARSE_TERMS_HEADER_KEYS` are kept as human-readable copies only. `eps` is `NaN`
+# when not recorded.
+SPARSE_TERMS_SCALARS_ORDER = (
+    "sum_weights",
+    "data_term",
+    "noise_normalization",
+    "n_vis",
+    "eps",
+)
+
+
+def interferometer_hdu_list_from(dataset: aa.Interferometer):
+    """
+    Returns the `HDUList` written to `dataset.fits` by `AnalysisInterferometer.save_attributes`, from which
+    the aggregator (`autogalaxy.aggregator.interferometer.interferometer._interferometer_from`) reloads the
+    dataset.
+
+    An in-memory dataset writes the real-space mask (in the `PrimaryHDU`), the visibilities, the noise-map and
+    the uv-wavelengths, with EXTNAMEs `MASK`, `DATA`, `NOISE_MAP` and `UV_WAVELENGTHS`.
+
+    An array-free dataset (built by `Interferometer.from_stream` / `from_sparse_terms`) has no visibility arrays,
+    so it instead writes its `SparseTerms`: the real-space mask (in the `PrimaryHDU`), the NUFFT precision
+    operator `W~` and the native noise-weighted dirty image and dirty beam, with EXTNAMEs `MASK`,
+    `NUFFT_PRECISION_OPERATOR`, `DIRTY_IMAGE` and `DIRTY_BEAM`. The scalar terms and recorded provenance are
+    stored losslessly as a float64 1-D array in the `SPARSE_TERMS_SCALARS` HDU (order
+    `SPARSE_TERMS_SCALARS_ORDER`), and copied for readability to the header under `SPARSE_TERMS_HEADER_KEYS`
+    (`EPS` / `TRNSFRMR` only when recorded; `TRNSFRMR` is stored only in the header); the mask
+    shape, pixel scales and origin come from the mask itself. The file size is set by the real-space grid, not
+    the number of visibilities.
+
+    Parameters
+    ----------
+    dataset
+        The interferometer dataset being fitted.
+    """
+    mask = dataset.real_space_mask
+
+    if not dataset.is_array_free:
+        return hdu_list_for_output_from(
+            values_list=[
+                mask.astype("float"),
+                dataset.data.in_array,
+                dataset.noise_map.in_array,
+                dataset.uv_wavelengths,
+            ],
+            ext_name_list=["mask", "data", "noise_map", "uv_wavelengths"],
+            header_dict=mask.header_dict,
+        )
+
+    terms = dataset.sparse_terms
+
+    if terms is None:
+        raise aa.exc.DatasetException(
+            "An array-free Interferometer must carry the `SparseTerms` it was built from (`sparse_terms`) "
+            "for its dataset to be saved; build it via `Interferometer.from_stream` / `from_sparse_terms`."
+        )
+
+    header_dict = {
+        **mask.header_dict,
+        SPARSE_TERMS_HEADER_KEYS["sum_weights"]: float(terms.sum_weights),
+        SPARSE_TERMS_HEADER_KEYS["data_term"]: float(terms.data_term),
+        SPARSE_TERMS_HEADER_KEYS["noise_normalization"]: float(
+            terms.noise_normalization
+        ),
+        SPARSE_TERMS_HEADER_KEYS["n_vis"]: int(terms.n_vis),
+    }
+
+    if terms.eps is not None:
+        header_dict[SPARSE_TERMS_HEADER_KEYS["eps"]] = float(terms.eps)
+
+    if terms.transformer_class_name is not None:
+        header_dict[SPARSE_TERMS_HEADER_KEYS["transformer_class_name"]] = str(
+            terms.transformer_class_name
+        )
+
+    return hdu_list_for_output_from(
+        values_list=[
+            mask.astype("float"),
+            np.asarray(terms.nufft_precision_operator, dtype="float64"),
+            np.asarray(terms.dirty_image_native, dtype="float64"),
+            np.asarray(terms.dirty_beam_native, dtype="float64"),
+            np.array(
+                [
+                    float(terms.sum_weights),
+                    float(terms.data_term),
+                    float(terms.noise_normalization),
+                    float(terms.n_vis),
+                    np.nan if terms.eps is None else float(terms.eps),
+                ],
+                dtype="float64",
+            ),
+        ],
+        ext_name_list=[
+            "mask",
+            "nufft_precision_operator",
+            "dirty_image",
+            "dirty_beam",
+            "sparse_terms_scalars",
+        ],
+        header_dict=header_dict,
+    )
+
+
 class AnalysisInterferometer(AnalysisDataset):
     Result = ResultInterferometer
     Visualizer = VisualizerInterferometer
@@ -232,7 +350,8 @@ class AnalysisInterferometer(AnalysisDataset):
         It also outputs, to the `image` folder, the file `dataset.fits`, which contains:
 
         - The real space mask applied to the dataset, in the `PrimaryHDU`.
-        - The interferometer dataset (data / noise-map / uv_wavelengths).
+        - The interferometer dataset (data / noise-map / uv_wavelengths), or for an array-free dataset
+          its `SparseTerms` (see `interferometer_hdu_list_from`).
 
         It is common for these attributes to be loaded by many of the template aggregator functions given in the
         `aggregator` modules. For example, when using the database tools to perform a fit, the default behaviour is for
@@ -247,16 +366,7 @@ class AnalysisInterferometer(AnalysisDataset):
         """
         super().save_attributes(paths=paths)
 
-        hdu_list = hdu_list_for_output_from(
-            values_list=[
-                self.dataset.real_space_mask.astype("float"),
-                self.dataset.data.in_array,
-                self.dataset.noise_map.in_array,
-                self.dataset.uv_wavelengths,
-            ],
-            ext_name_list=["mask", "data", "noise_map", "uv_wavelengths"],
-            header_dict=self.dataset.real_space_mask.header_dict,
-        )
+        hdu_list = interferometer_hdu_list_from(dataset=self.dataset)
 
         # `dataset.fits` is written once per search, to the `image` folder, and is written
         # unconditionally (it is not gated on any visualization setting). The write is skipped
@@ -270,7 +380,10 @@ class AnalysisInterferometer(AnalysisDataset):
         if not dataset_path.exists():
             hdu_list.writeto(dataset_path, overwrite=True)
 
-        paths.save_json(
-            "transformer_class",
-            to_dict(self.dataset.transformer.__class__),
-        )
+        # An array-free dataset has no transformer; its transformer class name is recorded in
+        # the `dataset.fits` header instead.
+        if self.dataset.transformer is not None:
+            paths.save_json(
+                "transformer_class",
+                to_dict(self.dataset.transformer.__class__),
+            )
