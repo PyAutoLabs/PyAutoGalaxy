@@ -578,6 +578,10 @@ def test__fit_figure_of_merit__sparse_operator__linear_light_only__matches_dense
 
         assert fit_sparse.inversion.dataset.sparse_dirty_image is None
 
+        # Nothing is subtracted, so the inversion reads its data term from the operator's cached scalar.
+        assert fit_sparse._uses_precomputed_data_term
+        assert fit_sparse.inversion.dataset.data is None
+
         _assert_sparse_fit_matches_dense(
             dataset=interferometer_7, dataset_sparse=dataset_sparse, galaxies=galaxies
         )
@@ -623,6 +627,10 @@ def test__fit_figure_of_merit__sparse_operator__light_profile_and_linear_light__
 
         assert fit_sparse.inversion.dataset.sparse_dirty_image is not None
 
+        # Light-profile visibilities are subtracted, so the array path is kept.
+        assert not fit_sparse._uses_precomputed_data_term
+        assert fit_sparse.inversion.dataset.data is not None
+
 
 def test__profile_visibilities__linear_light_only__zeros_without_fourier_transform(
     interferometer_7, monkeypatch
@@ -630,8 +638,16 @@ def test__profile_visibilities__linear_light_only__zeros_without_fourier_transfo
     """
     A fit whose light is entirely linear (e.g. an MGE `Basis` of linear Gaussians) has an all-zero ordinary
     light image, so `profile_visibilities` must be zeros without performing a Fourier transform.
+
+    On the sparse path nothing is subtracted from the visibilities, so the likelihood must not even build those
+    zeros: the inversion is passed `data=None` and reads its data term from the sparse operator's cached scalar.
     """
+    dataset_sparse = interferometer_7.apply_sparse_operator(use_jax=False)
+
     calls = []
+
+    # The sparse dataset reuses the dense dataset's transformer, so one spy covers both.
+    assert dataset_sparse.transformer is interferometer_7.transformer
 
     visibilities_from = interferometer_7.transformer.visibilities_from
 
@@ -640,6 +656,16 @@ def test__profile_visibilities__linear_light_only__zeros_without_fourier_transfo
         return visibilities_from(*args, **kwargs)
 
     monkeypatch.setattr(interferometer_7.transformer, "visibilities_from", spy)
+
+    zeros_calls = []
+
+    zeros = aa.Visibilities.zeros
+
+    def zeros_spy(*args, **kwargs):
+        zeros_calls.append(1)
+        return zeros(*args, **kwargs)
+
+    monkeypatch.setattr(aa.Visibilities, "zeros", zeros_spy)
 
     galaxies = [
         ag.Galaxy(
@@ -653,6 +679,7 @@ def test__profile_visibilities__linear_light_only__zeros_without_fourier_transfo
         )
     ]
 
+    # Dense: zeros of the data's shape, no transform.
     fit = ag.FitInterferometer(dataset=interferometer_7, galaxies=galaxies)
 
     profile_visibilities = fit.profile_visibilities
@@ -661,6 +688,35 @@ def test__profile_visibilities__linear_light_only__zeros_without_fourier_transfo
     assert profile_visibilities.shape == interferometer_7.data.shape
     assert np.all(profile_visibilities.array == 0.0)
 
+    # Sparse: the likelihood never evaluates the (zero) profile visibilities or their subtraction.
+    zeros_calls.clear()
+
+    fit_sparse = ag.FitInterferometer(dataset=dataset_sparse, galaxies=galaxies)
+
+    figure_of_merit = fit_sparse.figure_of_merit
+
+    assert fit_sparse.inversion.dataset.data is None
+    assert calls == []
+    assert zeros_calls == []
+    assert "profile_visibilities" not in fit_sparse.__dict__
+    assert "profile_subtracted_visibilities" not in fit_sparse.__dict__
+
+    # The value is the one given by passing the visibilities explicitly (the array path).
+    with monkeypatch.context() as m:
+        m.setattr(
+            ag.FitInterferometer,
+            "_uses_precomputed_data_term",
+            property(lambda self: False),
+        )
+
+        fit_array = ag.FitInterferometer(dataset=dataset_sparse, galaxies=galaxies)
+
+        assert fit_array.inversion.dataset.data is not None
+        assert figure_of_merit == pytest.approx(fit_array.figure_of_merit, rel=1.0e-12)
+
+    # Output paths still see real (zero) profile visibilities.
+    assert np.all(fit_sparse.profile_visibilities.array == 0.0)
+
     # With an ordinary light profile added, the transform is performed.
     galaxies[0].disk = ag.lp.Sersic(intensity=0.1, centre=(0.05, 0.05))
 
@@ -668,3 +724,134 @@ def test__profile_visibilities__linear_light_only__zeros_without_fourier_transfo
 
     assert np.any(fit.profile_visibilities.array != 0.0)
     assert len(calls) == 1
+
+
+def _pixelization_only_galaxies(coefficient=1.0):
+    pixelization = ag.Pixelization(
+        mesh=ag.mesh.RectangularUniform(shape=(3, 3)),
+        regularization=ag.reg.Constant(coefficient=coefficient),
+    )
+
+    return [ag.Galaxy(redshift=0.5, pixelization=pixelization)]
+
+
+def test__fit_figure_of_merit__sparse_operator__pixelization_only__data_term_scalar_matches_dense(
+    interferometer_7,
+):
+    """
+    A pixelization-only fit on the sparse path passes `data=None` to its inversion, whose `fast_chi_squared`
+    then reads the data term cached on the sparse operator; the log evidence must match the dense fit and the
+    fit's `noise_normalization` must be the operator's cached scalar, equal to the array reduction.
+    """
+    dataset_sparse = interferometer_7.apply_sparse_operator(use_jax=False)
+
+    galaxies = _pixelization_only_galaxies()
+
+    fit_sparse = ag.FitInterferometer(dataset=dataset_sparse, galaxies=galaxies)
+
+    assert fit_sparse._uses_precomputed_data_term
+    assert fit_sparse.inversion.dataset.data is None
+
+    _assert_sparse_fit_matches_dense(
+        dataset=interferometer_7, dataset_sparse=dataset_sparse, galaxies=galaxies
+    )
+
+    assert (
+        fit_sparse.noise_normalization
+        == aa.util.fit.noise_normalization_complex_from(
+            noise_map=interferometer_7.noise_map.array
+        )
+    )
+    assert (
+        fit_sparse.noise_normalization
+        == ag.FitInterferometer(
+            dataset=interferometer_7, galaxies=galaxies
+        ).noise_normalization
+    )
+
+    # Output quantities that read the visibilities get them via `inversion_with_data`.
+    inversion_with_data = fit_sparse.inversion_with_data
+
+    assert inversion_with_data.dataset.data is fit_sparse.data
+    assert inversion_with_data.reconstruction is fit_sparse.inversion.reconstruction
+    assert inversion_with_data.fast_chi_squared == pytest.approx(
+        fit_sparse.inversion.fast_chi_squared, rel=1.0e-12
+    )
+
+    mapper = inversion_with_data.cls_list_from(cls=aa.Mapper)[0]
+
+    np.testing.assert_array_equal(
+        inversion_with_data.data_subtracted_dict[mapper].array,
+        interferometer_7.data.array,
+    )
+
+    # The dense fit's inversion already carries its data, so it is returned unchanged.
+    fit = ag.FitInterferometer(dataset=interferometer_7, galaxies=galaxies)
+
+    assert fit.inversion_with_data is fit.inversion
+
+
+def test__fit_figure_of_merit__sparse_operator__light_profile__unchanged_vs_data_passed(
+    interferometer_7, monkeypatch
+):
+    """
+    With an ordinary light profile the sparse fit must keep passing the profile-subtracted visibilities, so its
+    figure of merit is exactly the one computed with the data passed explicitly.
+    """
+    dataset_sparse = interferometer_7.apply_sparse_operator(use_jax=False)
+
+    galaxies = [
+        ag.Galaxy(
+            redshift=0.5,
+            bulge=ag.lp.Sersic(intensity=0.1, centre=(0.05, 0.05)),
+        ),
+        *_pixelization_only_galaxies(),
+    ]
+
+    fit_sparse = ag.FitInterferometer(dataset=dataset_sparse, galaxies=galaxies)
+
+    assert not fit_sparse._uses_precomputed_data_term
+
+    figure_of_merit = fit_sparse.figure_of_merit
+
+    monkeypatch.setattr(
+        ag.FitInterferometer,
+        "_uses_precomputed_data_term",
+        property(lambda self: False),
+    )
+
+    fit_forced = ag.FitInterferometer(dataset=dataset_sparse, galaxies=galaxies)
+
+    assert fit_forced.figure_of_merit == figure_of_merit
+    np.testing.assert_array_equal(
+        fit_sparse.inversion.dataset.data.array,
+        (interferometer_7.data - fit_sparse.profile_visibilities).array,
+    )
+
+
+def test__fit_figure_of_merit__sparse_operator__pixelization_only__jax_jit_matches_numpy(
+    interferometer_7,
+):
+    jax = pytest.importorskip("jax")
+    import jax.numpy as jnp
+
+    dataset_sparse = interferometer_7.apply_sparse_operator(use_jax=False)
+
+    def figure_of_merit_from(coefficient, xp):
+        fit = ag.FitInterferometer(
+            dataset=dataset_sparse,
+            galaxies=_pixelization_only_galaxies(coefficient=coefficient),
+            xp=xp,
+        )
+
+        assert fit.inversion.dataset.data is None
+
+        return fit.figure_of_merit
+
+    figure_of_merit_numpy = figure_of_merit_from(coefficient=1.0, xp=np)
+
+    figure_of_merit_jax = jax.jit(lambda c: figure_of_merit_from(c, xp=jnp))(1.0)
+
+    assert float(figure_of_merit_jax) == pytest.approx(
+        figure_of_merit_numpy, rel=1.0e-8
+    )

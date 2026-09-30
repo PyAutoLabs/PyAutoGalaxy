@@ -105,7 +105,7 @@ class VisualizerInterferometer(af.Visualizer):
         if fit.inversion is not None:
             try:
                 plotter.inversion(
-                    inversion=fit.inversion,
+                    inversion=fit.inversion_with_data,
                 )
             except (IndexError, exc.InversionException):
                 logger(exc.invalid_linear_algebra_for_visualization_message())
