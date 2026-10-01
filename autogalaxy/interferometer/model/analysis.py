@@ -44,19 +44,25 @@ SPARSE_TERMS_HEADER_KEYS = {
     "n_vis": "NVIS",
     "eps": "EPS",
     "transformer_class_name": "TRNSFRMR",
+    "phase_centre_y": "PHCENTY",
+    "phase_centre_x": "PHCENTX",
 }
 
 # The order of the float64 1-D array in the `SPARSE_TERMS_SCALARS` HDU, the lossless store of the numeric
 # `SparseTerms` scalars. A FITS header card holds at most 20 characters of value, so astropy truncates
 # exponent-form float64 values (e.g. `1.2345678901234567e+20` is written as `1.23456789012345E+20`); the
-# header cards under `SPARSE_TERMS_HEADER_KEYS` are kept as human-readable copies only. `eps` is `NaN`
-# when not recorded.
+# header cards under `SPARSE_TERMS_HEADER_KEYS` are kept as human-readable copies only. `eps` and the
+# `(y, x)` phase centre (arcsec) are `NaN` when not recorded. Entries are only ever appended, so a file
+# written before an entry existed has a shorter array and the loader treats the missing entries as not
+# recorded.
 SPARSE_TERMS_SCALARS_ORDER = (
     "sum_weights",
     "data_term",
     "noise_normalization",
     "n_vis",
     "eps",
+    "phase_centre_y",
+    "phase_centre_x",
 )
 
 
@@ -75,7 +81,8 @@ def interferometer_hdu_list_from(dataset: aa.Interferometer):
     `NUFFT_PRECISION_OPERATOR`, `DIRTY_IMAGE` and `DIRTY_BEAM`. The scalar terms and recorded provenance are
     stored losslessly as a float64 1-D array in the `SPARSE_TERMS_SCALARS` HDU (order
     `SPARSE_TERMS_SCALARS_ORDER`), and copied for readability to the header under `SPARSE_TERMS_HEADER_KEYS`
-    (`EPS` / `TRNSFRMR` only when recorded; `TRNSFRMR` is stored only in the header); the mask
+    (`EPS` / `TRNSFRMR` / `PHCENTY` / `PHCENTX` only when recorded; `TRNSFRMR` is stored only in the header,
+    and the phase centre the visibilities were re-centred on is stored as its `(y, x)` arcsec pair); the mask
     shape, pixel scales and origin come from the mask itself. The file size is set by the real-space grid, not
     the number of visibilities.
 
@@ -124,6 +131,18 @@ def interferometer_hdu_list_from(dataset: aa.Interferometer):
             terms.transformer_class_name
         )
 
+    if terms.phase_centre is not None:
+        header_dict[SPARSE_TERMS_HEADER_KEYS["phase_centre_y"]] = float(
+            terms.phase_centre[0]
+        )
+        header_dict[SPARSE_TERMS_HEADER_KEYS["phase_centre_x"]] = float(
+            terms.phase_centre[1]
+        )
+
+    phase_centre = (
+        (np.nan, np.nan) if terms.phase_centre is None else terms.phase_centre
+    )
+
     return hdu_list_for_output_from(
         values_list=[
             mask.astype("float"),
@@ -137,6 +156,8 @@ def interferometer_hdu_list_from(dataset: aa.Interferometer):
                     float(terms.noise_normalization),
                     float(terms.n_vis),
                     np.nan if terms.eps is None else float(terms.eps),
+                    float(phase_centre[0]),
+                    float(phase_centre[1]),
                 ],
                 dtype="float64",
             ),

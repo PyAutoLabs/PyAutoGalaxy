@@ -69,6 +69,10 @@ def _sparse_terms_from(hdu_list, real_space_mask: aa.Mask2D) -> aa.SparseTerms:
     falling back to the primary header cards (`SPARSE_TERMS_HEADER_KEYS`, which truncate exponent-form
     float64 values) for files written before that HDU existed, the transformer class name from the header,
     and the mask provenance (shape, pixel scales, origin) from the reloaded real-space mask.
+
+    The `(y, x)` phase centre is reloaded from the same scalars / header cards; a file written before it was
+    persisted (a shorter `SPARSE_TERMS_SCALARS` array and no `PHCENTY` / `PHCENTX` cards) reloads it as `None`
+    (not recorded), as does a `NaN` entry.
     """
     header = hdu_list[0].header
 
@@ -84,6 +88,8 @@ def _sparse_terms_from(hdu_list, real_space_mask: aa.Mask2D) -> aa.SparseTerms:
             if field in scalars:
                 value = scalars[field]
                 return None if np.isnan(value) else value
+            # Not in the array: a file written before this entry was appended, so the header card (if
+            # any) is the only record.
             return header.get(SPARSE_TERMS_HEADER_KEYS[field])
 
     else:
@@ -93,6 +99,14 @@ def _sparse_terms_from(hdu_list, real_space_mask: aa.Mask2D) -> aa.SparseTerms:
 
     eps = header_value("eps")
     transformer_class_name = header_value("transformer_class_name")
+    phase_centre_y = header_value("phase_centre_y")
+    phase_centre_x = header_value("phase_centre_x")
+
+    phase_centre = (
+        None
+        if phase_centre_y is None or phase_centre_x is None
+        else (float(phase_centre_y), float(phase_centre_x))
+    )
 
     return aa.SparseTerms(
         nufft_precision_operator=np.asarray(
@@ -113,6 +127,7 @@ def _sparse_terms_from(hdu_list, real_space_mask: aa.Mask2D) -> aa.SparseTerms:
         transformer_class_name=(
             None if transformer_class_name is None else str(transformer_class_name)
         ),
+        phase_centre=phase_centre,
     )
 
 
