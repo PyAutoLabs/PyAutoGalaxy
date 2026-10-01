@@ -944,34 +944,258 @@ def test__fit_figure_of_merit__array_free_dataset__pixelization_only__jax_jit_ma
     )
 
 
-def test__fit_figure_of_merit__array_free_dataset__light_profile__raises(
+def _light_profile_galaxies(intensity=0.1, linear_component=None, coefficient=1.0):
+    """
+    A galaxy with an ordinary light profile, optionally alongside a linear component: `"pixelization"`,
+    `"linear_light_profile"` or `"basis"` (an MGE-like `Basis` mixing the ordinary profile with a linear one).
+    """
+    sersic = ag.lp.Sersic(intensity=intensity, centre=(0.05, 0.05))
+
+    if linear_component is None:
+        return [ag.Galaxy(redshift=0.5, bulge=sersic)]
+
+    if linear_component == "pixelization":
+        return [
+            ag.Galaxy(redshift=0.5, bulge=sersic),
+            *_pixelization_only_galaxies(coefficient=coefficient),
+        ]
+
+    if linear_component == "linear_light_profile":
+        return [
+            ag.Galaxy(
+                redshift=0.5,
+                bulge=sersic,
+                disk=ag.lp_linear.Gaussian(sigma=1.0, centre=(0.05, 0.05)),
+            )
+        ]
+
+    return [
+        ag.Galaxy(
+            redshift=0.5,
+            bulge=ag.lp_basis.Basis(
+                profile_list=[
+                    sersic,
+                    ag.lp_linear.Gaussian(sigma=1.0, centre=(0.05, 0.05)),
+                ]
+            ),
+        )
+    ]
+
+
+def _assert_array_free_fit_matches_dense(dataset, dataset_array_free, galaxies):
+    """
+    The fit on the array-free dataset reproduces the in-memory dense fit (which forms and subtracts the light
+    profile visibilities `F i_p`) at rel 1e-8, without ever forming visibilities.
+    """
+    fit = ag.FitInterferometer(dataset=dataset, galaxies=galaxies)
+    fit_array_free = ag.FitInterferometer(dataset=dataset_array_free, galaxies=galaxies)
+
+    assert fit_array_free._uses_precomputed_data_term
+
+    assert fit_array_free.figure_of_merit == pytest.approx(
+        fit.figure_of_merit, rel=1.0e-8
+    )
+
+    # Without residual visibilities an array-free fit with an inversion takes its chi-squared from
+    # `inversion.fast_chi_squared`, which differs from the dense map-based one only by the `s^T (eps I) s` the
+    # curvature matrix's `no_regularization_add_to_curvature_diag_value` adds for unregularized linear objects.
+    log_likelihood = fit.log_likelihood
+
+    if fit.inversion is not None:
+        log_likelihood = -0.5 * (
+            fit.inversion.fast_chi_squared + fit.noise_normalization
+        )
+
+    assert fit_array_free.log_likelihood == pytest.approx(log_likelihood, rel=1.0e-8)
+
+    if fit.inversion is None:
+        assert fit_array_free.inversion is None
+        assert fit_array_free.figure_of_merit == fit_array_free.log_likelihood
+    else:
+        assert isinstance(fit.inversion, aa.InversionInterferometerMapping)
+        assert isinstance(fit_array_free.inversion, aa.InversionInterferometerSparse)
+
+        # The inversion is passed the profile-subtracted dirty image and data term, never visibilities.
+        assert fit_array_free.inversion.dataset.data is None
+        assert fit_array_free.inversion.dataset.sparse_dirty_image is not None
+        assert fit_array_free.inversion.dataset.data_term is not None
+
+        assert fit_array_free.log_evidence == pytest.approx(
+            fit.log_evidence, rel=1.0e-8
+        )
+
+    assert "profile_visibilities" not in fit_array_free.__dict__
+    assert fit_array_free.profile_visibilities is None
+    assert fit_array_free.profile_subtracted_visibilities is None
+
+    return fit, fit_array_free
+
+
+def test__fit_figure_of_merit__array_free_dataset__light_profile_only__matches_dense(
     interferometer_7,
 ):
     """
-    Subtracting an ordinary light profile's visibilities needs the visibility arrays, so a fit with one on an
-    array-free dataset raises a typed exception rather than silently fitting the unsubtracted sparse terms.
+    A fit of only ordinary light profiles on an array-free dataset has no inversion: its chi-squared is the
+    data-term identity `data_term - 2 i_p^T d~ + i_p^T W~ i_p` (the `sparse_chi_squared` hook), so its
+    `log_likelihood` / `figure_of_merit` equal the dense fit's, while the visibility-space maps still raise.
     """
     dataset_array_free = _array_free_dataset_from(interferometer_7)
 
-    galaxies = [
-        ag.Galaxy(
-            redshift=0.5,
-            bulge=ag.lp.Sersic(intensity=0.1, centre=(0.05, 0.05)),
-        ),
-        *_pixelization_only_galaxies(),
-    ]
+    fit, fit_array_free = _assert_array_free_fit_matches_dense(
+        dataset=interferometer_7,
+        dataset_array_free=dataset_array_free,
+        galaxies=_light_profile_galaxies(),
+    )
 
-    fit = ag.FitInterferometer(dataset=dataset_array_free, galaxies=galaxies)
+    assert fit_array_free.chi_squared == pytest.approx(fit.chi_squared, rel=1.0e-8)
+    assert fit_array_free.noise_normalization == pytest.approx(
+        fit.noise_normalization, rel=1.0e-12
+    )
 
-    assert not fit._uses_precomputed_data_term
+    for name in ("residual_map", "chi_squared_map", "normalized_residual_map"):
+        with pytest.raises(aa.exc.DatasetException, match="array-free"):
+            getattr(fit_array_free, name)
 
-    with pytest.raises(aa.exc.DatasetException):
-        fit.profile_visibilities
+    # No light at all: the model is zero, the chi-squared is the operator's cached data term.
+    fit_empty = ag.FitInterferometer(
+        dataset=dataset_array_free, galaxies=[ag.Galaxy(redshift=0.5)]
+    )
 
-    with pytest.raises(aa.exc.DatasetException):
+    assert fit_empty.chi_squared == dataset_array_free.sparse_operator.data_term
+    assert fit_empty.log_likelihood == pytest.approx(
         ag.FitInterferometer(
-            dataset=dataset_array_free, galaxies=galaxies
-        ).figure_of_merit
+            dataset=interferometer_7, galaxies=[ag.Galaxy(redshift=0.5)]
+        ).log_likelihood,
+        rel=1.0e-8,
+    )
+
+
+@pytest.mark.parametrize(
+    "linear_component", ["pixelization", "linear_light_profile", "basis"]
+)
+def test__fit_figure_of_merit__array_free_dataset__light_profile_and_linear__matches_dense(
+    interferometer_7, linear_component
+):
+    """
+    An ordinary light profile alongside a pixelization or linear light profile on an array-free dataset: the
+    inversion is passed `data=None` with the profile-subtracted dirty image and data term, so its
+    `log_evidence` equals the dense fit's (which subtracts the profile visibilities).
+    """
+    _assert_array_free_fit_matches_dense(
+        dataset=interferometer_7,
+        dataset_array_free=_array_free_dataset_from(interferometer_7),
+        galaxies=_light_profile_galaxies(linear_component=linear_component),
+    )
+
+
+@pytest.mark.parametrize("linear_component", [None, "pixelization"])
+def test__fit_figure_of_merit__array_free_dataset__light_profile__jax_jit_matches_numpy(
+    interferometer_7, linear_component
+):
+    jax = pytest.importorskip("jax")
+    import jax.numpy as jnp
+
+    dataset_array_free = _array_free_dataset_from(interferometer_7)
+
+    def figure_of_merit_from(intensity, dataset, xp):
+        fit = ag.FitInterferometer(
+            dataset=dataset,
+            galaxies=_light_profile_galaxies(
+                intensity=intensity, linear_component=linear_component
+            ),
+            xp=xp,
+        )
+
+        return fit.figure_of_merit
+
+    figure_of_merit_dense = figure_of_merit_from(
+        intensity=0.1, dataset=interferometer_7, xp=np
+    )
+    figure_of_merit_numpy = figure_of_merit_from(
+        intensity=0.1, dataset=dataset_array_free, xp=np
+    )
+
+    figure_of_merit_jit = jax.jit(
+        lambda intensity: figure_of_merit_from(
+            intensity, dataset=dataset_array_free, xp=jnp
+        )
+    )
+
+    assert figure_of_merit_numpy == pytest.approx(figure_of_merit_dense, rel=1.0e-8)
+    assert float(figure_of_merit_jit(0.1)) == pytest.approx(
+        figure_of_merit_numpy, rel=1.0e-8
+    )
+
+    # The light profile's parameter is traced into the data term, not frozen at its first value.
+    assert float(figure_of_merit_jit(0.2)) == pytest.approx(
+        figure_of_merit_from(intensity=0.2, dataset=interferometer_7, xp=np),
+        rel=1.0e-8,
+    )
+
+
+def test__fit_figure_of_merit__array_free_dataset__light_profile__never_forms_visibilities(
+    interferometer_7, monkeypatch
+):
+    """
+    Spy: once the array-free dataset is built, make every transformer's `visibilities_from` raise; fits with
+    ordinary light profiles must still evaluate their figure of merit, i.e. the N_vis profile visibilities
+    are never formed.
+    """
+    dataset_array_free = _array_free_dataset_from(interferometer_7)
+
+    calls = []
+
+    def spy(*args, **kwargs):
+        calls.append(1)
+        raise AssertionError("an array-free fit formed visibilities")
+
+    monkeypatch.setattr(aa.TransformerNUFFT, "visibilities_from", spy)
+    monkeypatch.setattr(aa.TransformerDFT, "visibilities_from", spy)
+
+    for linear_component in (None, "pixelization", "linear_light_profile", "basis"):
+        fit = ag.FitInterferometer(
+            dataset=dataset_array_free,
+            galaxies=_light_profile_galaxies(linear_component=linear_component),
+        )
+
+        assert np.isfinite(fit.figure_of_merit)
+        assert np.isfinite(fit.log_likelihood)
+        assert "profile_visibilities" not in fit.__dict__
+
+    assert calls == []
+
+
+def test__model_data__array_free_dataset__raises_pointing_at_natural_images(
+    interferometer_7,
+):
+    dataset_array_free = _array_free_dataset_from(interferometer_7)
+
+    for linear_component in (None, "pixelization"):
+        fit = ag.FitInterferometer(
+            dataset=dataset_array_free,
+            galaxies=_light_profile_galaxies(linear_component=linear_component),
+        )
+
+        for name in (
+            "model_data",
+            "galaxy_model_visibilities_dict",
+            "model_visibilities_of_galaxies_list",
+        ):
+            with pytest.raises(
+                aa.exc.DatasetException, match="array-free.*model_image_natural"
+            ):
+                getattr(fit, name)
+
+        # The real-space model image still includes the ordinary light.
+        model_image = fit.model_image_natural.array
+
+        expected = fit.profile_image.array
+
+        if fit.inversion is not None:
+            expected = expected + fit.inversion.mapped_reconstructed_data.array
+
+        assert np.abs(fit.profile_image.array).max() > 0.0
+        np.testing.assert_allclose(model_image, expected, rtol=1.0e-12)
 
 
 def test__fit_figure_of_merit__array_free_dataset__linear_light_only__matches_in_memory_sparse(
