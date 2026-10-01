@@ -121,6 +121,7 @@ def test__interferometer_hdu_list_from__array_free_dataset__writes_sparse_terms(
             terms.noise_normalization,
             terms.n_vis,
             terms.eps,
+            *terms.phase_centre,
         ],
     )
     np.testing.assert_array_equal(
@@ -139,6 +140,7 @@ def test__interferometer_hdu_list_from__array_free_dataset__writes_sparse_terms(
     assert header["NVIS"] == terms.n_vis
     assert header["EPS"] == terms.eps
     assert header["TRNSFRMR"] == terms.transformer_class_name
+    assert (header["PHCENTY"], header["PHCENTX"]) == terms.phase_centre
     assert header["PIXSCAY"] == dataset.real_space_mask.pixel_scales[0]
 
 
@@ -225,6 +227,7 @@ def test__save_attributes__array_free_dataset__aggregator_round_trip(
         "origin",
         "eps",
         "transformer_class_name",
+        "phase_centre",
     ):
         assert getattr(terms_reloaded, name) == getattr(terms, name), name
 
@@ -394,5 +397,129 @@ def test__sparse_terms_from__no_scalars_hdu__falls_back_to_header_cards(
 
     terms_reloaded = _sparse_terms_from(hdu_list, real_space_mask=dataset.real_space_mask)
 
+    for name in (
+        "sum_weights",
+        "data_term",
+        "noise_normalization",
+        "n_vis",
+        "eps",
+        "phase_centre",
+    ):
+        assert getattr(terms_reloaded, name) == getattr(terms, name), name
+
+
+def test__interferometer_hdu_list_from__array_free_dataset__phase_centre_round_trips_through_disk(
+    interferometer_7, tmp_path
+):
+    """
+    The `(y, x)` phase centre the streamed visibilities were re-centred on is persisted (losslessly in the
+    `SPARSE_TERMS_SCALARS` HDU, readably in the `PHCENTY` / `PHCENTX` cards) and reloaded, so reloaded
+    shifted terms still refuse to be summed with unshifted ones.
+    """
+    import pytest
+
+    import autoarray as aa
+    from astropy.io import fits
+
+    from autogalaxy.aggregator.interferometer.interferometer import _sparse_terms_from
+    from autogalaxy.interferometer.model.analysis import interferometer_hdu_list_from
+
+    chunks = [
+        (
+            interferometer_7.uv_wavelengths,
+            interferometer_7.data,
+            interferometer_7.noise_map,
+        )
+    ]
+    transformer_class = type(interferometer_7.transformer)
+
+    dataset = aa.Interferometer.from_stream(
+        chunks,
+        real_space_mask=interferometer_7.real_space_mask,
+        transformer_class=transformer_class,
+        phase_centre=(0.7, -1.3),
+    )
+    terms_unshifted = _array_free_dataset_from(interferometer_7).sparse_terms
+
+    file_path = tmp_path / "dataset.fits"
+    interferometer_hdu_list_from(dataset=dataset).writeto(file_path)
+
+    with fits.open(file_path) as hdu_list:
+        assert (hdu_list[0].header["PHCENTY"], hdu_list[0].header["PHCENTX"]) == (
+            0.7,
+            -1.3,
+        )
+
+        terms_reloaded = _sparse_terms_from(
+            hdu_list, real_space_mask=dataset.real_space_mask
+        )
+
+    assert terms_reloaded.phase_centre == (0.7, -1.3)
+
+    with pytest.raises(aa.exc.InversionException, match="phase_centre"):
+        terms_reloaded + terms_unshifted
+
+
+def test__sparse_terms_from__phase_centre_unrecorded_or_predating_file__reloads_none(
+    interferometer_7,
+):
+    """
+    Unrecorded phase centre is written as `NaN` and reloads as `None`; a file written before the phase centre
+    was persisted (a 5-entry `SPARSE_TERMS_SCALARS` array and no `PHCENTY` / `PHCENTX` cards) also reloads
+    it as `None`, with the other scalars intact.
+    """
+    import dataclasses
+
+    import numpy as np
+    import autoarray as aa
+    from astropy.io import fits
+
+    from autogalaxy.aggregator.interferometer.interferometer import _sparse_terms_from
+    from autogalaxy.interferometer.model.analysis import interferometer_hdu_list_from
+
+    dataset = _array_free_dataset_from(interferometer_7)
+    terms = dataset.sparse_terms
+
+    dataset_unrecorded = aa.Interferometer.from_sparse_terms(
+        dataclasses.replace(terms, phase_centre=None),
+        real_space_mask=dataset.real_space_mask,
+    )
+    hdu_list = interferometer_hdu_list_from(dataset=dataset_unrecorded)
+
+    assert np.isnan(hdu_list["SPARSE_TERMS_SCALARS"].data[-2:]).all()
+    assert "PHCENTY" not in hdu_list[0].header
+
+    assert (
+        _sparse_terms_from(
+            hdu_list, real_space_mask=dataset.real_space_mask
+        ).phase_centre
+        is None
+    )
+
+    # A file predating the phase centre: drop the two appended entries and the header cards.
+    hdu_list = interferometer_hdu_list_from(dataset=dataset)
+    header = hdu_list[0].header.copy()
+    del header["PHCENTY"]
+    del header["PHCENTX"]
+
+    hdu_list = fits.HDUList(
+        [fits.PrimaryHDU(data=hdu_list[0].data, header=header)]
+        + [
+            (
+                fits.ImageHDU(
+                    data=hdu.data[:5], header=hdu.header, name="SPARSE_TERMS_SCALARS"
+                )
+                if hdu.name == "SPARSE_TERMS_SCALARS"
+                else hdu
+            )
+            for hdu in hdu_list[1:]
+        ]
+    )
+
+    terms_reloaded = _sparse_terms_from(
+        hdu_list, real_space_mask=dataset.real_space_mask
+    )
+
+    assert terms_reloaded.phase_centre is None
     for name in ("sum_weights", "data_term", "noise_normalization", "n_vis", "eps"):
         assert getattr(terms_reloaded, name) == getattr(terms, name), name
