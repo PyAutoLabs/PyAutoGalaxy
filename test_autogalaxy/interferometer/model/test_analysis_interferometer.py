@@ -237,6 +237,24 @@ def test__save_attributes__array_free_dataset__aggregator_round_trip(
 
     assert log_evidence_reloaded == pytest.approx(log_evidence, rel=1.0e-8)
 
+    # Ordinary light profiles (fitted via the data-term identity) also reproduce on the reloaded dataset,
+    # with and without an inversion.
+    light = ag.Galaxy(redshift=0.5, bulge=ag.lp.Sersic(intensity=0.1))
+
+    for galaxies in ([light, *_pixelization_only_galaxies()], [light]):
+        fit = ag.FitInterferometer(dataset=dataset, galaxies=galaxies)
+        fit_reloaded = ag.FitInterferometer(dataset=dataset_reloaded, galaxies=galaxies)
+
+        assert fit_reloaded.figure_of_merit == pytest.approx(
+            fit.figure_of_merit, rel=1.0e-8
+        )
+        assert fit_reloaded.figure_of_merit == pytest.approx(
+            ag.FitInterferometer(
+                dataset=interferometer_7, galaxies=galaxies
+            ).figure_of_merit,
+            rel=1.0e-8,
+        )
+
 
 def test__save_attributes__in_memory_dataset__aggregator_round_trip(
     interferometer_7, tmp_path

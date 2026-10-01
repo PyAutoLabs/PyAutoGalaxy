@@ -75,7 +75,18 @@ def _pixelization_only_model():
     )
 
 
-def _visualize(dataset, image_path):
+def _light_profile_and_pixelization_model():
+    import autofit as af
+
+    model = _pixelization_only_model()
+    model.galaxies.light = af.Model(
+        ag.Galaxy, redshift=0.5, bulge=ag.lp.Sersic(intensity=0.1)
+    )
+
+    return model
+
+
+def _visualize(dataset, image_path, model=None):
     """
     Run the interferometer visualizer's `visualize_before_fit` and `visualize` for a
     pixelization-only model on `dataset`, as a non-linear search would.
@@ -84,7 +95,7 @@ def _visualize(dataset, image_path):
 
     from autogalaxy.interferometer.model.visualizer import VisualizerInterferometer
 
-    model = _pixelization_only_model()
+    model = model or _pixelization_only_model()
     instance = model.instance_from_prior_medians()
 
     analysis = ag.AnalysisInterferometer(dataset=dataset, use_jax=False)
@@ -142,6 +153,38 @@ def test__visualizer__array_free_dataset(interferometer_7, tmp_path, plot_patch)
             rtol=1.0e-6,
             atol=1.0e-12,
         )
+
+
+def test__visualizer__array_free_dataset__ordinary_light_profile(
+    interferometer_7, tmp_path, plot_patch
+):
+    """
+    A model with an ordinary light profile alongside a pixelization visualizes on an array-free dataset: the
+    visualizer reads only `model_image_natural` / `dirty_model_image_natural`, never the model visibilities.
+    """
+    pytest.importorskip("nufftax")
+
+    import numpy as np
+
+    dataset = _array_free_dataset_from(interferometer_7)
+
+    fit = _visualize(
+        dataset=dataset,
+        image_path=tmp_path,
+        model=_light_profile_and_pixelization_model(),
+    )
+
+    assert np.abs(fit.profile_image.array).max() > 0.0
+
+    for filename in ("dataset", "fit", "galaxies", "inversion_0_0"):
+        assert str(tmp_path / f"{filename}.png") in plot_patch.paths, filename
+
+    np.testing.assert_allclose(
+        ag.ndarray_via_fits_from(file_path=tmp_path / "fit_dirty_images.fits", hdu=3),
+        fit.dirty_model_image_natural.native_for_fits,
+        rtol=1.0e-6,
+        atol=1.0e-12,
+    )
 
 
 def test__visualizer__in_memory_dataset__fit_dirty_images_unchanged(
