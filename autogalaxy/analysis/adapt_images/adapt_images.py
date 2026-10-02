@@ -139,7 +139,7 @@ def galaxy_name_image_dict_via_result_from(
     result, use_model_images: bool = False
 ) -> "AdaptImages":
     """
-    Returns the adapt-images from a non-linear search result.
+    Returns per-galaxy subtracted signal-to-noise maps by default, or model images.
 
     For model-fitting, the adapt-images are typically setup using the maximum log likelihood model of the
     previous model-fit. This means the model-fitting is used to cleanly deblend the light of the different
@@ -151,12 +151,13 @@ def galaxy_name_image_dict_via_result_from(
     This can use either:
 
     - The model image of each galaxy in the best-fit model.
-    - The subtracted image of each galaxy in the best-fit model, where the subtracted image is the dataset
-      minus the model images of all other galaxies.
+    - The subtracted signal-to-noise map of each galaxy in the best-fit model, where the dataset minus
+      the model images of all other galaxies is divided by the dataset noise map (the default).
 
-    Certain models produce galaxy-images with negative flux values (e.g. a pixelization), which can cause
-    numerical issues with the adaptive schemes. To prevent this, we set a minimum flux value for each
-    galaxy-image, which is a fraction of the maximum flux value of that image defined via a config file.
+    Certain models produce galaxy-images with negative values (e.g. a pixelization), which can cause
+    numerical issues with the adaptive schemes. To prevent this, we set a minimum value for each
+    galaxy-image, which is a fraction of its maximum value defined via a config file. This flooring applies
+    to both signal-to-noise maps and model images.
 
     The raw per-galaxy images are cached to the result's own ``files/`` folder on first computation
     (``galaxy_images_model.fits`` / ``galaxy_images_snr.fits``) and loaded from there on every later call —
@@ -181,14 +182,15 @@ def galaxy_name_image_dict_via_result_from(
     Parameters
     ----------
     result
-        The result of a previous model-fit, which contains the model-image of each galaxy.
+        The result of a previous model-fit, providing per-galaxy subtracted signal-to-noise maps and model images.
     use_model_images
-        If True, the model images of the galaxies are used to create the adapt images. If False, the subtracted
-        images of the galaxies are used.
+        If True, use the model images of the galaxies. If False (the default), use their subtracted
+        signal-to-noise maps, which have already been divided by the noise map.
 
     Returns
     -------
-    The adapt-images, which are the model-image of each galaxy inferred via the previous model-fit.
+    A dictionary mapping galaxy paths to subtracted signal-to-noise maps by default, or model images when
+    use_model_images is True, with the configured minimum-value flooring applied in either mode.
     """
     adapt_minimum_percent = conf.instance["general"]["adapt"]["adapt_minimum_percent"]
 
