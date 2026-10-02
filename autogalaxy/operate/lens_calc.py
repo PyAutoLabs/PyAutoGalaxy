@@ -80,6 +80,13 @@ def grid_scaled_2d_for_marching_squares_from(
 
 
 def evaluation_grid(func):
+    """Resample the effective zoom field, limiting both evaluation-grid axes.
+
+    When capped, keep square pixels and the existing zoom centre. The longest
+    axis spans its original physical field exactly; round the shorter axis up
+    so it is not cropped (padding is less than one pixel in total). Below the
+    cap, retain the requested spacing and existing integer rounding.
+    """
     @wraps(func)
     def wrapper(
         lensing_obj, grid, pixel_scale: Union[Tuple[float, float], float] = 0.05
@@ -102,14 +109,17 @@ def evaluation_grid(func):
             "max_evaluation_grid_size"
         ]
 
-        # This is a hack to prevent the evaluation gird going beyond 1000 x 1000 pixels, which slows the code
-        # down a lot. Need a better moe robust way to set this up for any general lens.
-
-        if shape_native[0] > max_evaluation_grid_size:
-            pixel_scale = pixel_scale_ratio / (
-                shape_native[0] / float(max_evaluation_grid_size)
+        if max(shape_native) > max_evaluation_grid_size:
+            longest_axis = max(zoom_shape_native)
+            pixel_scale = (
+                grid.pixel_scale * longest_axis / max_evaluation_grid_size
             )
-            shape_native = (max_evaluation_grid_size, max_evaluation_grid_size)
+            # Integer ceiling avoids floating-point round-off adding a pixel
+            # beyond the cap when an axis should land exactly on it.
+            shape_native = tuple(
+                (pixels * max_evaluation_grid_size + longest_axis - 1) // longest_axis
+                for pixels in zoom_shape_native
+            )
 
         grid = aa.Grid2D.uniform(
             shape_native=shape_native,
