@@ -28,8 +28,9 @@ def close_figures():
     plt.close("all")
 
 
-def _scribbler(shape=(20, 20), **kwargs):
-    image = aa.Array2D.no_mask(values=np.zeros(shape), pixel_scales=0.1)
+def _scribbler(shape=(20, 20), values=None, **kwargs):
+    values = np.zeros(shape) if values is None else np.asarray(values, dtype=float)
+    image = aa.Array2D.no_mask(values=values, pixel_scales=0.1)
     return ag.Scribbler(image=image.native, backend="Agg", block=False, **kwargs)
 
 
@@ -209,7 +210,9 @@ class TestSideBySidePanels:
         assert s.n_panels == 2
         assert s.panel_names == ["radial-subtracted", "as-observed"]
         assert s.display.shape == (20, 46)
-        assert float(s.display.min()) >= 0.0 and float(s.display.max()) <= 1.0
+        assert np.isnan(s.display[:, 20:26]).all()  # gutter is unpainted
+        panels = np.hstack([s.display[:, :20], s.display[:, 26:]])
+        assert float(panels.min()) >= 0.0 and float(panels.max()) <= 1.0
 
         s.add_circle_to_scribble((5.0, 10.0))  # left panel
         s.add_circle_to_scribble((26.0 + 15.0, 3.0))  # right panel, column 15
@@ -269,24 +272,40 @@ class TestSideBySidePanels:
 
 
 class TestPositionMarkers:
-    def test__positions_convert_to_pixels_and_draw_four_ticks_each(self):
+    def test__positions_convert_to_pixels_and_draw_a_closed_cross_each(self):
         # 20 px at 0.1"/px: (y, x) = (+0.5", -0.5") -> row 4.5, column 4.5
         s = _scribbler(shape=(20, 20), positions=[(0.5, -0.5), (0.0, 0.0)])
 
         pixels = s.positions_pixels()
         assert pixels[0] == pytest.approx([4.5, 4.5])
         assert pixels[1] == pytest.approx([9.5, 9.5])
-        assert len(s.position_markers) == 8
+        assert len(s.position_markers) == 4  # two lines per cross
 
-        xs, ys = s.position_markers[0].get_data()  # tick above the first position
+        # default arm: 1.5% of the shorter side, never below 3 px
+        assert s.position_marker_size == 3
+        xs, ys = s.position_markers[
+            0
+        ].get_data()  # vertical arm through the first position
         assert list(xs) == pytest.approx([4.5, 4.5])
-        assert list(ys) == pytest.approx([4.5 - 6, 4.5 - 2])
+        assert list(ys) == pytest.approx([4.5 - 3, 4.5 + 3])
+        xs, ys = s.position_markers[1].get_data()  # horizontal arm
+        assert list(xs) == pytest.approx([4.5 - 3, 4.5 + 3])
+        assert list(ys) == pytest.approx([4.5, 4.5])
+
+    def test__marker_size_scales_with_the_image_or_is_explicit(self):
+        assert (
+            _scribbler(shape=(400, 400), positions=[(0.0, 0.0)]).position_marker_size
+            == 6
+        )
+        s = _scribbler(shape=(20, 20), positions=[(0.0, 0.0)], position_marker_size=5)
+        _, ys = s.position_markers[0].get_data()
+        assert list(ys) == pytest.approx([9.5 - 5, 9.5 + 5])
 
     def test__markers_repeat_on_every_panel_and_never_enter_the_mask(self):
         s = _scribbler(shape=(20, 20), positions=[(0.0, 0.0)], subtract_radial=True)
 
-        assert len(s.position_markers) == 8
-        xs, _ = s.position_markers[4].get_data()  # first tick of the right-hand copy
+        assert len(s.position_markers) == 4
+        xs, _ = s.position_markers[2].get_data()  # vertical arm of the right-hand copy
         assert list(xs) == pytest.approx([9.5 + 26, 9.5 + 26])
         assert not s.mask_from().any()
 
@@ -306,3 +325,118 @@ class TestPositionMarkers:
     def test__no_positions_draws_nothing(self):
         assert _scribbler().position_markers == []
         assert _scribbler(positions=[]).position_markers == []
+
+
+class TestPanelStretch:
+    def test__arcsinh_default_keeps_faint_structure_visible_beside_a_bright_core(self):
+        rng = np.random.default_rng(0)
+        values = rng.normal(0.0, 1.0, (40, 40))
+        values[20, 20] = 1e4  # a core thousands of sigma above the sky
+        values[5, 5] = 4.0  # a faint companion
+
+        s = _scribbler(shape=(40, 40), values=values, subtract_radial=True)
+        right = s.display[:, 46:]  # the as-observed panel
+
+        assert s.stretch == "arcsinh"
+        assert right[20, 20] == 1.0
+        # the companion is clearly separated from the sky, not crushed onto it
+        assert right[5, 5] - np.median(right) > 0.1
+
+    def test__linear_stretch_reproduces_the_old_scaling(self):
+        values = np.zeros((40, 40))
+        values[20, 20] = 1e4
+        values[5, 5] = 4.0
+
+        s = _scribbler(
+            shape=(40, 40), values=values, subtract_radial=True, stretch="linear"
+        )
+        right = s.display[:, 46:]
+
+        assert right[20, 20] == pytest.approx(1.0)
+        assert right[5, 5] == pytest.approx(4e-4, abs=1e-6)
+
+    def test__single_panel_is_stretched_too_and_limits_are_honoured(self):
+        rng = np.random.default_rng(0)
+        values = rng.normal(0.0, 1.0, (40, 40))
+        values[20, 20] = 1e4
+        values[5, 5] = 4.0
+
+        s = _scribbler(shape=(40, 40), values=values)
+        assert s.display.shape == (40, 40)
+        assert s.display[20, 20] == 1.0
+        assert s.display[5, 5] - np.median(s.display) > 0.1
+
+        # vmax below the core: the core saturates and the companion sits at the top too
+        s = _scribbler(shape=(40, 40), values=values, vmin=0.0, vmax=4.0)
+        assert s.display[20, 20] == 1.0
+        assert s.display[5, 5] == pytest.approx(1.0)
+
+        # linear keeps the raw image as the display, as before
+        s = _scribbler(shape=(40, 40), values=values, stretch="linear")
+        assert s.display[20, 20] == 1e4
+
+    def test__unknown_stretch_is_rejected(self):
+        with pytest.raises(ValueError):
+            _scribbler(subtract_radial=True, stretch="sqrt")
+
+
+class TestBrushColour:
+    def test__brush_ring_and_halo_follow_the_active_brush(self):
+        s = _scribbler(shape=(20, 20))
+        s.on_mouse_motion(_event(s, 4.0, 6.0))
+
+        assert s.brush_color == "w" and s.brush_halo_color == "k"
+        assert s.brush.get_edgecolor()[:3] == pytest.approx((1.0, 1.0, 1.0))
+        assert s.brush_halo.get_edgecolor()[:3] == pytest.approx((0.0, 0.0, 0.0))
+        assert s.brush_halo.center == s.brush.center
+
+        s.set_active_segment(1)
+        assert s.brush_color == "k" and s.brush_halo_color == "w"
+        assert s.brush.get_edgecolor()[:3] == pytest.approx((0.0, 0.0, 0.0))
+        assert s.brush_halo.get_edgecolor()[:3] == pytest.approx((1.0, 1.0, 1.0))
+
+        s.on_keypress(_event(s, 4.0, 6.0, key="="))
+        assert s.brush_halo.radius == s.brush.radius == s.brush_radius
+
+    def test__strokes_are_painted_white_to_add_and_black_to_erase(self):
+        s = _scribbler(shape=(20, 20))
+        s.add_circle_to_scribble((5.0, 5.0))
+        s.set_active_segment(1)
+        s.add_circle_to_scribble((15.0, 15.0))
+
+        add, erase = (list(v) for v in s.scribbles.values())
+        assert add[0].get_facecolor()[:3] == pytest.approx((1.0, 1.0, 1.0))
+        assert erase[0].get_facecolor()[:3] == pytest.approx((0.0, 0.0, 0.0))
+
+    def test__explicit_brush_colour_is_kept(self):
+        s = _scribbler(shape=(20, 20), brush_color="w")
+        s.set_active_segment(1)
+        assert s.brush_color == "w"
+
+
+class TestTitle:
+    def test__title_lists_what_is_shown(self):
+        s = _scribbler()
+        assert s.title_text == s.KEY_LEGEND
+        assert s.ax.get_title() == s.KEY_LEGEND
+
+        proposal = np.zeros((20, 20), dtype=bool)
+        proposal[5:8, 5:8] = True
+        overlay = aa.Mask2D.circular(
+            shape_native=(20, 20), pixel_scales=0.1, radius=0.5
+        )
+        s = _scribbler(
+            title="Mask extra galaxies: F277W, proposing from F150W",
+            subtract_radial=True,
+            proposal=proposal,
+            mask_overlay=overlay,
+            positions=[(0.0, 0.0)],
+        )
+        lines = s.title_text.split("\n")
+        assert lines[0] == "Mask extra galaxies: F277W, proposing from F150W"
+        assert lines[1].startswith("LEFT: radial-subtracted")
+        assert "outline = the mask being refined" in lines[2]
+        assert "black x = edge of the overlaid mask" in lines[2]
+        assert "+ = marked positions" in lines[2]
+        assert lines[3] == s.KEY_LEGEND
+        assert s.ax.get_title() == s.title_text

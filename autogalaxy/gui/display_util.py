@@ -73,12 +73,72 @@ def mask_boundary(mask: np.ndarray) -> np.ndarray:
     return m & ~binary_erosion(m, np.ones((3, 3), dtype=bool), border_value=1)
 
 
+def arcsinh_stretch(
+    array_native: np.ndarray,
+    clip_percentiles: Tuple[float, float] = (0.5, 99.5),
+    vmin: Optional[float] = None,
+    vmax: Optional[float] = None,
+) -> np.ndarray:
+    """
+    Map an image onto [0, 1] through an arcsinh stretch about its median, scaled by a
+    robust (median absolute deviation) estimate of the noise.
+
+    arcsinh is linear within about one noise sigma of the median and logarithmic beyond,
+    so faint structure near the sky level and a galaxy core thousands of sigma above it
+    are both visible at once; a linear min-to-max scale collapses everything onto one
+    colour as soon as a single bright pixel is present. The stretched values are then
+    normalised between `clip_percentiles` so a handful of extreme pixels cannot set the
+    range, unless explicit `vmin` / `vmax` data values are given for either end. Non-finite
+    pixels map to 0.
+
+    Parameters
+    ----------
+    array_native
+        The 2D image.
+    clip_percentiles
+        The (low, high) percentiles of the stretched values mapped to 0 and 1, for
+        whichever end has no explicit limit.
+    vmin, vmax
+        Data values (not percentiles) mapped to 0 and 1, overriding the percentiles.
+    """
+    a = np.asarray(array_native, dtype=float)
+    finite = np.isfinite(a)
+    if not finite.any():
+        return np.zeros_like(a)
+    values = a[finite]
+    median = np.median(values)
+    sigma = 1.4826 * np.median(np.abs(values - median))
+    if not sigma > 0:
+        sigma = np.std(values)
+    if not sigma > 0:
+        return np.zeros_like(a)
+    stretched = np.arcsinh((np.where(finite, a, median) - median) / sigma)
+    lo, hi = np.percentile(stretched[finite], clip_percentiles)
+    if not hi > lo:
+        # nearly flat image with a few outliers: the percentiles coincide, so use the
+        # full range rather than show nothing
+        lo, hi = stretched[finite].min(), stretched[finite].max()
+    if vmin is not None:
+        lo = np.arcsinh((vmin - median) / sigma)
+    if vmax is not None:
+        hi = np.arcsinh((vmax - median) / sigma)
+    if not hi > lo:
+        return np.zeros_like(a)
+    out = np.clip((stretched - lo) / (hi - lo), 0.0, 1.0)
+    out[~finite] = 0.0
+    return out
+
+
 def composite_panels(
-    panels: Sequence[np.ndarray], gap: int = 6, fill: float = 0.0
+    panels: Sequence[np.ndarray], gap: int = 6, fill: float = np.nan
 ) -> np.ndarray:
     """
     Lay 2D panels of equal height side by side, separated by `gap` blank columns of value
     `fill`. The inverse of `fold_panels`.
+
+    The gutter defaults to NaN so that `imshow` leaves it unpainted (background colour)
+    rather than colouring it as the colour map's lowest value, which would read as the
+    left panel's image running on past its own edge.
     """
     panels = [np.asarray(p) for p in panels]
     if len(panels) == 1:

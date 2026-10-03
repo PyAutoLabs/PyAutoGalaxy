@@ -80,8 +80,9 @@ class TestPanels:
         composite = du.composite_panels([a, b], gap=3)
 
         assert composite.shape == (5, 19)
-        assert composite[:, 8:11].sum() == 0.0
+        assert np.isnan(composite[:, 8:11]).all()  # gutter unpainted by default
         assert composite[:, 11:].all()
+        assert du.composite_panels([a, b], gap=3, fill=0.0)[:, 8:11].sum() == 0.0
 
         scribbled = np.zeros((5, 19), dtype=bool)
         scribbled[1, 2] = True  # left panel
@@ -172,3 +173,49 @@ class TestMaskRegrid:
         assert differ.sum() <= 8
         r = _radius_grid((20, 20)) * 0.2
         assert not differ[np.abs(r - 1.0) > 0.15].any()
+
+
+class TestArcsinhStretch:
+    def test__maps_onto_unit_interval_and_keeps_faint_structure_visible(self):
+        rng = np.random.default_rng(1)
+        values = rng.normal(0.0, 1.0, (50, 50))
+        values[25, 25] = 1e4
+        values[5, 5] = 5.0
+
+        out = du.arcsinh_stretch(values)
+
+        assert out.shape == values.shape
+        assert out.min() == 0.0 and out.max() == 1.0
+        assert out[25, 25] == 1.0
+        # 5 sigma above the sky lands well inside the range rather than at the floor
+        assert 0.2 < out[5, 5] - np.median(out) < 0.9
+        # a linear scale would put the same pixel at 5e-4
+        linear = (values - values.min()) / (values.max() - values.min())
+        assert linear[5, 5] - np.median(linear) < 1e-3
+
+    def test__explicit_limits_replace_the_percentiles(self):
+        rng = np.random.default_rng(2)
+        values = rng.normal(0.0, 1.0, (50, 50))
+        values[25, 25] = 1e4
+
+        out = du.arcsinh_stretch(values, vmin=-2.0, vmax=10.0)
+
+        assert out[25, 25] == 1.0
+        assert (out[values >= 10.0] == 1.0).all()
+        assert (out[values <= -2.0] == 0.0).all()
+        # a pixel exactly at the limits lands at the ends
+        values[0, 0], values[0, 1] = -2.0, 10.0
+        out = du.arcsinh_stretch(values, vmin=-2.0, vmax=10.0)
+        assert out[0, 0] == pytest.approx(0.0) and out[0, 1] == pytest.approx(1.0)
+
+    def test__non_finite_pixels_map_to_zero_and_flat_images_do_not_divide_by_zero(self):
+        values = np.ones((4, 4))
+        values[0, 0] = np.nan
+        values[1, 1] = 3.0
+
+        out = du.arcsinh_stretch(values)
+        assert out[0, 0] == 0.0
+        assert np.isfinite(out).all()
+
+        assert (du.arcsinh_stretch(np.ones((4, 4))) == 0.0).all()
+        assert (du.arcsinh_stretch(np.full((4, 4), np.nan)) == 0.0).all()
