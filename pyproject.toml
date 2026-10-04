@@ -24,6 +24,8 @@ classifiers = [
 ]
 keywords = ["cli"]
 dependencies = [
+    # Prevent fallback to Nerves releases permitting the CPU LAPACK deadlock.
+    "autonerves>2026.10.4.1",
     # Floors, not pins (PyAutoLens#687) — bump to the first release with JAX
     # in the family's base dependencies once it exists (PyAutoLens#702), so
     # backtracking cannot pair this autogalaxy with a jax-optional chain.
