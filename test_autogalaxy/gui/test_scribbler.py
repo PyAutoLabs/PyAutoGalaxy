@@ -257,6 +257,40 @@ class TestSideBySidePanels:
         assert y.min() == pytest.approx(1.5, abs=1e-6)
         assert y.max() == pytest.approx(5.5, abs=1e-6)
 
+    def test__stroke_at_left_panel_inner_edge_does_not_wrap_onto_column_0(self):
+        # 40 px panels, 6 px gutter: the right panel starts at display column 46. An
+        # 8 px brush at column 38 reaches column 46, which used to fold back onto
+        # image column 0.
+        s = _scribbler(shape=(40, 40), subtract_radial=True)
+        s._set_brush_radius(8)
+
+        s.add_circle_to_scribble((38.0, 20.0))
+
+        masked_cols = np.flatnonzero(s.mask_from().any(axis=0))
+        assert list(masked_cols) == list(range(30, 40))
+        assert not s.mask_from()[:, 0].any()
+
+    def test__stroke_at_right_panel_inner_edge_does_not_wrap_onto_last_column(self):
+        s = _scribbler(shape=(40, 40), subtract_radial=True)
+        s._set_brush_radius(8)
+
+        s.add_circle_to_scribble((46.0 + 1.0, 20.0))  # right panel, image column 1
+
+        masked_cols = np.flatnonzero(s.mask_from().any(axis=0))
+        assert list(masked_cols) == list(range(0, 10))
+        assert not s.mask_from()[:, 39].any()
+
+    def test__stroke_centred_in_the_gutter_goes_to_the_nearest_panel(self):
+        s = _scribbler(shape=(40, 40), subtract_radial=True)
+        s._set_brush_radius(8)
+
+        s.add_circle_to_scribble((41.0, 20.0))  # gutter, nearer the left panel
+        assert list(np.flatnonzero(s.mask_from().any(axis=0))) == list(range(33, 40))
+
+        s.remove_circle_from_scribble()
+        s.add_circle_to_scribble((44.0, 20.0))  # gutter, nearer the right panel
+        assert list(np.flatnonzero(s.mask_from().any(axis=0))) == list(range(0, 7))
+
     def test__subtract_radial_alone_gives_one_panel(self):
         s = _scribbler(shape=(20, 20), subtract_radial=True, side_by_side=False)
 

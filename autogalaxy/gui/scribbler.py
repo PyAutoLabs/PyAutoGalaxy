@@ -774,12 +774,45 @@ class Scribbler:
         circle_mask = (xx - center[1]) ** 2 + (yy - center[0]) ** 2 <= radius**2
         mask[circle_mask] = 1
 
+    def _panel_index_of(self, x: float) -> int:
+        """
+        The side-by-side panel a stroke centred at display column `x` belongs to: the
+        panel containing it, or the nearest panel for a centre in a gutter (or off the
+        display), ties going to the left.
+        """
+        if self.n_panels <= 1:
+            return 0
+        n_x = self.image_shape[1]
+        step = n_x + self.panel_gap
+        distances = []
+        for i in range(self.n_panels):
+            lo, hi = i * step - 0.5, i * step + n_x - 0.5
+            distances.append(max(lo - x, 0.0, x - hi))
+        return int(np.argmin(distances))
+
     def circles_to_mask(self, centers, radii):
-        # Rasterised on the DISPLAY (which may hold several panels), then folded back
-        # onto the image grid by `get_scribble_masks`.
+        """
+        Rasterise brush circles on the DISPLAY (which may hold several panels); they are
+        folded back onto the image grid by `get_scribble_masks`.
+
+        Each circle is clipped to the panel its centre falls in (see `_panel_index_of`),
+        so a stroke near a panel's inner edge cannot spill across the gutter into the
+        neighbouring panel and fold back onto the far edge of the image.
+        """
         mask = np.zeros(self.display.shape[:2], dtype=bool)
+        n_x = self.image_shape[1]
+        step = n_x + self.panel_gap
         for center, radius in zip(centers, radii):
-            self.add_circle_to_mask(center, radius, mask)
+            if center[0] is None or center[1] is None:
+                continue
+            circle = np.zeros_like(mask)
+            self.add_circle_to_mask(center, radius, circle)
+            if self.n_panels > 1:
+                i = self._panel_index_of(center[0])
+                in_panel = np.zeros_like(mask)
+                in_panel[:, i * step : i * step + n_x] = True
+                circle &= in_panel
+            mask |= circle
         return mask
 
     def get_scribble_masks(self):
