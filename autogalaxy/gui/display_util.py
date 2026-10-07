@@ -24,6 +24,10 @@ def radial_median_subtract(
     """
     Subtract the azimuthally-averaged (median) radial profile about the array centre.
 
+    The profile is measured about the centre of the array, so this assumes the lens (or
+    galaxy) sits at the array centre; an off-centre galaxy leaves a strong dipole
+    residual instead of being removed.
+
     A smooth, near-circular galaxy is almost entirely a function of radius, while lensed
     arcs, companions and other structure are not; subtracting the per-radius median
     removes the galaxy and leaves that structure standing out, including what is buried
@@ -192,8 +196,12 @@ def mask_regridded_from(
 
     Each destination pixel centre is converted to scaled coordinates, then to the source
     pixel containing it, whose value is taken. Nearest neighbour is the right resampling
-    for a boolean: there is no interpolation across the True / False boundary. Destination
-    pixels outside the source footprint are `False` (unmasked).
+    for a boolean: there is no interpolation across the True / False boundary.
+
+    Destination pixels outside the source footprint are always `False` (unmasked). That
+    suits masks of extra emission to remove (e.g. extra-galaxy masks), but NOT a
+    fit-region mask (True = excluded from the fit) regridded onto a larger grid: the
+    region beyond the source footprint would come back unmasked and enter the fit.
 
     Parameters
     ----------
@@ -242,6 +250,10 @@ def mask_2d_regridded_from(
     """
     `mask_regridded_from` for an `aa.Mask2D`: returns a `Mask2D` on the new grid covering
     the same scaled-coordinate region.
+
+    Pixels outside the source mask's footprint are returned unmasked (`False`), so this
+    is suitable for extra-galaxy masks but not for a fit-region mask regridded onto a
+    larger grid (see `mask_regridded_from`).
     """
     regridded = mask_regridded_from(
         mask_native=np.asarray(mask),
