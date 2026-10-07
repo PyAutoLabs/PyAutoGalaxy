@@ -219,3 +219,8 @@ class TestArcsinhStretch:
 
         assert (du.arcsinh_stretch(np.ones((4, 4))) == 0.0).all()
         assert (du.arcsinh_stretch(np.full((4, 4), np.nan)) == 0.0).all()
+
+    def test__mask_2d_regridded_from_is_exported_at_package_level(self):
+        import autogalaxy as ag
+
+        assert ag.mask_2d_regridded_from is du.mask_2d_regridded_from

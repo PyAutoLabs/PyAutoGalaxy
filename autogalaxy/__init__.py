@@ -122,6 +122,7 @@ from .util.shear_field import ShearYX2DIrregular
 from . import cosmology as cosmo
 from .gui.clicker import Clicker
 from .gui.scribbler import Scribbler
+from .gui.display_util import mask_2d_regridded_from
 
 from autonerves import conf
 from autonerves.fitsable import ndarray_via_hdu_from
@@ -153,6 +154,7 @@ def __getattr__(name):
         globals()["interop"] = interop
         return interop
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 # ---------------------------------------------------------------------------
 # Public re-export of the autonerves configuration / serialization surface.
