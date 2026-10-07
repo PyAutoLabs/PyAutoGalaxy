@@ -241,6 +241,7 @@ general/model_cookbook
 general/likelihood_function
 general/citations
 general/credits
+general/community
 ```
 
 ```{toctree}
