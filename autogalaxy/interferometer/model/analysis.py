@@ -9,6 +9,7 @@ This module provides `AnalysisInterferometer`, which implements `log_likelihood_
 
 It also handles adapt images, visualization, and result wrapping into `ResultInterferometer`.
 """
+
 import logging
 import numpy as np
 from typing import Optional
@@ -46,15 +47,19 @@ SPARSE_TERMS_HEADER_KEYS = {
     "transformer_class_name": "TRNSFRMR",
     "phase_centre_y": "PHCENTY",
     "phase_centre_x": "PHCENTX",
+    "oversample": "OVERSAMP",
+    "oversample_pad": "OVERSPAD",
 }
 
 # The order of the float64 1-D array in the `SPARSE_TERMS_SCALARS` HDU, the lossless store of the numeric
 # `SparseTerms` scalars. A FITS header card holds at most 20 characters of value, so astropy truncates
 # exponent-form float64 values (e.g. `1.2345678901234567e+20` is written as `1.23456789012345E+20`); the
-# header cards under `SPARSE_TERMS_HEADER_KEYS` are kept as human-readable copies only. `eps` and the
-# `(y, x)` phase centre (arcsec) are `NaN` when not recorded. Entries are only ever appended, so a file
-# written before an entry existed has a shorter array and the loader treats the missing entries as not
-# recorded.
+# header cards under `SPARSE_TERMS_HEADER_KEYS` are kept as human-readable copies only. `eps`, the
+# `(y, x)` phase centre (arcsec) and the `oversample` factor / pad of the fine grids are `NaN` when not
+# recorded (the oversampling is recorded only when the fine grids themselves are written, so a reloaded
+# `SparseTerms` never claims an `oversample` without its grids). Entries are only ever appended, so a
+# file written before an entry existed has a shorter array and the loader treats the missing entries as
+# not recorded.
 SPARSE_TERMS_SCALARS_ORDER = (
     "sum_weights",
     "data_term",
@@ -63,10 +68,14 @@ SPARSE_TERMS_SCALARS_ORDER = (
     "eps",
     "phase_centre_y",
     "phase_centre_x",
+    "oversample",
+    "oversample_pad",
 )
 
 
-def interferometer_hdu_list_from(dataset: aa.Interferometer):
+def interferometer_hdu_list_from(
+    dataset: aa.Interferometer, include_fine_grids: bool = False
+):
     """
     Returns the `HDUList` written to `dataset.fits` by `AnalysisInterferometer.save_attributes`, from which
     the aggregator (`autogalaxy.aggregator.interferometer.interferometer._interferometer_from`) reloads the
@@ -86,10 +95,22 @@ def interferometer_hdu_list_from(dataset: aa.Interferometer):
     shape, pixel scales and origin come from the mask itself. The file size is set by the real-space grid, not
     the number of visibilities.
 
+    Terms accumulated with `oversample=q` (`Interferometer.from_stream(..., oversample=q)`) also carry the
+    fine precision-operator and dirty-image grids. These are written -- as HDUs `PRECISION_OPERATOR_FINE`
+    and `DIRTY_IMAGE_FINE` after `SPARSE_TERMS_SCALARS`, with `oversample` / `oversample_pad` in the scalars
+    and the `OVERSAMP` / `OVERSPAD` cards -- **only** when `include_fine_grids=True`. They are not written
+    by default because `dataset.fits` is written into every search's output by `save_attributes` and the
+    grids grow as `q^2`: ~840 MB per file at a 400 x 400 grid and `q = 8`. Without them the file is the
+    same as for terms without fine grids (the oversampling scalars are `NaN`), and reloads with no fine
+    grids; rebuild them from the visibilities, or write this HDU list yourself with
+    `include_fine_grids=True`, when they are needed.
+
     Parameters
     ----------
     dataset
         The interferometer dataset being fitted.
+    include_fine_grids
+        If `True` and the dataset's `SparseTerms` carry `oversample` fine grids, write them too.
     """
     mask = dataset.real_space_mask
 
@@ -143,6 +164,26 @@ def interferometer_hdu_list_from(dataset: aa.Interferometer):
         (np.nan, np.nan) if terms.phase_centre is None else terms.phase_centre
     )
 
+    write_fine_grids = include_fine_grids and (
+        terms.precision_operator_fine is not None and terms.dirty_image_fine is not None
+    )
+
+    if write_fine_grids:
+        header_dict[SPARSE_TERMS_HEADER_KEYS["oversample"]] = int(terms.oversample)
+        header_dict[SPARSE_TERMS_HEADER_KEYS["oversample_pad"]] = float(
+            terms.oversample_pad
+        )
+        oversample = (float(terms.oversample), float(terms.oversample_pad))
+        fine_values = [
+            np.asarray(terms.precision_operator_fine, dtype="float64"),
+            np.asarray(terms.dirty_image_fine, dtype="float64"),
+        ]
+        fine_ext_names = ["precision_operator_fine", "dirty_image_fine"]
+    else:
+        oversample = (np.nan, np.nan)
+        fine_values = []
+        fine_ext_names = []
+
     return hdu_list_for_output_from(
         values_list=[
             mask.astype("float"),
@@ -158,9 +199,12 @@ def interferometer_hdu_list_from(dataset: aa.Interferometer):
                     np.nan if terms.eps is None else float(terms.eps),
                     float(phase_centre[0]),
                     float(phase_centre[1]),
+                    float(oversample[0]),
+                    float(oversample[1]),
                 ],
                 dtype="float64",
             ),
+            *fine_values,
         ],
         ext_name_list=[
             "mask",
@@ -168,6 +212,7 @@ def interferometer_hdu_list_from(dataset: aa.Interferometer):
             "dirty_image",
             "dirty_beam",
             "sparse_terms_scalars",
+            *fine_ext_names,
         ],
         header_dict=header_dict,
     )

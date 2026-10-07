@@ -73,6 +73,11 @@ def _sparse_terms_from(hdu_list, real_space_mask: aa.Mask2D) -> aa.SparseTerms:
     The `(y, x)` phase centre is reloaded from the same scalars / header cards; a file written before it was
     persisted (a shorter `SPARSE_TERMS_SCALARS` array and no `PHCENTY` / `PHCENTX` cards) reloads it as `None`
     (not recorded), as does a `NaN` entry.
+
+    The `oversample` fine grids are read from the `PRECISION_OPERATOR_FINE` / `DIRTY_IMAGE_FINE` HDUs, with
+    `oversample` / `oversample_pad` from the scalars, when the file has them (they are written only on
+    request, see `interferometer_hdu_list_from(include_fine_grids=True)`). A file without them -- written
+    without opting in, or before they existed -- reloads all four as `None`.
     """
     header = hdu_list[0].header
 
@@ -108,6 +113,27 @@ def _sparse_terms_from(hdu_list, real_space_mask: aa.Mask2D) -> aa.SparseTerms:
         else (float(phase_centre_y), float(phase_centre_x))
     )
 
+    oversample = header_value("oversample")
+    oversample_pad = header_value("oversample_pad")
+
+    if (
+        _has_hdu(hdu_list, "precision_operator_fine")
+        and _has_hdu(hdu_list, "dirty_image_fine")
+        and oversample is not None
+    ):
+        fine_grids = dict(
+            precision_operator_fine=np.asarray(
+                _hdu(hdu_list, "precision_operator_fine").data, dtype="float64"
+            ),
+            dirty_image_fine=np.asarray(
+                _hdu(hdu_list, "dirty_image_fine").data, dtype="float64"
+            ),
+            oversample=int(oversample),
+            oversample_pad=None if oversample_pad is None else float(oversample_pad),
+        )
+    else:
+        fine_grids = {}
+
     return aa.SparseTerms(
         nufft_precision_operator=np.asarray(
             _hdu(hdu_list, "nufft_precision_operator").data, dtype="float64"
@@ -128,6 +154,7 @@ def _sparse_terms_from(hdu_list, real_space_mask: aa.Mask2D) -> aa.SparseTerms:
             None if transformer_class_name is None else str(transformer_class_name)
         ),
         phase_centre=phase_centre,
+        **fine_grids,
     )
 
 
