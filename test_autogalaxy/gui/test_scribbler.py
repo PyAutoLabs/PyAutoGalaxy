@@ -6,6 +6,7 @@ loop runs; the callbacks are then driven directly with synthetic events.
 """
 
 from types import SimpleNamespace
+import warnings
 
 from unittest import mock
 
@@ -412,6 +413,16 @@ class TestPanelStretch:
     def test__unknown_stretch_is_rejected(self):
         with pytest.raises(ValueError):
             _scribbler(subtract_radial=True, stretch="sqrt")
+
+    def test__norm_with_arcsinh_stretch_warns_that_it_is_ignored(self):
+        with pytest.warns(UserWarning, match="norm='log' is ignored"):
+            _scribbler(norm="log")
+
+    def test__norm_with_linear_stretch_does_not_warn(self):
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", UserWarning)
+            _scribbler(norm="log", stretch="linear")
+            _scribbler()
 
 
 class TestBrushColour:

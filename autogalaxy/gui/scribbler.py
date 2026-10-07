@@ -1,3 +1,4 @@
+import warnings
 from collections import OrderedDict
 from typing import List, Optional, Tuple
 
@@ -125,7 +126,9 @@ class Scribbler:
             *norm* / *vmin* / *vmax* arguments below.
         norm
             ``"log"`` for a logarithmic colour scale, ``"linear"`` (or ``None``)
-            otherwise. Only used with `stretch="linear"`.
+            otherwise. Only used with `stretch="linear"`; passing it with any
+            other stretch emits a `UserWarning`, since it would otherwise be
+            silently ignored.
         vmin, vmax
             The data values at the ends of the colour scale, for either stretch.
         brush_width
@@ -246,6 +249,14 @@ class Scribbler:
         if stretch not in ("arcsinh", "linear"):
             raise ValueError(f"stretch must be 'arcsinh' or 'linear', not {stretch!r}")
         self.stretch = stretch
+        if norm is not None and stretch != "linear":
+            warnings.warn(
+                f"Scribbler: norm={norm!r} is ignored with stretch={stretch!r}; "
+                "it only applies with stretch='linear'. Pass stretch='linear' to use "
+                "it, or vmin / vmax to set the ends of the arcsinh stretch.",
+                UserWarning,
+                stacklevel=2,
+            )
 
         # brush
         self.brush_radius = max(int(self.image_shape[0] * brush_width), min_radius)
