@@ -1,4 +1,3 @@
-
 import autofit as af
 import autogalaxy as ag
 
@@ -122,6 +121,8 @@ def test__interferometer_hdu_list_from__array_free_dataset__writes_sparse_terms(
             terms.n_vis,
             terms.eps,
             *terms.phase_centre,
+            np.nan,
+            np.nan,
         ],
     )
     np.testing.assert_array_equal(
@@ -164,9 +165,7 @@ def test__interferometer_hdu_list_from__in_memory_dataset__unchanged_layout(
         hdu_list[0].data, interferometer_7.real_space_mask.astype("float")
     )
     np.testing.assert_array_equal(hdu_list[1].data, interferometer_7.data.in_array)
-    np.testing.assert_array_equal(
-        hdu_list[2].data, interferometer_7.noise_map.in_array
-    )
+    np.testing.assert_array_equal(hdu_list[2].data, interferometer_7.noise_map.in_array)
     np.testing.assert_array_equal(hdu_list[3].data, interferometer_7.uv_wavelengths)
 
 
@@ -186,9 +185,7 @@ def test__save_attributes__array_free_dataset__aggregator_round_trip(
 
     dataset = _array_free_dataset_from(interferometer_7)
 
-    paths = af.DirectoryPaths(
-        name="array_free_round_trip", path_prefix=str(tmp_path)
-    )
+    paths = af.DirectoryPaths(name="array_free_round_trip", path_prefix=str(tmp_path))
 
     analysis = ag.AnalysisInterferometer(dataset=dataset, use_jax=False)
     analysis.save_attributes(paths=paths)
@@ -206,8 +203,7 @@ def test__save_attributes__array_free_dataset__aggregator_round_trip(
     assert dataset_reloaded.sparse_operator is not None
 
     assert (
-        dataset_reloaded.sparse_operator.data_term
-        == dataset.sparse_operator.data_term
+        dataset_reloaded.sparse_operator.data_term == dataset.sparse_operator.data_term
     )
     assert (
         dataset_reloaded.sparse_operator.noise_normalization
@@ -393,9 +389,13 @@ def test__sparse_terms_from__no_scalars_hdu__falls_back_to_header_cards(
     terms = dataset.sparse_terms
 
     hdu_list = interferometer_hdu_list_from(dataset=dataset)
-    hdu_list = fits.HDUList([hdu for hdu in hdu_list if hdu.name != "SPARSE_TERMS_SCALARS"])
+    hdu_list = fits.HDUList(
+        [hdu for hdu in hdu_list if hdu.name != "SPARSE_TERMS_SCALARS"]
+    )
 
-    terms_reloaded = _sparse_terms_from(hdu_list, real_space_mask=dataset.real_space_mask)
+    terms_reloaded = _sparse_terms_from(
+        hdu_list, real_space_mask=dataset.real_space_mask
+    )
 
     for name in (
         "sum_weights",
@@ -486,7 +486,7 @@ def test__sparse_terms_from__phase_centre_unrecorded_or_predating_file__reloads_
     )
     hdu_list = interferometer_hdu_list_from(dataset=dataset_unrecorded)
 
-    assert np.isnan(hdu_list["SPARSE_TERMS_SCALARS"].data[-2:]).all()
+    assert np.isnan(hdu_list["SPARSE_TERMS_SCALARS"].data[5:7]).all()
     assert "PHCENTY" not in hdu_list[0].header
 
     assert (
@@ -521,5 +521,177 @@ def test__sparse_terms_from__phase_centre_unrecorded_or_predating_file__reloads_
     )
 
     assert terms_reloaded.phase_centre is None
+    for name in ("sum_weights", "data_term", "noise_normalization", "n_vis", "eps"):
+        assert getattr(terms_reloaded, name) == getattr(terms, name), name
+
+
+def _fine_array_free_dataset_from(dataset, oversample=2):
+    import autoarray as aa
+
+    return aa.Interferometer.from_stream(
+        [(dataset.uv_wavelengths, dataset.data, dataset.noise_map)],
+        real_space_mask=dataset.real_space_mask,
+        transformer_class=aa.TransformerNUFFT,
+        oversample=oversample,
+    )
+
+
+def test__interferometer_hdu_list_from__fine_grids__written_only_when_opted_in(
+    interferometer_7,
+):
+    """
+    The `oversample` fine grids are hundreds of MB at realistic sizes (~840 MB at 400 pixels, q = 8) and
+    `dataset.fits` is written into every search's output, so they are written only with
+    `include_fine_grids=True`; by default the layout and scalars are those of terms without fine grids.
+    """
+    import numpy as np
+    import pytest
+
+    pytest.importorskip("nufftax")
+
+    from autogalaxy.interferometer.model.analysis import interferometer_hdu_list_from
+
+    dataset = _fine_array_free_dataset_from(interferometer_7)
+    terms = dataset.sparse_terms
+
+    assert terms.oversample == 2
+
+    hdu_list = interferometer_hdu_list_from(dataset=dataset)
+
+    assert [hdu.name for hdu in hdu_list] == [
+        "MASK",
+        "NUFFT_PRECISION_OPERATOR",
+        "DIRTY_IMAGE",
+        "DIRTY_BEAM",
+        "SPARSE_TERMS_SCALARS",
+    ]
+    assert np.isnan(hdu_list["SPARSE_TERMS_SCALARS"].data[7:9]).all()
+    assert "OVERSAMP" not in hdu_list[0].header
+
+    hdu_list = interferometer_hdu_list_from(dataset=dataset, include_fine_grids=True)
+
+    assert [hdu.name for hdu in hdu_list] == [
+        "MASK",
+        "NUFFT_PRECISION_OPERATOR",
+        "DIRTY_IMAGE",
+        "DIRTY_BEAM",
+        "SPARSE_TERMS_SCALARS",
+        "PRECISION_OPERATOR_FINE",
+        "DIRTY_IMAGE_FINE",
+    ]
+    np.testing.assert_array_equal(
+        hdu_list["PRECISION_OPERATOR_FINE"].data, terms.precision_operator_fine
+    )
+    np.testing.assert_array_equal(
+        hdu_list["DIRTY_IMAGE_FINE"].data, terms.dirty_image_fine
+    )
+    np.testing.assert_array_equal(hdu_list["SPARSE_TERMS_SCALARS"].data[7:9], [2, 0.25])
+    assert hdu_list[0].header["OVERSAMP"] == 2
+
+    # Terms without fine grids: opting in writes nothing extra.
+    hdu_list = interferometer_hdu_list_from(
+        dataset=_array_free_dataset_from(interferometer_7), include_fine_grids=True
+    )
+
+    assert "PRECISION_OPERATOR_FINE" not in [hdu.name for hdu in hdu_list]
+    assert "OVERSAMP" not in hdu_list[0].header
+
+
+def test__sparse_terms_from__fine_grids_round_trip_through_disk(
+    interferometer_7, tmp_path
+):
+    import numpy as np
+    import pytest
+
+    pytest.importorskip("nufftax")
+
+    import autoarray as aa
+    from astropy.io import fits
+
+    from autogalaxy.aggregator.interferometer.interferometer import _sparse_terms_from
+    from autogalaxy.interferometer.model.analysis import interferometer_hdu_list_from
+
+    dataset = _fine_array_free_dataset_from(interferometer_7)
+    terms = dataset.sparse_terms
+
+    file_path = tmp_path / "dataset.fits"
+    interferometer_hdu_list_from(dataset=dataset, include_fine_grids=True).writeto(
+        file_path
+    )
+
+    with fits.open(file_path) as hdu_list:
+        terms_reloaded = _sparse_terms_from(
+            hdu_list, real_space_mask=dataset.real_space_mask
+        )
+
+    np.testing.assert_array_equal(
+        terms_reloaded.precision_operator_fine, terms.precision_operator_fine
+    )
+    np.testing.assert_array_equal(
+        terms_reloaded.dirty_image_fine, terms.dirty_image_fine
+    )
+    assert terms_reloaded.oversample == 2
+    assert isinstance(terms_reloaded.oversample, int)
+    assert terms_reloaded.oversample_pad == 0.25
+
+    # Reloaded fine terms still refuse to be summed with terms of another q.
+    other = _fine_array_free_dataset_from(interferometer_7, oversample=4).sparse_terms
+
+    with pytest.raises(aa.exc.InversionException, match="oversample"):
+        terms_reloaded + other
+
+    # Written without opting in: reloads with no fine grids and no oversample.
+    file_path = tmp_path / "dataset_default.fits"
+    interferometer_hdu_list_from(dataset=dataset).writeto(file_path)
+
+    with fits.open(file_path) as hdu_list:
+        terms_reloaded = _sparse_terms_from(
+            hdu_list, real_space_mask=dataset.real_space_mask
+        )
+
+    assert terms_reloaded.precision_operator_fine is None
+    assert terms_reloaded.dirty_image_fine is None
+    assert terms_reloaded.oversample is None
+    assert terms_reloaded.oversample_pad is None
+
+
+def test__sparse_terms_from__file_predating_fine_grids__reloads_none(interferometer_7):
+    """
+    A file written before the fine grids existed -- a 7-entry `SPARSE_TERMS_SCALARS` array, no `OVERSAMP`
+    card and no fine-grid HDUs -- reloads with `None` fine grids and oversampling, other terms intact.
+    """
+    from astropy.io import fits
+
+    from autogalaxy.aggregator.interferometer.interferometer import _sparse_terms_from
+    from autogalaxy.interferometer.model.analysis import interferometer_hdu_list_from
+
+    dataset = _array_free_dataset_from(interferometer_7)
+    terms = dataset.sparse_terms
+
+    hdu_list = interferometer_hdu_list_from(dataset=dataset)
+
+    hdu_list = fits.HDUList(
+        [hdu_list[0]]
+        + [
+            (
+                fits.ImageHDU(
+                    data=hdu.data[:7], header=hdu.header, name="SPARSE_TERMS_SCALARS"
+                )
+                if hdu.name == "SPARSE_TERMS_SCALARS"
+                else hdu
+            )
+            for hdu in hdu_list[1:]
+        ]
+    )
+
+    terms_reloaded = _sparse_terms_from(
+        hdu_list, real_space_mask=dataset.real_space_mask
+    )
+
+    assert terms_reloaded.precision_operator_fine is None
+    assert terms_reloaded.dirty_image_fine is None
+    assert terms_reloaded.oversample is None
+    assert terms_reloaded.oversample_pad is None
+    assert terms_reloaded.phase_centre == terms.phase_centre
     for name in ("sum_weights", "data_term", "noise_normalization", "n_vis", "eps"):
         assert getattr(terms_reloaded, name) == getattr(terms, name), name
