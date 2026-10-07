@@ -52,15 +52,15 @@ The [**PyAutoGalaxy AI Assistant**](https://github.com/PyAutoLabs/autogalaxy_ass
 
 A complete overview of the software's aims is provided in our [Journal of Open Source Software paper](https://joss.theoj.org/papers/10.21105/joss.04475).
 
-## Community & Support
+## Community & Contributing
 
-Questions, help with your code or your analysis, and ideas: the
-[PyAutoLabs Discussions](https://github.com/orgs/PyAutoLabs/discussions).
-Bug reports with a reproducer (a snippet, the traceback, your versions):
-an issue on the library's tracker. The Slack is for collaborators, by
-invitation.
+**PyAutoGalaxy** is built in the open by its users: everyone is welcome to ask questions,
+share what they have made with it, and contribute.
 
-The collaborator Slack workspace shares project updates and discussions about galaxy modeling and analysis.
+Questions, ideas and bug reports: the [PyAutoLabs Discussions](https://github.com/orgs/PyAutoLabs/discussions).
+Chat with us on [Slack](https://join.slack.com/t/pyautolens/shared_invite/zt-2cufp4eyf-fXfgMxRGuvg~bMrI3uOAxg).
+
+Community-built tools and tutorials, and how to contribute: the [**PyAutoGalaxy** community page](https://pyautogalaxy.readthedocs.io/en/latest/general/community.html).
 
 ## HowToGalaxy
 
@@ -73,11 +73,5 @@ A complete overview of the lectures [is provided on the HowToGalaxy readthedocs 
 ## Citations
 
 Information on how to cite **PyAutoGalaxy** in publications can be found [on the citations page](https://github.com/PyAutoLabs/PyAutoGalaxy/blob/main/CITATIONS.md).
-
-## Contributing
-
-Information on how to contribute to **PyAutoGalaxy** can be found [on the contributing page](https://github.com/PyAutoLabs/PyAutoGalaxy/blob/main/CONTRIBUTING.md).
-
-Hands on support for contributions is available via our Slack workspace, again please email to request an invite.
 
 <sub><i><a href="https://open.spotify.com/track/3i9QKRl5Ql3pgUfNdYBVTc">glow</a></i></sub>
