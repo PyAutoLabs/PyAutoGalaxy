@@ -45,6 +45,7 @@ Homepage = "https://github.com/PyAutoLabs/PyAutoGalaxy"
 include-package-data = true
 
 [tool.setuptools.packages.find]
+include = ["autogalaxy*"]
 exclude = ["docs", "test_autogalaxy", "test_autogalaxy*"]
 
 [tool.setuptools_scm]
