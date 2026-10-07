@@ -1,17 +1,25 @@
+import warnings
 from collections import OrderedDict
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple
 
 import numpy as np
+
+from autogalaxy.gui.display_util import (
+    arcsinh_stretch,
+    composite_panels,
+    fold_panels,
+    radial_median_subtract,
+)
 
 
 class Scribbler:
     #: Fixed roles of the two default scribble segments. Press the key to switch brush.
-    ADD_SEGMENT = "1"  # green: pixels to add to the mask
-    ERASE_SEGMENT = "2"  # red: pixels to remove from the mask (or from a proposal)
+    ADD_SEGMENT = "1"  # white: pixels to add to the mask
+    ERASE_SEGMENT = "2"  # black: pixels to remove from the mask (or from a proposal)
 
     #: One-line key legend, printed when the GUI starts and shown as the axes title.
     KEY_LEGEND = (
-        "'1' add (green) | '2' erase (red) | '=' bigger brush | '-' smaller brush | "
+        "'1' add (white) | '2' erase (black) | '=' bigger brush | '-' smaller brush | "
         "'z' undo | Esc done"
     )
 
@@ -32,6 +40,14 @@ class Scribbler:
         proposal: Optional[np.ndarray] = None,
         brush_resize_factor: float = 1.4,
         min_radius: int = 1,
+        subtract_radial: bool = False,
+        side_by_side: bool = True,
+        panel_gap: int = 6,
+        positions=None,
+        position_marker_size: Optional[int] = None,
+        stretch: str = "arcsinh",
+        brush_color: Optional[str] = None,
+        title: Optional[str] = None,
         block: bool = True,
     ):
         """
@@ -41,9 +57,13 @@ class Scribbler:
 
         Adapted from https://gist.github.com/brikeats/4f63f867fd8ea0f196c78e9b835150ab
 
-        **Brushes.** Two scribble segments are available: `'1'` (green) ADDS pixels to
-        the mask and `'2'` (red) ERASES them. Press the key to switch brush; the current
-        brush is drawn as a blue circle following the cursor. `'='` and `'-'` grow and
+        **Brushes.** Two scribble segments are available: `'1'` (white) ADDS pixels to
+        the mask and `'2'` (black) ERASES them. White and black because no colour map
+        contains either, so a stroke is never lost in the image, and because they are
+        told apart by every kind of colour vision, which a green / red pair is not. Press
+        the key to switch brush; the current brush follows the cursor as a ring in its
+        own colour with a thin halo of the opposite one, visible on any background.
+        `'='` and `'-'` grow and
         shrink the brush multiplicatively (by `brush_resize_factor` per press, never by less
         than one pixel), so a few presses take you from a 1 px detail brush to a thick
         outskirts brush. `'z'` undoes the last circle of the active brush and `Esc` / `q`
@@ -51,14 +71,47 @@ class Scribbler:
 
         **Starting from a proposal.** Pass `proposal` (a boolean array of the image's native
         shape, True = masked) to REFINE an existing mask instead of drawing from scratch:
-        its boundary is outlined in white over the image and, after the GUI closes,
+        its boundary is outlined (black on a white halo) over the image and, after the GUI closes,
         `mask_from()` returns `(proposal | added) & ~erased`. A proposal can be a mask
-        drawn earlier for this image, or one drawn for another waveband of the same object.
+        drawn earlier for this image, or one drawn for another waveband of the same object
+        (see `autogalaxy.gui.display_util.mask_regridded_from` for moving a mask between
+        grids of different pixel scale).
+
+        **Seeing under the galaxy.** With `subtract_radial=True` the image's
+        azimuthally-averaged radial profile is subtracted for display (see
+        `display_util.radial_median_subtract`), which lifts lensed arcs and companions out
+        from under a smooth galaxy's light. With `side_by_side=True` (the default) the
+        subtracted image is shown on the LEFT and the image as observed on the RIGHT,
+        separated by a blank gutter, since each answers a different question: where faint
+        structure is, and where a contaminant's real extent and the galaxy's envelope are.
+        Strokes on either panel are folded onto the one image grid, so painting on the
+        right masks the same pixels as painting on the left. Each panel is colour-scaled
+        independently. This is a display transform only: the mask is read back from brush
+        positions, so it cannot change what a stroke masks.
+
+        **Colour scale.** Every display (single panel or side by side) is mapped through
+        an arcsinh stretch about its own sky level (`stretch="arcsinh"`, see
+        `display_util.arcsinh_stretch`): linear within a noise sigma of the sky and
+        logarithmic beyond, so faint arcs and a galaxy core thousands of sigma brighter
+        are visible at once, where a linear scale shows only the core. `vmin` / `vmax`
+        set the data values at the ends of the stretch (the default clips at the 0.5 and
+        99.5 percentiles). `stretch="linear"` restores matplotlib's plain scaling and
+        honours `norm="log"`.
+
+        **Marking known positions.** Pass `positions` (a list of (y, x) scaled coordinates
+        or a `Grid2DIrregular`, e.g. the multiple-image positions clicked in the
+        `positions.py` GUI) to mark each one with a small cross while you paint. A cross,
+        not a ring: the proposal outline and the mask-overlay edge are closed boundaries,
+        and a third closed shape reads as one more region being masked. The cross is
+        small (a few pixels, scaled to the image) and its arms meet at the marked pixel so
+        there is no doubt which pixel it names; it is drawn black with a thin white halo
+        so it reads on any background. Markers are repeated on every panel and are
+        display only.
 
         **Reading the result.** `mask_from()` returns the combined mask described above
         (with no proposal, simply `added & ~erased`); `show_mask()` returns the ADD segment
         alone, for backwards compatibility; `get_scribble_masks()` returns every segment as
-        its own boolean array.
+        its own boolean array. All are on the image's own grid, whatever is displayed.
 
         Parameters
         ----------
@@ -73,9 +126,11 @@ class Scribbler:
             *norm* / *vmin* / *vmax* arguments below.
         norm
             ``"log"`` for a logarithmic colour scale, ``"linear"`` (or ``None``)
-            otherwise.
+            otherwise. Only used with `stretch="linear"`; passing it with any
+            other stretch emits a `UserWarning`, since it would otherwise be
+            silently ignored.
         vmin, vmax
-            Explicit colour-scale limits.
+            The data values at the ends of the colour scale, for either stretch.
         brush_width
             The starting brush radius as a fraction of the image height.
         backend
@@ -89,13 +144,40 @@ class Scribbler:
         rgb_image
             An optional RGB image shown beside the data.
         extent
-            The (x0, x1, y0, y1) scaled-coordinate extent to zoom the display to.
+            The (x0, x1, y0, y1) scaled-coordinate extent to zoom the display to. With
+            side-by-side panels it applies to the left panel's pixel coordinates.
         proposal
             An existing boolean mask (True = masked) to outline and refine, see above.
         brush_resize_factor
             The factor the brush radius is multiplied / divided by per `'='` / `'-'` press.
         min_radius
             The smallest brush radius in pixels.
+        subtract_radial
+            Display the image with its radial median profile subtracted, see above.
+        side_by_side
+            With `subtract_radial`, also show the as-observed image in a second panel.
+        panel_gap
+            The width in pixels of the blank gutter between side-by-side panels.
+        positions
+            (y, x) scaled coordinates to mark with a cross, see above. Requires `image` to
+            carry its geometry (an `Array2D` in native form).
+        position_marker_size
+            The arm length of each cross in pixels. `None` (the default) scales it to the
+            image: 1.5% of the shorter side, never less than 3 px.
+        stretch
+            How the image is mapped to colour: `"arcsinh"` (the default, see above and
+            `display_util.arcsinh_stretch`) or `"linear"` (matplotlib's own scaling,
+            with `norm`). Ignored for a legacy ``Cmap``-style object, which brings its
+            own norm.
+        brush_color
+            The colour of the brush ring that follows the cursor. `None` (the default)
+            uses the active brush's own colour, white to add and black to erase.
+        title
+            What this window is for, shown as the first line above the image, e.g.
+            `"Mask extra galaxies: F277W, proposing from F150W"`. Below it the window
+            always lists the markers it is showing (proposal outline, overlay edge,
+            position crosses) and the keys, so a script need only say what is being
+            masked and where the proposal came from.
         block
             If `True` (the default) the constructor opens the window and blocks until it is
             closed. If `False` the figure is built but the event loop is not started; call
@@ -134,6 +216,7 @@ class Scribbler:
             extent = (x0_pix, x1_pix, y0_pix, y1_pix)
 
         self.im = image
+        self.image_shape = tuple(np.asarray(image).shape[:2])
         self.backend = backend
         self.figsize = figsize
         self.extent = extent
@@ -142,17 +225,53 @@ class Scribbler:
             self._validate_proposal(proposal) if proposal is not None else None
         )
 
+        # display panels (the mask is always read back on the image's own grid)
+        self.subtract_radial = subtract_radial
+        self.side_by_side = side_by_side
+        self.panel_gap = panel_gap
+        self.panel_names: List[str] = []
+        self.display = None
+
+        # position markers
+        self.positions = (
+            None if positions is None else np.asarray(positions, dtype=float)
+        )
+        if self.positions is not None and self.positions.size:
+            self.positions = self.positions.reshape(-1, 2)
+            if not hasattr(image, "pixel_scales"):
+                raise ValueError(
+                    "positions need the image's geometry: pass an Array2D in native form"
+                )
+        if position_marker_size is None:
+            position_marker_size = max(3, int(round(0.015 * min(self.image_shape))))
+        self.position_marker_size = position_marker_size
+        self.position_markers = []
+        if stretch not in ("arcsinh", "linear"):
+            raise ValueError(f"stretch must be 'arcsinh' or 'linear', not {stretch!r}")
+        self.stretch = stretch
+        if norm is not None and stretch != "linear":
+            warnings.warn(
+                f"Scribbler: norm={norm!r} is ignored with stretch={stretch!r}; "
+                "it only applies with stretch='linear'. Pass stretch='linear' to use "
+                "it, or vmin / vmax to set the ends of the arcsinh stretch.",
+                UserWarning,
+                stacklevel=2,
+            )
+
         # brush
-        self.brush_radius = max(int(image.shape_native[0] * brush_width), min_radius)
+        self.brush_radius = max(int(self.image_shape[0] * brush_width), min_radius)
         self.min_radius = min_radius
         self.brush_resize_factor = brush_resize_factor
-        self.brush_color = "b"
+        self._brush_color = brush_color
         self.brush = None
+        self.brush_halo = None
+        self.title = title
+        self.has_mask_overlay = mask_overlay is not None
 
         # scribbles
         if not segment_names:
             segment_names = [self.ADD_SEGMENT, self.ERASE_SEGMENT]
-        self.scribble_colors = "gr"
+        self.scribble_colors = "wk"
         self.scribbles = OrderedDict()
         for name in segment_names:
             self.scribbles[name] = []
@@ -180,12 +299,150 @@ class Scribbler:
         silently broadcast in `mask_from()`).
         """
         proposal = np.asarray(proposal, dtype=bool)
-        if proposal.shape != tuple(self.im.shape_native):
+        if proposal.shape != self.image_shape:
             raise ValueError(
                 f"proposal shape {proposal.shape} does not match the image's native "
-                f"shape {tuple(self.im.shape_native)}"
+                f"shape {self.image_shape}"
             )
         return proposal
+
+    @property
+    def n_panels(self) -> int:
+        return len(self.panel_names)
+
+    def _panels(self) -> List[Tuple[str, np.ndarray]]:
+        """
+        The (name, values) display panels: the image alone, or its radial-subtracted
+        version optionally beside it.
+        """
+        values = np.asarray(self.im, dtype=float)
+        if not self.subtract_radial:
+            return [("image", values)]
+        panels = [("radial-subtracted", radial_median_subtract(values))]
+        if self.side_by_side:
+            panels.append(("as-observed", values))
+        return panels
+
+    @property
+    def marker_legend(self) -> str:
+        """
+        One line naming every marker drawn on this window (nothing if there are none):
+        the outline of the proposal being refined, the black `x` edge of the overlaid
+        mask, and the `+` crosses at the marked positions.
+        """
+        parts = []
+        if self.proposal is not None and self.proposal.any():
+            parts.append("outline = the mask being refined")
+        if self.has_mask_overlay:
+            parts.append("black x = edge of the overlaid mask (masked-out region)")
+        if self.positions is not None and self.positions.size:
+            parts.append("+ = marked positions")
+        return "   |   ".join(parts)
+
+    @property
+    def title_text(self) -> str:
+        """
+        The window title: the caller's `title` (what is being masked, and from which
+        waveband the proposal came), the panel layout, the marker legend and the keys.
+        """
+        lines = []
+        if self.title:
+            lines.append(self.title)
+        if self.n_panels > 1:
+            lines.append(
+                f"LEFT: {self.panel_names[0]}   |   RIGHT: {self.panel_names[1]}"
+                f"   --   scribble on either"
+            )
+        if self.marker_legend:
+            lines.append(self.marker_legend)
+        lines.append(self.KEY_LEGEND)
+        return "\n".join(lines)
+
+    @property
+    def brush_color(self) -> str:
+        """
+        The colour of the brush ring: the active brush's own colour unless one was given,
+        so the ring doubles as a mode indicator.
+        """
+        if self._brush_color is not None:
+            return self._brush_color
+        return self.active_scribble_color
+
+    @property
+    def brush_halo_color(self) -> str:
+        """
+        The thin halo drawn inside the brush ring, in the opposite tone, so the ring is
+        visible whatever the image colour beneath it.
+        """
+        return "k" if self.brush_color in ("w", "white") else "w"
+
+    def _normalised(self, values, cmap, norm, vmin, vmax) -> np.ndarray:
+        """
+        Map one panel's values onto [0, 1] so panels of very different dynamic range can
+        share one image: an arcsinh stretch about the panel's own sky level, or (with
+        `stretch="linear"`) the same colour scaling the single-panel display uses.
+        """
+        import matplotlib.colors
+
+        if self.stretch == "arcsinh" and not hasattr(cmap, "norm_from"):
+            return arcsinh_stretch(values, vmin=vmin, vmax=vmax)
+
+        if hasattr(cmap, "norm_from"):
+            mpl_norm = cmap.norm_from(array=values)
+        else:
+            from autogalaxy.util.plot_utils import norm_from
+
+            mpl_norm = norm_from(
+                array=values, use_log10=norm == "log", vmin=vmin, vmax=vmax
+            )
+        if mpl_norm is None:
+            mpl_norm = matplotlib.colors.Normalize()
+        return np.ma.filled(mpl_norm(np.nan_to_num(values)), 0.0)
+
+    def positions_pixels(self) -> np.ndarray:
+        """
+        The (row, column) pixel coordinates of `positions` on the image's grid (floats;
+        the pixel centre of row 0 is the most positive y).
+        """
+        if self.positions is None or not self.positions.size:
+            return np.zeros((0, 2))
+        pixel_scales = self.im.pixel_scales
+        origin = self.im.origin
+        n_y, n_x = self.image_shape
+        rows = (n_y - 1) / 2.0 - (self.positions[:, 0] - origin[0]) / pixel_scales[0]
+        cols = (n_x - 1) / 2.0 + (self.positions[:, 1] - origin[1]) / pixel_scales[1]
+        return np.stack([rows, cols], axis=1)
+
+    def _draw_position_markers(self):
+        """
+        Draw each position as a small dark cross (two lines meeting at the marked pixel)
+        on every panel; the `Line2D`s are kept in `position_markers`.
+        """
+        arm = float(self.position_marker_size)
+        for row, col in self.positions_pixels():
+            for i in range(self.n_panels):
+                x = col + i * (self.image_shape[1] + self.panel_gap)
+                for xs, ys in (
+                    ([x, x], [row - arm, row + arm]),
+                    ([x - arm, x + arm], [row, row]),
+                ):
+                    self.ax.plot(
+                        xs,
+                        ys,
+                        color="w",
+                        linewidth=2.5,
+                        solid_capstyle="butt",
+                        zorder=1e5 - 1,
+                    )
+                    (line,) = self.ax.plot(
+                        xs,
+                        ys,
+                        color="k",
+                        linewidth=1.0,
+                        solid_capstyle="butt",
+                        zorder=1e5,
+                    )
+                    self.position_markers.append(line)
 
     def _build_figure(self, cmap, norm, vmin, vmax, mask_overlay, rgb_image):
         """
@@ -199,6 +456,8 @@ class Scribbler:
 
         matplotlib.use(self.backend)
         image = self.im
+        panels = self._panels()
+        self.panel_names = [name for name, _ in panels]
 
         # create initial plot
         self.figure = plt.figure(figsize=self.figsize)
@@ -212,35 +471,78 @@ class Scribbler:
             plt.imshow(rgb_image, origin=_conf_imshow_origin())
         self.ax = self.figure.add_subplot(111)
 
-        if cmap is None and norm is None and vmin is None and vmax is None:
-            plt.imshow(image, interpolation="none", origin=_conf_imshow_origin())
-        elif hasattr(cmap, "norm_from"):
-            # Legacy `Cmap`-style object. The public plot namespaces no longer
-            # export one, but a caller holding an instance still works.
-            mpl_norm = cmap.norm_from(array=image)
-            cmap_name = getattr(cmap, "cmap_name", None) or cmap.config_dict.get(
-                "cmap", "viridis"
-            )
-            plt.imshow(
-                image, cmap=cmap_name, norm=mpl_norm, origin=_conf_imshow_origin()
-            )
-        else:
-            from autogalaxy.util.plot_utils import _resolve_colormap, norm_from
+        if (
+            self.n_panels == 1
+            and self.stretch == "arcsinh"
+            and not hasattr(cmap, "norm_from")
+        ):
+            from autogalaxy.util.plot_utils import _resolve_colormap
 
-            mpl_norm = norm_from(
-                array=image, use_log10=norm == "log", vmin=vmin, vmax=vmax
-            )
+            self.display = arcsinh_stretch(np.asarray(image), vmin=vmin, vmax=vmax)
             plt.imshow(
-                image,
+                self.display,
                 cmap=_resolve_colormap(cmap),
-                norm=mpl_norm,
+                vmin=0.0,
+                vmax=1.0,
+                interpolation="none",
+                origin=_conf_imshow_origin(),
+            )
+        elif self.n_panels == 1:
+            self.display = np.asarray(image)
+            if cmap is None and norm is None and vmin is None and vmax is None:
+                plt.imshow(image, interpolation="none", origin=_conf_imshow_origin())
+            elif hasattr(cmap, "norm_from"):
+                # Legacy `Cmap`-style object. The public plot namespaces no longer
+                # export one, but a caller holding an instance still works.
+                mpl_norm = cmap.norm_from(array=image)
+                cmap_name = getattr(cmap, "cmap_name", None) or cmap.config_dict.get(
+                    "cmap", "viridis"
+                )
+                plt.imshow(
+                    image, cmap=cmap_name, norm=mpl_norm, origin=_conf_imshow_origin()
+                )
+            else:
+                from autogalaxy.util.plot_utils import _resolve_colormap, norm_from
+
+                mpl_norm = norm_from(
+                    array=image, use_log10=norm == "log", vmin=vmin, vmax=vmax
+                )
+                plt.imshow(
+                    image,
+                    cmap=_resolve_colormap(cmap),
+                    norm=mpl_norm,
+                    origin=_conf_imshow_origin(),
+                )
+        else:
+            from autogalaxy.util.plot_utils import _resolve_colormap
+
+            self.display = composite_panels(
+                [self._normalised(v, cmap, norm, vmin, vmax) for _, v in panels],
+                gap=self.panel_gap,
+            )
+            if hasattr(cmap, "norm_from"):
+                cmap_name = getattr(cmap, "cmap_name", None) or cmap.config_dict.get(
+                    "cmap", "viridis"
+                )
+            else:
+                cmap_name = _resolve_colormap(cmap)
+            plt.imshow(
+                self.display,
+                cmap=cmap_name,
+                vmin=0.0,
+                vmax=1.0,
+                interpolation="none",
                 origin=_conf_imshow_origin(),
             )
 
         if mask_overlay is not None:
             grid = mask_overlay.derive_grid.edge
             grid = mask_overlay.geometry.grid_pixel_centres_2d_from(grid_scaled_2d=grid)
-            plt.scatter(y=grid[:, 0], x=grid[:, 1], c="k", marker="x", s=10)
+            for i in range(self.n_panels):
+                x_offset = i * (self.image_shape[1] + self.panel_gap)
+                plt.scatter(
+                    y=grid[:, 0], x=grid[:, 1] + x_offset, c="k", marker="x", s=10
+                )
 
         self._proposal_contour = None
         if self.proposal is not None and self.proposal.any():
@@ -248,14 +550,32 @@ class Scribbler:
             # is being judged against. No `origin=`: without X / Y, contour places Z[0, 0]
             # at data (0, 0), which is where imshow draws pixel [0, 0] for either origin
             # (contour's own `origin="upper"` would flip the outline vertically).
-            self._proposal_contour = self.ax.contour(
-                self.proposal.astype(float),
+            outline = composite_panels(
+                [self.proposal.astype(float)] * self.n_panels,
+                gap=self.panel_gap,
+                fill=0.0,
+            )
+            # Black line on a white halo, like the position crosses, so the outline
+            # reads on the bright sky of the arcsinh display as well as on a dark one.
+            self.ax.contour(
+                outline,
                 levels=[0.5],
                 colors="w",
-                linewidths=1.0,
+                linewidths=3.5,
+                zorder=1e4 - 1,
+            )
+            self._proposal_contour = self.ax.contour(
+                outline,
+                levels=[0.5],
+                colors="k",
+                linewidths=1.6,
+                zorder=1e4,
             )
 
-        self.ax.set_title(self.KEY_LEGEND, fontsize=10)
+        if self.positions is not None and self.positions.size:
+            self._draw_position_markers()
+
+        self.ax.set_title(self.title_text, fontsize=10)
         plt.axis(self.extent)
         plt.axis("off")
 
@@ -279,6 +599,11 @@ class Scribbler:
         import matplotlib.pyplot as plt
 
         print(f"Scribbler keys: {self.KEY_LEGEND}")
+        if self.n_panels > 1:
+            print(
+                f"  panels: LEFT {self.panel_names[0]}, RIGHT {self.panel_names[1]} "
+                f"-- scribble on either, both land on the same pixels"
+            )
         print(f"  brush radius = {self.brush_radius} px")
 
         plt.ion()
@@ -309,15 +634,26 @@ class Scribbler:
         # draw the brush circle
         if self.brush:
             self.brush.center = center
+            self.brush_halo.center = center
         else:
             self.brush = matplotlib.patches.Circle(
                 center,
                 radius=self.brush_radius,
                 edgecolor=self.brush_color,
                 facecolor="none",
+                linewidth=2.5,
                 zorder=1e6,
             )  # always on top
+            self.brush_halo = matplotlib.patches.Circle(
+                center,
+                radius=self.brush_radius,
+                edgecolor=self.brush_halo_color,
+                facecolor="none",
+                linewidth=0.8,
+                zorder=1e6 + 1,
+            )
             self.ax.add_patch(self.brush)
+            self.ax.add_patch(self.brush_halo)
 
         # add to the scribble, if mouse is down
         if self.mouse_is_down:
@@ -350,6 +686,10 @@ class Scribbler:
         name = list(self.scribbles.keys())[index]
         self.active_scribble = self.scribbles[name]
         self.active_scribble_color = self.scribble_colors[index]
+        if self.brush is not None:
+            self.brush.set_edgecolor(self.brush_color)
+            self.brush_halo.set_edgecolor(self.brush_halo_color)
+            self.figure.canvas.draw_idle()
 
     def add_circle_to_scribble(self, center):
         import matplotlib
@@ -376,6 +716,7 @@ class Scribbler:
         self.brush_radius = max(self.min_radius, int(round(radius)))
         if self.brush:
             self.brush.radius = self.brush_radius
+            self.brush_halo.radius = self.brush_radius
             self.figure.canvas.draw()
         print(f"  brush radius = {self.brush_radius} px")
 
@@ -440,23 +781,66 @@ class Scribbler:
     def add_circle_to_mask(self, center, radius, mask):
         if center[0] is None or center[1] is None:
             return
-        xx, yy = np.mgrid[: self.im.shape[0], : self.im.shape[1]]
+        xx, yy = np.mgrid[: mask.shape[0], : mask.shape[1]]
         circle_mask = (xx - center[1]) ** 2 + (yy - center[0]) ** 2 <= radius**2
         mask[circle_mask] = 1
 
+    def _panel_index_of(self, x: float) -> int:
+        """
+        The side-by-side panel a stroke centred at display column `x` belongs to: the
+        panel containing it, or the nearest panel for a centre in a gutter (or off the
+        display), ties going to the left.
+        """
+        if self.n_panels <= 1:
+            return 0
+        n_x = self.image_shape[1]
+        step = n_x + self.panel_gap
+        distances = []
+        for i in range(self.n_panels):
+            lo, hi = i * step - 0.5, i * step + n_x - 0.5
+            distances.append(max(lo - x, 0.0, x - hi))
+        return int(np.argmin(distances))
+
     def circles_to_mask(self, centers, radii):
-        mask = np.zeros(self.im.shape[:2], dtype=bool)
+        """
+        Rasterise brush circles on the DISPLAY (which may hold several panels); they are
+        folded back onto the image grid by `get_scribble_masks`.
+
+        Each circle is clipped to the panel its centre falls in (see `_panel_index_of`),
+        so a stroke near a panel's inner edge cannot spill across the gutter into the
+        neighbouring panel and fold back onto the far edge of the image.
+        """
+        mask = np.zeros(self.display.shape[:2], dtype=bool)
+        n_x = self.image_shape[1]
+        step = n_x + self.panel_gap
         for center, radius in zip(centers, radii):
-            self.add_circle_to_mask(center, radius, mask)
+            if center[0] is None or center[1] is None:
+                continue
+            circle = np.zeros_like(mask)
+            self.add_circle_to_mask(center, radius, circle)
+            if self.n_panels > 1:
+                i = self._panel_index_of(center[0])
+                in_panel = np.zeros_like(mask)
+                in_panel[:, i * step : i * step + n_x] = True
+                circle &= in_panel
+            mask |= circle
         return mask
 
     def get_scribble_masks(self):
+        """
+        Every scribble segment as a boolean array on the image's own grid. Strokes on any
+        side-by-side panel are OR-ed together, so painting the right panel masks the same
+        pixels as painting the left.
+        """
         masks = {}
         for name, scribble in self.scribbles.items():
             if len(scribble) == 0:
-                masks[name] = np.zeros(self.im.shape, dtype=bool)
+                masks[name] = np.zeros(self.image_shape, dtype=bool)
             else:
                 centers = [circle.center for circle in scribble]
                 radii = [circle.radius for circle in scribble]
-                masks[name] = self.circles_to_mask(centers, radii)
+                raster = self.circles_to_mask(centers, radii)
+                masks[name], _ = fold_panels(
+                    raster, self.n_panels, self.image_shape[1], gap=self.panel_gap
+                )
         return masks
