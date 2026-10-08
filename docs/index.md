@@ -144,7 +144,7 @@ galaxies_plotter.figures_2d(image=True)
 To perform model-fitting, `PyAutoGalaxy` adopts the probabilistic programming
 language `PyAutoFit` (<https://github.com/PyAutoLabs/PyAutoFit>). `PyAutoFit` allows users to compose a
 model from `LightProfile` and `Galaxy` objects, customize the model parameterization and fit it to data via a
-non-linear search (e.g., `dynesty` [@dynesty], `emcee` [@emcee], `PySwarms` [@pyswarms]). By composing a model with
+non-linear search (e.g., `Nautilus` [@nautilus], `dynesty` [@dynesty], `emcee` [@emcee]). By composing a model with
 `Pixelization` objects, the galaxy's light is reconstructed using a non-parametric rectangular
 grid or Voronoi mesh that accounts for irregular galaxy morphologies.
 

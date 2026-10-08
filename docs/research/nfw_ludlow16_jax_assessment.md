@@ -233,7 +233,7 @@ top.
 
 The `kappa_s` discrepancy (1 × 10⁻³ relative, 0.1%) is one bit-flip in a
 typical 10-bit posterior coverage on `kappa_s` — invisible in any plausible
-HMC / Nautilus / MultiNest run on real data.
+HMC / Nautilus / Dynesty run on real data.
 
 ### Verdict on science fidelity
 

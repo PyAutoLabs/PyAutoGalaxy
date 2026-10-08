@@ -32,8 +32,6 @@ our [building from source installation guide](https://pyautogalaxy.readthedocs.i
 
 **emcee** <https://github.com/dfm/emcee>
 
-**PySwarms** <https://github.com/ljvmiranda921/pyswarms>
-
 **colossus**: <https://bdiemer.bitbucket.io/colossus/>
 
 **astropy** <https://www.astropy.org/>

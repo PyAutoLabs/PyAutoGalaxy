@@ -13,7 +13,7 @@ entry in the above .bib file is under the citation key `pyautogalaxy`.
 As shown in the examples, we would greatly appreciate it if you mention **PyAutoGalaxy** by name and include a link to
 our GitHub page!
 
-You should also specify the non-linear search(es) you use in your analysis (e.g. Dynesty, Emcee, PySwarms, etc) in
+You should also specify the non-linear search(es) you use in your analysis (e.g. Nautilus, Dynesty, Emcee, Zeus, etc) in
 the main body of text, and delete as appropriate any packages your analysis did not use. The citations.bib file includes
 the citation key for all of these projects.
 
