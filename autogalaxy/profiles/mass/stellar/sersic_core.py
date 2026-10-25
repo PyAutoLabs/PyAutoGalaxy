@@ -163,9 +163,10 @@ class SersicCoreSph(SersicCore):
         intensity: float = 0.05,
         gamma: float = 0.25,
         alpha: float = 3.0,
+        mass_to_light_ratio: float = 1.0,
     ):
         """
-        The elliptical cored-Sersic light profile.
+        The spherical cored-Sersic stellar mass profile.
 
         Parameters
         ----------
@@ -184,6 +185,8 @@ class SersicCoreSph(SersicCore):
             The intensity at the break radius.
         gamma
             The logarithmic power-law slope of the inner core profiles
+        mass_to_light_ratio
+            Scales the stellar convergence and deflections at fixed light intensity.
         alpha :
             Controls the sharpness of the transition between the inner core / outer Sersic profiles.
         """
@@ -196,6 +199,7 @@ class SersicCoreSph(SersicCore):
             intensity=intensity,
             gamma=gamma,
             alpha=alpha,
+            mass_to_light_ratio=mass_to_light_ratio,
         )
         self.radius_break = radius_break
         self.intensity = intensity
