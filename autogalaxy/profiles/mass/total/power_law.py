@@ -198,10 +198,13 @@ class PowerLaw(PowerLawCore):
 
             from .jax_utils import omega
 
-            angle = xp.arctan2(y, qx)  # Note, this angle is not the position angle
-            z = xp.add(
-                xp.multiply(xp.cos(angle), 1 + 0j), xp.multiply(xp.sin(angle), 0 + 1j)
-            )
+            # Match the NumPy unit vector exactly on the coordinate axes.
+            # Mask the norm inputs at the centre as well as the divisor so
+            # reverse-mode differentiation never encounters hypot(0, 0).
+            on_centre = (qx == 0.0) & (y == 0.0)
+            r_ell = xp.hypot(xp.where(on_centre, 1.0, qx), y)
+            z = (qx + 1j * y) / r_ell
+            z = xp.where(on_centre, 1.0 + 0j, z)
 
             zh = omega(z, slope, factor, n_terms=20, xp=xp)
 
