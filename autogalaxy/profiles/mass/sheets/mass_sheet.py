@@ -63,5 +63,5 @@ class MassSheet(MassProfile):
     def deflections_yx_2d_from(self, grid: aa.type.Grid2DLike, xp=np, **kwargs):
         grid_radii = self.radial_grid_from(grid=grid, xp=xp, **kwargs)
         return self._cartesian_grid_via_radial_from(
-            grid=grid, radius=self.kappa * grid_radii, xp=xp
+            grid=grid, radius=self.kappa * grid_radii.array, xp=xp
         )
