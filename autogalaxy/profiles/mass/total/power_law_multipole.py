@@ -3,7 +3,8 @@ from typing import Tuple
 
 import autoarray as aa
 
-from autogalaxy import convert
+from autogalaxy import convert, exc
+from autoarray.validate import is_concrete_scalar
 
 from autogalaxy.profiles.mass.abstract.abstract import MassProfile
 from autogalaxy.profiles.mass.total import PowerLaw
@@ -65,6 +66,13 @@ class PowerLawMultipole(MassProfile):
     integrates to zero over all angular positions; the net mass contribution is
     therefore zero.
 
+    The ``m=1, slope=2`` combination is not supported by this power-law
+    expression: its denominator vanishes. The isothermal dipole requires a
+    separate logarithmic potential (Chu et al. 2013, equations 5, 8 and 9).
+    Concrete parameters are rejected at construction. For a free/traced slope,
+    constrain its support to exclude 2 when using ``m=1``; constructor guards
+    do not impose constraints inside a JAX trace.
+
     Parameters
     ----------
     m : int
@@ -81,7 +89,7 @@ class PowerLawMultipole(MassProfile):
 
     References
     ----------
-    Chu, Hu & Kneib (2013), ApJ, 765, 134.  arXiv:1302.5482
+    Chu, Lin, Li & Kang (2013), ApJ, 765, 134.  arXiv:1302.5482
     Evans & Witt (2003), MNRAS, 345, 1351.
 
     Examples
@@ -125,6 +133,12 @@ class PowerLawMultipole(MassProfile):
         super().__init__(centre=centre, ell_comps=(0.0, 0.0))
 
         self.m = int(m)
+        if self.m == 1 and is_concrete_scalar(slope) and slope == 2.0:
+            raise exc.ModelParameterException(
+                "PowerLawMultipole m=1 / slope=2 is degenerate: the power-law "
+                "denominator vanishes. The isothermal dipole requires a separate "
+                "logarithmic potential; exclude slope=2 from a free m=1 model."
+            )
 
         self.einstein_radius = einstein_radius
         self.slope = slope
