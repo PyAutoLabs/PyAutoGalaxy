@@ -23,6 +23,7 @@ import yaml
 
 import autofit as af
 import autogalaxy as ag
+from autonerves import conf
 
 PRIORS_PATH = Path(ag.__file__).parent / "config" / "priors"
 
@@ -157,6 +158,31 @@ def parameter_base_name(parameter: str) -> str:
 def test__priors_path_is_the_packaged_config():
     assert PRIORS_PATH.is_dir()
     assert any(PRIORS_PATH.rglob("*.yaml"))
+
+
+def test__linear_operated_sersic_inherits_packaged_linear_priors():
+    # Use the packaged defaults rather than the suite's test config overrides.
+    original_configs = conf.instance.configs.copy()
+    conf.instance.push(new_path=PRIORS_PATH.parent)
+    try:
+        assert not (PRIORS_PATH / "light/linear_operated/sersic.yaml").exists()
+        linear = af.Model(ag.lp_linear.Sersic)
+        operated = af.Model(ag.lp_linear_operated.Sersic)
+
+        def prior_settings(model):
+            return {
+                path: {key: value for key, value in prior.dict().items() if key != "id"}
+                for path, prior in model.path_priors_tuples
+            }
+
+        assert operated.prior_count == linear.prior_count == 6
+        assert prior_settings(operated) == prior_settings(linear)
+        assert all("intensity" not in path for path, _ in operated.path_priors_tuples)
+        instance = operated.instance_from_prior_medians()
+        assert isinstance(instance, ag.lp_linear_operated.Sersic)
+        assert instance.intensity == 1.0
+    finally:
+        conf.instance.configs = original_configs
 
 
 def test__every_prior_key_resolves_to_a_class():
