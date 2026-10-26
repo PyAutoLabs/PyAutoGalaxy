@@ -777,12 +777,15 @@ class LensCalc:
 
     def magnification_2d_via_hessian_from(self, grid, xp=np) -> aa.ArrayIrregular:
         """
-        Returns the 2D magnification map of lensing object, which is computed from the 2D deflection angle map
-        via the Hessian using the expressions (see equation 60 https://inspirehep.net/literature/419263):
+        Returns the signed 2D magnification of the lensing object, which is computed from the 2D deflection angle
+        map via the Hessian using the expressions (see equation 60 https://inspirehep.net/literature/419263):
 
-        `magnification = 1.0 / det(Jacobian) = 1.0 / abs((1.0 - convergence)**2.0 - shear**2.0)`
-        `magnification = (1.0 - hessian_{0,0}) * (1.0 - hessian_{1, 1)) - hessian_{0,1}*hessian_{1,0}`
-        `magnification = (1.0 - hessian_xx) * (1.0 - hessian_yy)) - hessian_xy*hessian_yx`
+        `magnification = 1.0 / det(A)`
+        `det(A) = (1.0 - hessian_xx) * (1.0 - hessian_yy) - hessian_xy * hessian_yx`
+
+        No absolute value is taken: the sign of the returned magnification is the image parity (positive for
+        images at minima or maxima of the arrival-time surface, negative for saddle-point images). Take `abs()`
+        for the unsigned magnification.
 
         By going via the Hessian, the magnification can be calculated at any (y,x) coordinate, therefore using either a
         2D uniform or irregular grid.

@@ -172,3 +172,24 @@ def test__convergence_2d_from__elliptical_vs_spherical():
 #     )
 #
 #     assert convergence == pytest.approx(convergence_via_mge, 1e-3)
+
+
+@pytest.mark.parametrize("ratio", [0.0, 0.3, 2.0])
+def test_spherical_mass_to_light_ratio_scales_mass(ratio):
+    unit = ag.mp.SersicCoreSph()
+    scaled = ag.mp.SersicCoreSph(mass_to_light_ratio=ratio)
+    for method in ("convergence_2d_from", "deflections_yx_2d_from"):
+        reference = getattr(unit, method)(grid=grid).array
+        result = getattr(scaled, method)(grid=grid).array
+        # Deflections use a numerical MGE decomposition (existing profile pins
+        # use 1e-4); convergence is analytic and can be checked tightly.
+        rtol = 1e-6 if method == "deflections_yx_2d_from" else 1e-12
+        np.testing.assert_allclose(result, ratio * reference, rtol=rtol, atol=1e-14)
+
+
+def test_spherical_mass_to_light_ratio_has_model_prior():
+    import autofit as af
+    model = af.Model(ag.mp.SersicCoreSph)
+    assert isinstance(model.mass_to_light_ratio, af.LogUniformPrior)
+    assert model.mass_to_light_ratio.lower_limit == 1e-6
+    assert model.mass_to_light_ratio.upper_limit == 1e6

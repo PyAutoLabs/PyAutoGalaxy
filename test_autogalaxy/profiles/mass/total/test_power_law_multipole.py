@@ -1,3 +1,4 @@
+import numpy as np
 import pytest
 
 import autogalaxy as ag
@@ -103,3 +104,16 @@ def test__convergence_func__returns_zero_monopole():
 
     # A pure multipole encloses zero net mass.
     assert mp.mass_angular_within_circle_from(radius=2.0) == pytest.approx(0.0, 1e-9)
+
+
+@pytest.mark.parametrize("slope", [2, 2.0, np.float64(2.0)])
+def test_isothermal_dipole_rejected_at_construction(slope):
+    with pytest.raises(ag.exc.ModelParameterException, match="m=1 / slope=2"):
+        ag.mp.PowerLawMultipole(m=1, slope=slope, multipole_comps=(0.01, 0.0))
+
+
+@pytest.mark.parametrize("m,slope", [(1, 1.9), (1, 2.1), (2, 2.0), (4, 2.0)])
+def test_supported_multipoles_remain_finite(m, slope):
+    profile = ag.mp.PowerLawMultipole(m=m, slope=slope, multipole_comps=(0.01, 0.0))
+    grid = ag.Grid2DIrregular([(0.1, 0.2), (-0.3, 0.4)])
+    assert np.isfinite(profile.deflections_yx_2d_from(grid).array).all()
