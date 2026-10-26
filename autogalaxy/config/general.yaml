@@ -10,10 +10,10 @@ hpc:
 grid:
   max_evaluation_grid_size: 1000   # An evaluation grid whose shape is adaptive chosen is used to compute quantities like critical curves, this integer is the max size of the grid ensuring faster run times.
 adapt:
-  adapt_minimum_percent: 0.01
-  adapt_noise_limit: 100000000.0
+  adapt_minimum_percent: 0.01 # Floor each adapt-image pixel at this fraction of that image's maximum.
+  adapt_noise_limit: 100000000.0 # Legacy adapt-noise limit; no reader found in the current library source.
 inversion:
   use_border_relocator: true          # If True, by default a pixelization's border is used to relocate all pixels outside its border to the border.
 test:
   check_likelihood_function: true   # if True, when a search is resumed the likelihood of a previous sample is recalculated to ensure it is consistent with the previous run.
-  exception_override: false
+  exception_override: false # If True, disable model assertions during likelihood evaluation.

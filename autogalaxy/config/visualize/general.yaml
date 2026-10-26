@@ -1,27 +1,27 @@
 general:
-  backend: default
-  dpi: 150
-  imshow_origin: upper
-  log10_min_value: 1.0e-4
-  log10_max_value: 1.0e99
-  zoom_around_mask: true
-  critical_curves_method: marching_squares
+  backend: default # The matplotlib backend used for visualization. `default` uses the system default, can specify specific backend (e.g. TKAgg, Qt5Agg, WXAgg).
+  dpi: 150 # Resolution in dots per inch used when saving figures. Lower values reduce file size (e.g. 150 gives ~50% smaller files than 300 with negligible quality loss for diagnostic subplots).
+  imshow_origin: upper # The `origin` input of `imshow`, determining if pixel values are ascending or descending on the y-axis. Presentation only: overlays are reflected with the image so they stay registered, but under `lower` the displayed y axis and reported model y parameters (e.g. centres) disagree in sign. Flipping the data itself at load time is a different operation.
+  log10_min_value: 1.0e-4 # If negative values are being plotted on a log10 scale, values below this value are rounded up to it (e.g. to remove negative values).
+  log10_max_value: 1.0e99 # If positive values are being plotted on a log10 scale, values above this value are rounded down to it.
+  zoom_around_mask: true # If True, plots of data structures with a mask automatically zoom in the masked region.
+  critical_curves_method: marching_squares # Critical-curve extraction method: marching_squares or zero_contour.
 inversion:
-  reconstruction_vmax_factor: 0.5
-  total_mappings_pixels: 8
+  reconstruction_vmax_factor: 0.5 # Legacy reconstruction colour-scale factor; no reader found in the current library source.
+  total_mappings_pixels: 8 # Legacy fallback for the maximum number of source clumps drawn by subplot_mappings.
 zoom:
-  plane_percent: 0.01
-  inversion_percent: 0.01
-colormap: autoarray
+  plane_percent: 0.01 # Fraction of peak image brightness used to determine the plotted plane extent.
+  inversion_percent: 0.01 # Fraction of peak reconstruction brightness used to determine the plotted source extent.
+colormap: autoarray # Default colormap for 2D plots. Use any matplotlib name to override (e.g. jet, viridis).
 ticks:
-  extent_factor_2d: 0.75
-  number_of_ticks_2d: 3
+  extent_factor_2d: 0.75 # Fraction of half-extent used for 2D tick positions (< 1.0 pulls ticks inward from edges).
+  number_of_ticks_2d: 3 # Number of ticks on each spatial axis of 2D plots.
 contour:
-  total_contours: 10
-  include_values: true
+  total_contours: 10 # Number of contour levels drawn over log10 (and explicit linear) plots.
+  include_values: true # Whether to label each contour line with its value.
 colorbar:
-  fraction: 0.047
-  pad: 0.01
-  labelrotation: 90
-  labelsize: 16
-  labelsize_subplot: 16
+  fraction: 0.047 # Fraction of original axes to use for the colorbar.
+  pad: 0.01 # Padding between colorbar and axes.
+  labelrotation: 90 # Rotation of colorbar tick labels in degrees.
+  labelsize: 16 # Font size of colorbar tick labels for single-panel figures.
+  labelsize_subplot: 16 # Font size of colorbar tick labels for subplot panels.
