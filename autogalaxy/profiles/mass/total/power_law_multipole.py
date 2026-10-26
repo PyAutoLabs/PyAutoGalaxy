@@ -40,10 +40,6 @@ def radial_and_angle_grid_from(
 
 
 class PowerLawMultipole(MassProfile):
-    latent_parameters = {
-        ("multipole_comps_0", "multipole_comps_1"): convert.latent_multipole_from
-    }
-
     r"""Angular multipole perturbation to a power-law total mass distribution.
 
     This profile provides only the multipole perturbation; it must be combined
@@ -125,6 +121,10 @@ class PowerLawMultipole(MassProfile):
         grid=grid
     )
     """
+
+    latent_parameters = {
+        ("multipole_comps_0", "multipole_comps_1"): convert.latent_multipole_from
+    }
 
     def __init__(
         self,

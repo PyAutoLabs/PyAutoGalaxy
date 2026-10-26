@@ -548,6 +548,23 @@ def latent_scaled_multipole_from(
     return {"k_m": k_m, "phi_m": Periodic(phi_m, period=360.0 / int(m))}
 
 
+def latent_light_multipole_3_from(multipole_3_comps_0, multipole_3_comps_1, **kwargs) -> dict:
+    """The m=3 light-mode strength and phase in its elliptical reference frame."""
+    # Light profiles store (cosine, sine); the mass helper accepts (sine, cosine).
+    k_3, phi_3 = multipole_k_m_and_phi_m_from(
+        multipole_comps=(multipole_3_comps_1, multipole_3_comps_0), m=3
+    )
+    return {"k_3": k_3, "phi_3": Periodic(phi_3, period=120.0)}
+
+
+def latent_light_multipole_4_from(multipole_4_comps_0, multipole_4_comps_1, **kwargs) -> dict:
+    """The m=4 light-mode strength and phase in its elliptical reference frame."""
+    k_4, phi_4 = multipole_k_m_and_phi_m_from(
+        multipole_comps=(multipole_4_comps_1, multipole_4_comps_0), m=4
+    )
+    return {"k_4": k_4, "phi_4": Periodic(phi_4, period=90.0)}
+
+
 def latent_light_multipoles_from(
     multipole_3_comps_0,
     multipole_3_comps_1,
@@ -555,16 +572,8 @@ def latent_light_multipoles_from(
     multipole_4_comps_1,
     **kwargs,
 ) -> dict:
-    """The m=3 and m=4 strengths and angles (degrees) of a light profile's Fourier multipoles."""
-    k_3, phi_3 = multipole_k_m_and_phi_m_from(
-        multipole_comps=(multipole_3_comps_0, multipole_3_comps_1), m=3
-    )
-    k_4, phi_4 = multipole_k_m_and_phi_m_from(
-        multipole_comps=(multipole_4_comps_0, multipole_4_comps_1), m=4
-    )
+    """The m=3 and m=4 light-mode strengths and phases (degrees)."""
     return {
-        "k_3": k_3,
-        "phi_3": Periodic(phi_3, period=120.0),
-        "k_4": k_4,
-        "phi_4": Periodic(phi_4, period=90.0),
+        **latent_light_multipole_3_from(multipole_3_comps_0, multipole_3_comps_1),
+        **latent_light_multipole_4_from(multipole_4_comps_0, multipole_4_comps_1),
     }
