@@ -1,153 +1,153 @@
 label:
   label:
-    sigma: \sigma
-    alpha: \alpha
-    angle_binary: \theta
-    beta: \beta
-    break_radius: \theta_{\rm B}
-    centre_0: y
-    centre_1: x
-    coefficient: \lambda
-    c_2: c_{\rm 2}
-    concentration: conc
-    core_radius: C_{\rm r}
-    core_radius_0: C_{rm r0}
-    core_radius_1: C_{\rm r1}
-    effective_radius: R_{\rm eff}
-    einstein_radius: \theta_{\rm Ein}
-    ell_comps_0: \epsilon_{\rm 1}
-    ell_comps_1: \epsilon_{\rm 2}
-    multipole_comps_0: M_{\rm 1}
-    multipole_comps_1: M_{\rm 2}
-    scaled_multipole_comps_0: M_{\rm 1}
-    scaled_multipole_comps_1: M_{\rm 2}
-    flux: F
-    gamma: \gamma
-    gamma_1: \gamma
-    gamma_2: \gamma
-    inner_coefficient: \lambda_{\rm 1}
-    inner_slope: t_{\rm 1}
-    intensity: I_{\rm b}
-    kappa: \kappa
-    kappa_s: \kappa_{\rm s}
-    log10m_vir: log_{\rm 10}(m_{vir})
-    m: m
-    mass: M
-    mass_at_200: M_{\rm 200}
-    mass_ratio: M_{\rm ratio}
-    mass_to_light_gradient: \Gamma
-    mass_to_light_ratio: \Psi
-    mass_to_light_ratio_base: \Psi_{\rm base}
-    mass_to_light_radius: R_{\rm ref}
-    noise_factor: \omega_{\rm 1}
-    noise_power: \omega{\rm 2}
-    noise_scale: \sigma_{\rm 1}
-    normalization_scale: n
-    outer_coefficient: \lambda_{\rm 2}
-    outer_slope: t_{\rm 2}
-    overdens: \Delta_{\rm vir}
-    pixels: N_{\rm pix}
-    ra: r_{\rm a}
-    radius_break: R_{\rm b}
-    redshift: z
-    redshift_object: z_{\rm obj}
-    redshift_source: z_{\rm src}
-    rs: r_{\rm s}
-    scale_radius: R_{\rm s}
-    scatter: \sigma
-    separation: s
-    sersic_index: n
-    shape_0: y_{\rm pix}
-    shape_1: x_{\rm pix}
-    signal_scale: V
-    sky_scale: \sigma_{\rm 0}
-    slope: \gamma
-    truncation_radius: R_{\rm t}
-    virial_mass: M_{\rm vir}
-    virial_overdens: \Delta_{\rm vir}
-    weight_floor: W_{\rm f}
-    weight_power: W_{\rm p}
-    zeroth_coefficient: \lambda_{\rm 0}
-    zeroth_signal_scale: V
+    sigma: \sigma # Plot label used for the sigma parameter.
+    alpha: \alpha # Plot label used for the alpha parameter.
+    angle_binary: \theta # Plot label used for the angle_binary parameter.
+    beta: \beta # Plot label used for the beta parameter.
+    break_radius: \theta_{\rm B} # Plot label used for the break_radius parameter.
+    centre_0: y # Plot label used for the centre_0 parameter.
+    centre_1: x # Plot label used for the centre_1 parameter.
+    coefficient: \lambda # Plot label used for the coefficient parameter.
+    c_2: c_{\rm 2} # Plot label used for the c_2 parameter.
+    concentration: conc # Plot label used for the concentration parameter.
+    core_radius: C_{\rm r} # Plot label used for the core_radius parameter.
+    core_radius_0: C_{rm r0} # Plot label used for the core_radius_0 parameter.
+    core_radius_1: C_{\rm r1} # Plot label used for the core_radius_1 parameter.
+    effective_radius: R_{\rm eff} # Plot label used for the effective_radius parameter.
+    einstein_radius: \theta_{\rm Ein} # Plot label used for the einstein_radius parameter.
+    ell_comps_0: \epsilon_{\rm 1} # Plot label used for the ell_comps_0 parameter.
+    ell_comps_1: \epsilon_{\rm 2} # Plot label used for the ell_comps_1 parameter.
+    multipole_comps_0: M_{\rm 1} # Plot label used for the multipole_comps_0 parameter.
+    multipole_comps_1: M_{\rm 2} # Plot label used for the multipole_comps_1 parameter.
+    scaled_multipole_comps_0: M_{\rm 1} # Plot label used for the scaled_multipole_comps_0 parameter.
+    scaled_multipole_comps_1: M_{\rm 2} # Plot label used for the scaled_multipole_comps_1 parameter.
+    flux: F # Plot label used for the flux parameter.
+    gamma: \gamma # Plot label used for the gamma parameter.
+    gamma_1: \gamma # Plot label used for the gamma_1 parameter.
+    gamma_2: \gamma # Plot label used for the gamma_2 parameter.
+    inner_coefficient: \lambda_{\rm 1} # Plot label used for the inner_coefficient parameter.
+    inner_slope: t_{\rm 1} # Plot label used for the inner_slope parameter.
+    intensity: I_{\rm b} # Plot label used for the intensity parameter.
+    kappa: \kappa # Plot label used for the kappa parameter.
+    kappa_s: \kappa_{\rm s} # Plot label used for the kappa_s parameter.
+    log10m_vir: log_{\rm 10}(m_{vir}) # Plot label used for the log10m_vir parameter.
+    m: m # Plot label used for the m parameter.
+    mass: M # Plot label used for the mass parameter.
+    mass_at_200: M_{\rm 200} # Plot label used for the mass_at_200 parameter.
+    mass_ratio: M_{\rm ratio} # Plot label used for the mass_ratio parameter.
+    mass_to_light_gradient: \Gamma # Plot label used for the mass_to_light_gradient parameter.
+    mass_to_light_ratio: \Psi # Plot label used for the mass_to_light_ratio parameter.
+    mass_to_light_ratio_base: \Psi_{\rm base} # Plot label used for the mass_to_light_ratio_base parameter.
+    mass_to_light_radius: R_{\rm ref} # Plot label used for the mass_to_light_radius parameter.
+    noise_factor: \omega_{\rm 1} # Plot label used for the noise_factor parameter.
+    noise_power: \omega{\rm 2} # Plot label used for the noise_power parameter.
+    noise_scale: \sigma_{\rm 1} # Plot label used for the noise_scale parameter.
+    normalization_scale: n # Plot label used for the normalization_scale parameter.
+    outer_coefficient: \lambda_{\rm 2} # Plot label used for the outer_coefficient parameter.
+    outer_slope: t_{\rm 2} # Plot label used for the outer_slope parameter.
+    overdens: \Delta_{\rm vir} # Plot label used for the overdens parameter.
+    pixels: N_{\rm pix} # Plot label used for the pixels parameter.
+    ra: r_{\rm a} # Plot label used for the ra parameter.
+    radius_break: R_{\rm b} # Plot label used for the radius_break parameter.
+    redshift: z # Plot label used for the redshift parameter.
+    redshift_object: z_{\rm obj} # Plot label used for the redshift_object parameter.
+    redshift_source: z_{\rm src} # Plot label used for the redshift_source parameter.
+    rs: r_{\rm s} # Plot label used for the rs parameter.
+    scale_radius: R_{\rm s} # Plot label used for the scale_radius parameter.
+    scatter: \sigma # Plot label used for the scatter parameter.
+    separation: s # Plot label used for the separation parameter.
+    sersic_index: n # Plot label used for the sersic_index parameter.
+    shape_0: y_{\rm pix} # Plot label used for the shape_0 parameter.
+    shape_1: x_{\rm pix} # Plot label used for the shape_1 parameter.
+    signal_scale: V # Plot label used for the signal_scale parameter.
+    sky_scale: \sigma_{\rm 0} # Plot label used for the sky_scale parameter.
+    slope: \gamma # Plot label used for the slope parameter.
+    truncation_radius: R_{\rm t} # Plot label used for the truncation_radius parameter.
+    virial_mass: M_{\rm vir} # Plot label used for the virial_mass parameter.
+    virial_overdens: \Delta_{\rm vir} # Plot label used for the virial_overdens parameter.
+    weight_floor: W_{\rm f} # Plot label used for the weight_floor parameter.
+    weight_power: W_{\rm p} # Plot label used for the weight_power parameter.
+    zeroth_coefficient: \lambda_{\rm 0} # Plot label used for the zeroth_coefficient parameter.
+    zeroth_signal_scale: V # Plot label used for the zeroth_signal_scale parameter.
   superscript:
-    ExternalShear: ext
-    GaussianRandomField: grf
-    InputDeflections: input
-    InputPotential: input
-    Mesh: mesh
-    Point: point
-    SMBH: smbh
-    Redshift: z
-    Regularization: reg
+    ExternalShear: ext # Class suffix for an unnamed ExternalShear Model; named components use component paths.
+    GaussianRandomField: grf # Class suffix for an unnamed GaussianRandomField Model; named components use component paths.
+    InputDeflections: input # Class suffix for an unnamed InputDeflections Model; named components use component paths.
+    InputPotential: input # Class suffix for an unnamed InputPotential Model; named components use component paths.
+    Mesh: mesh # Class suffix for an unnamed Mesh Model; named components use component paths.
+    Point: point # Class suffix for an unnamed Point Model; named components use component paths.
+    SMBH: smbh # Class suffix for an unnamed SMBH Model; named components use component paths.
+    Redshift: z # Class suffix for an unnamed Redshift Model; named components use component paths.
+    Regularization: reg # Class suffix for an unnamed Regularization Model; named components use component paths.
 label_format:
   format:
-    sigma: '{:.4f}'
-    alpha: '{:.4f}'
-    angle_binary: '{:.4f}'
-    angular_diameter_distance_to_earth: '{:.4f}'
-    beta: '{:.4f}'
-    c_2: '{:.4f}'
-    centre_0: '{:.4f}'
-    centre_1: '{:.4f}'
-    coefficient: '{:.4f}'
-    concentration: '{:.4f}'
-    core_radius: '{:.4f}'
-    core_radius_0: '{:.4f}'
-    core_radius_1: '{:.4f}'
-    effective_radius: '{:.4f}'
-    einstein_mass: '{:.4e}'
-    einstein_radius: '{:.4f}'
-    ell_comps_0: '{:.4f}'
-    ell_comps_1: '{:.4f}'
-    multipole_comps_0: '{:.4f}'
-    multipole_comps_1: '{:.4f}'
-    input_multipole_comps_0: '{:.4f}'
-    input_multipole_comps_1: '{:.4f}'
-    flux: '{:.4e}'
-    gamma: '{:.4f}'
-    inner_coefficient: '{:.4f}'
-    inner_slope: '{:.4f}'
-    intensity: '{:.4f}'
-    kappa: '{:.4f}'
-    kappa_s: '{:.4f}'
-    kpc_per_arcsec: '{:.4f}'
-    log10m_vir: '{:.4f}'
-    luminosity: '{:.4e}'
-    m: '{:.1f}'
-    mass: '{:.4e}'
-    mass_at_200: '{:.4e}'
-    mass_at_truncation_radius: '{:.4e}'
-    mass_ratio: '{:.4f}'
-    mass_to_light_gradient: '{:.4f}'
-    mass_to_light_ratio: '{:.4f}'
-    n_x: '{:.1d}'
-    n_y: '{:.1d}'
-    noise_factor: '{:.3f}'
-    noise_power: '{:.3f}'
-    noise_scale: '{:.3f}'
-    normalization_scale: '{:.4f}'
-    outer_coefficient: '{:.4f}'
-    outer_slope: '{:.4f}'
-    overdens: '{:.4f}'
-    pixels: '{:.4f}'
-    ra: '{:.4f}'
-    radius: '{:.4f}'
-    radius_break: '{:.4f}'
-    redshift: '{:.4f}'
-    redshift_object: '{:.4f}'
-    redshift_source: '{:.4f}'
-    rho: '{:.4f}'
-    rs: '{:.4f}'
-    scale_radius: '{:.4f}'
-    separation: '{:.4f}'
-    sersic_index: '{:.4f}'
-    shape_0: '{:.4f}'
-    shape_1: '{:.4f}'
-    signal_scale: '{:.4f}'
-    sky_scale: '{:.4f}'
-    slope: '{:.4f}'
-    truncation_radius: '{:.4f}'
-    virial_mass: '{:.4f}'
-    virial_overdens: '{:.4f}'
-    weight_floor: '{:.4f}'
-    weight_power: '{:.4f}'
+    sigma: '{:.4f}' # Python format string used for sigma in result summaries.
+    alpha: '{:.4f}' # Python format string used for alpha in result summaries.
+    angle_binary: '{:.4f}' # Python format string used for angle_binary in result summaries.
+    angular_diameter_distance_to_earth: '{:.4f}' # Python format string used for angular_diameter_distance_to_earth in result summaries.
+    beta: '{:.4f}' # Python format string used for beta in result summaries.
+    c_2: '{:.4f}' # Python format string used for c_2 in result summaries.
+    centre_0: '{:.4f}' # Python format string used for centre_0 in result summaries.
+    centre_1: '{:.4f}' # Python format string used for centre_1 in result summaries.
+    coefficient: '{:.4f}' # Python format string used for coefficient in result summaries.
+    concentration: '{:.4f}' # Python format string used for concentration in result summaries.
+    core_radius: '{:.4f}' # Python format string used for core_radius in result summaries.
+    core_radius_0: '{:.4f}' # Python format string used for core_radius_0 in result summaries.
+    core_radius_1: '{:.4f}' # Python format string used for core_radius_1 in result summaries.
+    effective_radius: '{:.4f}' # Python format string used for effective_radius in result summaries.
+    einstein_mass: '{:.4e}' # Python format string used for einstein_mass in result summaries.
+    einstein_radius: '{:.4f}' # Python format string used for einstein_radius in result summaries.
+    ell_comps_0: '{:.4f}' # Python format string used for ell_comps_0 in result summaries.
+    ell_comps_1: '{:.4f}' # Python format string used for ell_comps_1 in result summaries.
+    multipole_comps_0: '{:.4f}' # Python format string used for multipole_comps_0 in result summaries.
+    multipole_comps_1: '{:.4f}' # Python format string used for multipole_comps_1 in result summaries.
+    input_multipole_comps_0: '{:.4f}' # Python format string used for input_multipole_comps_0 in result summaries.
+    input_multipole_comps_1: '{:.4f}' # Python format string used for input_multipole_comps_1 in result summaries.
+    flux: '{:.4e}' # Python format string used for flux in result summaries.
+    gamma: '{:.4f}' # Python format string used for gamma in result summaries.
+    inner_coefficient: '{:.4f}' # Python format string used for inner_coefficient in result summaries.
+    inner_slope: '{:.4f}' # Python format string used for inner_slope in result summaries.
+    intensity: '{:.4f}' # Python format string used for intensity in result summaries.
+    kappa: '{:.4f}' # Python format string used for kappa in result summaries.
+    kappa_s: '{:.4f}' # Python format string used for kappa_s in result summaries.
+    kpc_per_arcsec: '{:.4f}' # Python format string used for kpc_per_arcsec in result summaries.
+    log10m_vir: '{:.4f}' # Python format string used for log10m_vir in result summaries.
+    luminosity: '{:.4e}' # Python format string used for luminosity in result summaries.
+    m: '{:.1f}' # Python format string used for m in result summaries.
+    mass: '{:.4e}' # Python format string used for mass in result summaries.
+    mass_at_200: '{:.4e}' # Python format string used for mass_at_200 in result summaries.
+    mass_at_truncation_radius: '{:.4e}' # Python format string used for mass_at_truncation_radius in result summaries.
+    mass_ratio: '{:.4f}' # Python format string used for mass_ratio in result summaries.
+    mass_to_light_gradient: '{:.4f}' # Python format string used for mass_to_light_gradient in result summaries.
+    mass_to_light_ratio: '{:.4f}' # Python format string used for mass_to_light_ratio in result summaries.
+    n_x: '{:.1d}' # Python format string used for n_x in result summaries.
+    n_y: '{:.1d}' # Python format string used for n_y in result summaries.
+    noise_factor: '{:.3f}' # Python format string used for noise_factor in result summaries.
+    noise_power: '{:.3f}' # Python format string used for noise_power in result summaries.
+    noise_scale: '{:.3f}' # Python format string used for noise_scale in result summaries.
+    normalization_scale: '{:.4f}' # Python format string used for normalization_scale in result summaries.
+    outer_coefficient: '{:.4f}' # Python format string used for outer_coefficient in result summaries.
+    outer_slope: '{:.4f}' # Python format string used for outer_slope in result summaries.
+    overdens: '{:.4f}' # Python format string used for overdens in result summaries.
+    pixels: '{:.4f}' # Python format string used for pixels in result summaries.
+    ra: '{:.4f}' # Python format string used for ra in result summaries.
+    radius: '{:.4f}' # Python format string used for radius in result summaries.
+    radius_break: '{:.4f}' # Python format string used for radius_break in result summaries.
+    redshift: '{:.4f}' # Python format string used for redshift in result summaries.
+    redshift_object: '{:.4f}' # Python format string used for redshift_object in result summaries.
+    redshift_source: '{:.4f}' # Python format string used for redshift_source in result summaries.
+    rho: '{:.4f}' # Python format string used for rho in result summaries.
+    rs: '{:.4f}' # Python format string used for rs in result summaries.
+    scale_radius: '{:.4f}' # Python format string used for scale_radius in result summaries.
+    separation: '{:.4f}' # Python format string used for separation in result summaries.
+    sersic_index: '{:.4f}' # Python format string used for sersic_index in result summaries.
+    shape_0: '{:.4f}' # Python format string used for shape_0 in result summaries.
+    shape_1: '{:.4f}' # Python format string used for shape_1 in result summaries.
+    signal_scale: '{:.4f}' # Python format string used for signal_scale in result summaries.
+    sky_scale: '{:.4f}' # Python format string used for sky_scale in result summaries.
+    slope: '{:.4f}' # Python format string used for slope in result summaries.
+    truncation_radius: '{:.4f}' # Python format string used for truncation_radius in result summaries.
+    virial_mass: '{:.4f}' # Python format string used for virial_mass in result summaries.
+    virial_overdens: '{:.4f}' # Python format string used for virial_overdens in result summaries.
+    weight_floor: '{:.4f}' # Python format string used for weight_floor in result summaries.
+    weight_power: '{:.4f}' # Python format string used for weight_power in result summaries.
