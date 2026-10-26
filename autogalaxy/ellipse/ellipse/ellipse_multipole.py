@@ -1,5 +1,6 @@
 import numpy as np
 from typing import Tuple
+from autogalaxy import convert
 from autogalaxy.convert import multipole_comps_from, multipole_k_m_and_phi_m_from
 
 
@@ -7,6 +8,10 @@ from autogalaxy.ellipse.ellipse.ellipse import Ellipse
 
 
 class EllipseMultipole:
+    latent_parameters = {
+        ("multipole_comps_0", "multipole_comps_1"): convert.latent_multipole_from
+    }
+
     def __init__(
         self,
         m=4,
@@ -119,6 +124,13 @@ class EllipseMultipole:
 
 
 class EllipseMultipoleScaled(EllipseMultipole):
+    latent_parameters = {
+        (
+            "scaled_multipole_comps_0",
+            "scaled_multipole_comps_1",
+        ): convert.latent_scaled_multipole_from
+    }
+
     def __init__(
         self,
         m=4,

@@ -2,6 +2,15 @@ label:
   label:
     alpha: \alpha
     angle_binary: \theta
+    axis_ratio: q
+    angle: \phi
+    magnitude: \gamma
+    k_m: k_{\rm m}
+    phi_m: \phi_{\rm m}
+    k_3: k_{\rm 3}
+    phi_3: \phi_{\rm 3}
+    k_4: k_{\rm 4}
+    phi_4: \phi_{\rm 4}
     beta: \beta
     break_radius: \theta_{\rm B}
     centre_0: y
@@ -18,8 +27,8 @@ label:
     multipole_comps_1: M_{\rm 2}
     flux: F
     gamma: \gamma
-    gamma_1: \gamma
-    gamma_2: \gamma
+    gamma_1: \gamma_{\rm 1}
+    gamma_2: \gamma_{\rm 2}
     inner_coefficient: \lambda_{\rm 1}
     inner_slope: t_{\rm 1}
     intensity: I_{\rm b}

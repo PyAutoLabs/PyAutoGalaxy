@@ -122,6 +122,10 @@ class PowerLawMultipole(MassProfile):
     )
     """
 
+    latent_parameters = {
+        ("multipole_comps_0", "multipole_comps_1"): convert.latent_multipole_from
+    }
+
     def __init__(
         self,
         m=4,

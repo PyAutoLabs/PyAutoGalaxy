@@ -23,8 +23,8 @@ label:
     scaled_multipole_comps_1: M_{\rm 2} # Plot label used for the scaled_multipole_comps_1 parameter.
     flux: F # Plot label used for the flux parameter.
     gamma: \gamma # Plot label used for the gamma parameter.
-    gamma_1: \gamma # Plot label used for the gamma_1 parameter.
-    gamma_2: \gamma # Plot label used for the gamma_2 parameter.
+    gamma_1: \gamma_{\rm 1} # Plot label used for the gamma_1 parameter.
+    gamma_2: \gamma_{\rm 2} # Plot label used for the gamma_2 parameter.
     inner_coefficient: \lambda_{\rm 1} # Plot label used for the inner_coefficient parameter.
     inner_slope: t_{\rm 1} # Plot label used for the inner_slope parameter.
     intensity: I_{\rm b} # Plot label used for the intensity parameter.
@@ -69,6 +69,16 @@ label:
     weight_power: W_{\rm p} # Plot label used for the weight_power parameter.
     zeroth_coefficient: \lambda_{\rm 0} # Plot label used for the zeroth_coefficient parameter.
     zeroth_signal_scale: V # Plot label used for the zeroth_signal_scale parameter.
+    axis_ratio: q # Plot label used for the axis_ratio latent parameter.
+    angle: \phi # Plot label used for the angle latent parameter.
+    magnitude: \gamma # Plot label used for the magnitude latent parameter.
+    k_m: k_{\rm m} # Plot label used for the k_m latent parameter.
+    phi_m: \phi_{\rm m} # Plot label used for the phi_m latent parameter.
+    k_3: k_{\rm 3} # Plot label used for the k_3 latent parameter.
+    phi_3: \phi_{\rm 3} # Plot label used for the phi_3 latent parameter.
+    k_4: k_{\rm 4} # Plot label used for the k_4 latent parameter.
+    phi_4: \phi_{\rm 4} # Plot label used for the phi_4 latent parameter.
+  # Class suffixes apply only to bare unnamed Models; named components use paths.
   superscript:
     ExternalShear: ext # Class suffix for an unnamed ExternalShear Model; named components use component paths.
     GaussianRandomField: grf # Class suffix for an unnamed GaussianRandomField Model; named components use component paths.

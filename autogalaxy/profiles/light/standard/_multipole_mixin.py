@@ -15,6 +15,8 @@ import numpy as np
 
 import autoarray as aa
 
+from autogalaxy import convert
+
 
 class _LightProfileMultipoleMixin:
     """
@@ -26,6 +28,17 @@ class _LightProfileMultipoleMixin:
 
     multipole_3_comps: Tuple[float, float]
     multipole_4_comps: Tuple[float, float]
+
+    latent_parameters = {
+        (
+            "multipole_3_comps_0",
+            "multipole_3_comps_1",
+        ): convert.latent_light_multipole_3_from,
+        (
+            "multipole_4_comps_0",
+            "multipole_4_comps_1",
+        ): convert.latent_light_multipole_4_from,
+    }
 
     def perturbed_radii_from(
         self,
