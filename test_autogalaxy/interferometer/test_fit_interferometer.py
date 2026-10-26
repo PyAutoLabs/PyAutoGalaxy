@@ -886,9 +886,7 @@ def test__fit_figure_of_merit__array_free_dataset__pixelization_only__matches_in
     galaxies = _pixelization_only_galaxies()
 
     fit_sparse = ag.FitInterferometer(dataset=dataset_sparse, galaxies=galaxies)
-    fit_array_free = ag.FitInterferometer(
-        dataset=dataset_array_free, galaxies=galaxies
-    )
+    fit_array_free = ag.FitInterferometer(dataset=dataset_array_free, galaxies=galaxies)
 
     assert fit_array_free._uses_precomputed_data_term
     assert fit_array_free.inversion.dataset.data is None
@@ -1296,9 +1294,7 @@ def test__fit_figure_of_merit__array_free_dataset__linear_light_only__matches_in
         )
     ]
 
-    fit_array_free = ag.FitInterferometer(
-        dataset=dataset_array_free, galaxies=galaxies
-    )
+    fit_array_free = ag.FitInterferometer(dataset=dataset_array_free, galaxies=galaxies)
 
     assert fit_array_free.inversion.dataset.data is None
     assert fit_array_free.figure_of_merit == pytest.approx(
@@ -1433,3 +1429,187 @@ def test__natural_dirty_images__galaxy_with_ordinary_and_linear_light__matches_m
         rtol=1.0e-8,
         atol=1.0e-8 * np.abs(expected.array).max(),
     )
+
+
+def _matrix_free_dataset_sparse_from():
+    """
+    A data-dominated sparse dataset for the matrix-free route (`Settings(interferometer_route="matrix_free")`),
+    as in PyAutoArray's `test_matrix_free_util._dataset_sparse_from(n_visibilities=500, uv_scale=1e6)`: many
+    visibilities on long baselines give a compact dirty beam, the regime the stochastic log-determinant of the
+    matrix-free route is built for. The 7-pixel `interferometer_7` fixture is too small for that comparison.
+    """
+    mask = aa.Mask2D.circular(shape_native=(12, 12), pixel_scales=0.5, radius=2.5)
+
+    rng = np.random.default_rng(seed=1)
+
+    n_visibilities = 500
+
+    dataset = aa.Interferometer(
+        data=aa.Visibilities(visibilities=rng.normal(size=(n_visibilities, 2))),
+        noise_map=aa.VisibilitiesNoiseMap(visibilities=np.ones((n_visibilities, 2))),
+        uv_wavelengths=rng.normal(size=(n_visibilities, 2)) * 1.0e6,
+        real_space_mask=mask,
+        transformer_class=aa.TransformerDFT,
+    )
+
+    return dataset.apply_sparse_operator(use_jax=False)
+
+
+def _matern_pixelization_galaxy_from(coefficient=1.0, shape=(6, 6), **kwargs):
+    return ag.Galaxy(
+        redshift=0.5,
+        pixelization=ag.Pixelization(
+            mesh=ag.mesh.RectangularUniform(shape=shape),
+            regularization=ag.reg.MaternSparse(coefficient=coefficient, scale=1.0),
+        ),
+        **kwargs,
+    )
+
+
+def _matrix_free_fit_pair_from(dataset, galaxies, use_positive_only_solver=False):
+    return tuple(
+        ag.FitInterferometer(
+            dataset=dataset,
+            galaxies=galaxies,
+            settings=aa.Settings(
+                interferometer_route=route,
+                use_positive_only_solver=use_positive_only_solver,
+                use_edge_zeroed_pixels=False,
+            ),
+        )
+        for route in ("matrix_free", "fft")
+    )
+
+
+def _assert_relative_close(value, reference, rtol):
+    value = np.asarray(getattr(value, "array", value))
+    reference = np.asarray(getattr(reference, "array", reference))
+
+    assert np.max(np.abs(value - reference)) <= rtol * np.max(np.abs(reference))
+
+
+@pytest.mark.parametrize("coefficient", [1.0, 0.01])
+@pytest.mark.parametrize("with_light_profile", [False, True])
+def test__fit__matrix_free_route__matches_fft_route(coefficient, with_light_profile):
+    """
+    A `MaternSparse` rectangular-mesh fit on the matrix-free route reproduces the FFT sparse route: the
+    reconstruction (PCG, rtol 1e-10) and every exact evidence term to round-off, and the log evidence within
+    the stochastic Lanczos tolerance of `ln det(F + H)` (0.5%, so the evidence within half of 0.5% of that
+    term, as in PyAutoArray's `test_matrix_free.py`).
+
+    Without an ordinary light profile the fit builds its inversion with `data=None`
+    (`_uses_precomputed_data_term`) and the matrix-free route reads the operator's cached dirty image and data
+    term; with one, the profile-subtracted dirty image is passed instead.
+    """
+    dataset_sparse = _matrix_free_dataset_sparse_from()
+
+    galaxies = [_matern_pixelization_galaxy_from(coefficient=coefficient)]
+
+    if with_light_profile:
+        galaxies.append(
+            ag.Galaxy(
+                redshift=0.5, bulge=ag.lp.Sersic(intensity=0.1, centre=(0.1, 0.1))
+            )
+        )
+
+    fit_matrix_free, fit_fft = _matrix_free_fit_pair_from(
+        dataset=dataset_sparse, galaxies=galaxies
+    )
+
+    assert isinstance(fit_matrix_free.inversion, aa.InversionInterferometerMatrixFree)
+    assert type(fit_fft.inversion) is aa.InversionInterferometerSparse
+
+    assert fit_matrix_free._uses_precomputed_data_term is (not with_light_profile)
+    assert (fit_matrix_free.inversion.dataset.data is None) is (not with_light_profile)
+
+    _assert_relative_close(
+        fit_matrix_free.inversion.reconstruction,
+        fit_fft.inversion.reconstruction,
+        rtol=1.0e-6,
+    )
+
+    assert fit_matrix_free.chi_squared == pytest.approx(fit_fft.chi_squared, rel=1.0e-8)
+    assert fit_matrix_free.noise_normalization == pytest.approx(
+        fit_fft.noise_normalization, rel=1.0e-8
+    )
+
+    for name in ("regularization_term", "log_det_regularization_matrix_term"):
+        assert float(getattr(fit_matrix_free.inversion, name)) == pytest.approx(
+            float(getattr(fit_fft.inversion, name)), rel=1.0e-8
+        ), name
+
+    log_det_curvature_reg_fft = float(
+        fit_fft.inversion.log_det_curvature_reg_matrix_term
+    )
+
+    assert float(
+        fit_matrix_free.inversion.log_det_curvature_reg_matrix_term
+    ) == pytest.approx(log_det_curvature_reg_fft, rel=0.005)
+
+    tolerance = 0.5 * 0.005 * abs(log_det_curvature_reg_fft)
+
+    assert abs(fit_matrix_free.log_evidence - fit_fft.log_evidence) <= tolerance
+    assert abs(fit_matrix_free.figure_of_merit - fit_fft.figure_of_merit) <= tolerance
+    assert fit_matrix_free.figure_of_merit == fit_matrix_free.log_evidence
+
+    # Visibility-sized outputs.
+    _assert_relative_close(fit_matrix_free.model_data, fit_fft.model_data, rtol=1.0e-6)
+    _assert_relative_close(
+        fit_matrix_free.residual_map, fit_fft.residual_map, rtol=1.0e-6
+    )
+
+
+def test__fit__matrix_free_route__positive_only__matches_fft_route():
+    dataset_sparse = _matrix_free_dataset_sparse_from()
+
+    fit_matrix_free, fit_fft = _matrix_free_fit_pair_from(
+        dataset=dataset_sparse,
+        galaxies=[_matern_pixelization_galaxy_from(coefficient=0.01, shape=(10, 10))],
+        use_positive_only_solver=True,
+    )
+
+    assert isinstance(fit_matrix_free.inversion, aa.InversionInterferometerMatrixFree)
+
+    reconstruction = np.asarray(fit_matrix_free.inversion.reconstruction)
+    reconstruction_fft = np.asarray(fit_fft.inversion.reconstruction)
+
+    assert np.mean(reconstruction_fft == 0.0) >= 0.25
+    assert np.all(reconstruction >= 0.0)
+    assert np.array_equal(reconstruction == 0.0, reconstruction_fft == 0.0)
+
+    _assert_relative_close(reconstruction, reconstruction_fft, rtol=1.0e-6)
+    _assert_relative_close(fit_matrix_free.model_data, fit_fft.model_data, rtol=1.0e-6)
+
+
+def test__fit__matrix_free_route__unsupported_configurations__raise():
+    dataset_sparse = _matrix_free_dataset_sparse_from()
+
+    # A linear light profile alongside the pixelization.
+    fit = ag.FitInterferometer(
+        dataset=dataset_sparse,
+        galaxies=[_matern_pixelization_galaxy_from(bulge=ag.lp_linear.Sersic())],
+        settings=aa.Settings(
+            interferometer_route="matrix_free",
+            use_positive_only_solver=False,
+            use_edge_zeroed_pixels=False,
+        ),
+    )
+
+    with pytest.raises(aa.exc.InversionException, match="linear-function list"):
+        fit.inversion
+
+    # The positive-only solver with edge-zeroing: both are on in the packaged defaults, so there
+    # `Settings(interferometer_route="matrix_free")` alone raises. (This test config sets
+    # `use_positive_only_solver: false`, so they are passed explicitly here.)
+    fit = ag.FitInterferometer(
+        dataset=dataset_sparse,
+        galaxies=[_matern_pixelization_galaxy_from()],
+        settings=aa.Settings(
+            interferometer_route="matrix_free",
+            use_positive_only_solver=True,
+            use_edge_zeroed_pixels=True,
+        ),
+    )
+
+    with pytest.raises(aa.exc.InversionException, match="use_edge_zeroed_pixels"):
+        fit.figure_of_merit

@@ -86,7 +86,7 @@ def _light_profile_and_pixelization_model():
     return model
 
 
-def _visualize(dataset, image_path, model=None):
+def _visualize(dataset, image_path, model=None, settings=None):
     """
     Run the interferometer visualizer's `visualize_before_fit` and `visualize` for a
     pixelization-only model on `dataset`, as a non-linear search would.
@@ -98,7 +98,9 @@ def _visualize(dataset, image_path, model=None):
     model = model or _pixelization_only_model()
     instance = model.instance_from_prior_medians()
 
-    analysis = ag.AnalysisInterferometer(dataset=dataset, use_jax=False)
+    analysis = ag.AnalysisInterferometer(
+        dataset=dataset, settings=settings, use_jax=False
+    )
     paths = SimpleNamespace(image_path=image_path)
 
     VisualizerInterferometer.visualize_before_fit(
@@ -224,3 +226,78 @@ def test__visualizer__in_memory_dataset__fit_dirty_images_unchanged(
             ),
             np.asarray(array.native_for_fits),
         )
+
+
+@pytest.mark.parametrize("with_light_profile", [False, True])
+def test__visualizer__matrix_free_route(tmp_path, plot_patch, with_light_profile):
+    """
+    A `MaternSparse` rectangular-mesh fit on the matrix-free route (`Settings(interferometer_route="matrix_free")`)
+    visualizes: the fit, dirty-image and inversion subplots and the reconstruction CSV are output, with the
+    reconstruction noise map (which needs the dense curvature matrix the route never forms) skipped and written as
+    `nan`.
+    """
+    import autoarray as aa
+    import autofit as af
+    import numpy as np
+
+    import autogalaxy.plot as aplt
+
+    mask = aa.Mask2D.circular(shape_native=(12, 12), pixel_scales=0.5, radius=2.5)
+
+    rng = np.random.default_rng(seed=1)
+
+    dataset = aa.Interferometer(
+        data=aa.Visibilities(visibilities=rng.normal(size=(500, 2))),
+        noise_map=aa.VisibilitiesNoiseMap(visibilities=np.ones((500, 2))),
+        uv_wavelengths=rng.normal(size=(500, 2)) * 1.0e6,
+        real_space_mask=mask,
+        transformer_class=aa.TransformerDFT,
+    ).apply_sparse_operator(use_jax=False)
+
+    pixelization = ag.Pixelization(
+        mesh=ag.mesh.RectangularUniform(shape=(6, 6)),
+        regularization=ag.reg.MaternSparse(coefficient=1.0, scale=1.0),
+    )
+
+    model = af.Collection(
+        galaxies=af.Collection(
+            galaxy=af.Model(ag.Galaxy, redshift=0.5, pixelization=pixelization)
+        )
+    )
+
+    if with_light_profile:
+        model.galaxies.light = af.Model(
+            ag.Galaxy, redshift=0.5, bulge=ag.lp.Sersic(intensity=0.1)
+        )
+
+    fit = _visualize(
+        dataset=dataset,
+        image_path=tmp_path,
+        model=model,
+        settings=aa.Settings(
+            interferometer_route="matrix_free",
+            use_positive_only_solver=False,
+            use_edge_zeroed_pixels=False,
+        ),
+    )
+
+    assert isinstance(fit.inversion, aa.InversionInterferometerMatrixFree)
+    assert fit._uses_precomputed_data_term is (not with_light_profile)
+
+    for filename in ("dataset", "fit", "galaxies", "inversion_0_0"):
+        assert str(tmp_path / f"{filename}.png") in plot_patch.paths, filename
+
+    assert (tmp_path / "galaxy_images.fits").exists()
+    assert (tmp_path / "fit_dirty_images.fits").exists()
+
+    lines = (tmp_path / "source_plane_reconstruction_0.csv").read_text().splitlines()
+
+    assert lines[0] == "y,x,reconstruction,noise_map"
+    assert len(lines) == 1 + 36
+    assert all(line.endswith(",nan") for line in lines[1:])
+
+    plot_patch.paths = []
+
+    aplt.subplot_fit_real_space(fit=fit, output_path=tmp_path, output_format="png")
+
+    assert str(tmp_path / "fit_real_space.png") in plot_patch.paths
