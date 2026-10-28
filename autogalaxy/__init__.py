@@ -74,6 +74,10 @@ from .operate.image import OperateImageList
 from .operate.image import OperateImageGalaxies
 from .operate.lens_calc import LensCalc
 from .operate.lens_calc import mass_angular_within_circle_via_grid_from
+from .operate.mass_budget import CircularAperture
+from .operate.mass_budget import MassBudget
+from .operate.mass_budget import kappa_s_for_mass_from
+from .operate.mass_budget import mass_to_light_ratio_for_mass_from
 from .imaging.fit_imaging import FitImaging
 from .imaging.model.analysis import AnalysisImaging
 from autofit import Latent
