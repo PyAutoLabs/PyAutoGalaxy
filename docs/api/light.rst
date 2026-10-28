@@ -89,6 +89,9 @@ shapelet decomposition) so that they behave as a single profile in the model.  W
 constituent profiles are ``LightProfileLinear`` instances their intensities are all solved
 simultaneously via a single inversion.
 
+A basis of solved (non-linear) ``Gaussian`` light profiles is re-expressed as a mass basis of
+``ag.lmp.Gaussian`` profiles at a shared mass-to-light ratio with ``Basis.mass_basis_from``.
+
 .. currentmodule:: autogalaxy.profiles.basis
 
 .. autosummary::

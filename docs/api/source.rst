@@ -33,6 +33,14 @@ Operators
    OperateImage
    LensCalc
 
+Projected mass inside a circle (convergence, angular units), grid-integrated so it is defined for any
+object with ``convergence_2d_from`` (a mass profile, ``Basis``, ``Galaxy`` or ``Galaxies``):
+
+.. autosummary::
+   :toctree: _autosummary
+
+   mass_angular_within_circle_via_grid_from
+
 Total [ag.mp]
 -------------
 
