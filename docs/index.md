@@ -265,6 +265,7 @@ howtogalaxy/chapter_optional
 api/data
 api/light
 api/galaxy
+api/mass_budget
 api/fitting
 api/modeling
 api/pixelization
