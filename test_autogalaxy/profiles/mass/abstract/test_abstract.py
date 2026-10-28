@@ -101,6 +101,45 @@ def test__mass_angular_within_circle_from__sph_grid_integration():
     assert mass_grid == pytest.approx(mass, 0.02)
 
 
+@pytest.mark.parametrize(
+    "mp",
+    [
+        ag.mp.NFWSph(kappa_s=0.2, scale_radius=5.0),
+        ag.mp.NFWTruncatedSph(kappa_s=0.2, scale_radius=5.0, truncation_radius=10.0),
+        ag.mp.SersicSph(
+            intensity=1.0,
+            effective_radius=0.8,
+            sersic_index=2.0,
+            mass_to_light_ratio=2.0,
+        ),
+        ag.mp.PowerLawCoreSph(einstein_radius=1.5, slope=2.2, core_radius=0.2),
+        ag.mp.IsothermalCoreSph(einstein_radius=1.5, core_radius=0.2),
+        ag.mp.dPIEMassSph(),
+    ],
+    ids=["nfw", "nfw_truncated", "sersic", "power_law_core", "isothermal_core", "dpie"],
+)
+def test__mass_angular_within_circle_from__scalar_radius_integrand__matches_grid_integration(
+    mp,
+):
+    """
+    Regression: `mass_integral` wrapped the scalar radius `scipy.integrate.quad` feeds it as a
+    0-d `ArrayIrregular`, which every `convergence_func` written for a 1D radius array
+    mis-handled (NFW returned a length-1 array, gNFW raised `IndexError`, the truncated NFW,
+    Sersic, cored and dPIE profiles raised `AttributeError` copying a bare float). One
+    representative of each formerly failing family is integrated and checked against the
+    grid-integrated oracle.
+    """
+    grid = ag.Grid2D.uniform(shape_native=(200, 200), pixel_scales=0.02)
+
+    mass_via_grid = ag.mass_angular_within_circle_via_grid_from(
+        mp, radius=1.0, centre=(0.0, 0.0), grid=grid
+    )
+
+    assert mp.mass_angular_within_circle_from(radius=1.0) == pytest.approx(
+        mass_via_grid, rel=1e-4
+    )
+
+
 def test__average_convergence_of_1_radius__isothermal_sph():
     mp = ag.mp.IsothermalSph(centre=(0.0, 0.0), einstein_radius=2.0)
 

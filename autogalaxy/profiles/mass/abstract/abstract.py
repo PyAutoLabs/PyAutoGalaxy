@@ -226,7 +226,14 @@ class MassProfile(EllProfile):
         x
             The radial coordinate at which the integrand is evaluated.
         """
-        return 2 * xp.pi * x * self.convergence_func(grid_radius=aa.ArrayIrregular(x))
+        # `scipy.integrate.quad` feeds a Python float, but every `convergence_func` is written
+        # for the 1D array of radii `convergence_2d_from` passes, and a 0-d radius breaks many of
+        # them (NFW promotes it to a length-1 complex64 array, gNFW indexes `.shape[0]`,
+        # Sersic / cored / dPIE trip autoarray's copy of a bare float). Feed a length-1 array and
+        # coerce the single convergence value back to a float for `quad`.
+        grid_radius = aa.ArrayIrregular(xp.asarray([x], dtype=float))
+        convergence = self.convergence_func(grid_radius=grid_radius, xp=xp)
+        return 2 * xp.pi * x * float(xp.asarray(convergence).reshape(-1)[0])
 
     @property
     def ellipticity_rescale(self):
