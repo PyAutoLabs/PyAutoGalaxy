@@ -275,3 +275,74 @@ class Basis(LightProfile, MassProfile):
         return Basis(
             profile_list=light_profile_list, regularization=self.regularization
         )
+
+    def mass_basis_from(self, mass_to_light_ratio: float) -> "Basis":
+        """
+        Returns a new `Basis` in which every `Gaussian` light profile of this basis is re-expressed as a
+        light-and-mass `lmp.Gaussian` with a shared `mass_to_light_ratio`.
+
+        Each member's `centre`, `ell_comps`, `intensity` and `sigma` are copied unchanged, so the convergence of
+        the returned basis equals `mass_to_light_ratio` times the image of this basis. This is the instance-level
+        counterpart of `chaining_util.mass_light_dark_basis_from`, which builds the equivalent `af.Model` from a
+        `Result`.
+
+        Members must be standard `lp.Gaussian` profiles (including `lp.GaussianSph`) or `lmp.Gaussian` profiles
+        (whose existing `mass_to_light_ratio` is replaced). Linear light profiles are rejected, because their
+        intensities are not known: pass the solved-intensity basis (e.g. from `lp_instance_from` or a tracer loaded
+        from `tracer.json`). Operated profiles, multipole Gaussians, `lmp.GaussianGradient` and every non-Gaussian
+        profile have no `lmp.Gaussian` counterpart and are also rejected.
+
+        Parameters
+        ----------
+        mass_to_light_ratio
+            The mass-to-light ratio shared by every Gaussian of the returned mass basis.
+
+        Returns
+        -------
+        A new `Basis` of `lmp.Gaussian` profiles with the same `regularization` as this basis.
+
+        Raises
+        ------
+        ProfileException
+            If any member of the basis has no `lmp.Gaussian` counterpart.
+        """
+        from autogalaxy import exc
+        from autogalaxy.profiles import light_and_mass_profiles as lmp
+        from autogalaxy.profiles.light import standard as lp
+        from autogalaxy.profiles.light.operated.abstract import LightProfileOperated
+
+        mass_profile_list = []
+
+        for profile in self.profile_list:
+            if isinstance(profile, lp_linear.LightProfileLinear):
+                is_valid = False
+            elif isinstance(profile, lmp.Gaussian):
+                is_valid = True
+            else:
+                is_valid = (
+                    isinstance(profile, lp.Gaussian)
+                    and not isinstance(profile, LightProfileOperated)
+                    and not isinstance(profile, lp.GaussianMultipole)
+                    and not isinstance(profile, lmp.LightMassProfile)
+                )
+
+            if not is_valid:
+                raise exc.ProfileException(
+                    "Basis.mass_basis_from: member of type "
+                    f"{type(profile).__module__}.{type(profile).__name__} has no lmp.Gaussian "
+                    "counterpart. Only standard (non-linear, non-operated) lp.Gaussian or "
+                    "lmp.Gaussian members can be converted to a mass basis; for linear light "
+                    "profiles pass the solved-intensity basis (e.g. via lp_instance_from)."
+                )
+
+            mass_profile_list.append(
+                lmp.Gaussian(
+                    centre=profile.centre,
+                    ell_comps=profile.ell_comps,
+                    intensity=profile.intensity,
+                    sigma=profile.sigma,
+                    mass_to_light_ratio=mass_to_light_ratio,
+                )
+            )
+
+        return Basis(profile_list=mass_profile_list, regularization=self.regularization)

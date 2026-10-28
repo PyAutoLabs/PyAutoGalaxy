@@ -1940,3 +1940,167 @@ class LensCalc:
         # some seeds diverged.
         area = jnp.max(area_per_seed)
         return jnp.sqrt(area / jnp.pi)
+
+
+def mass_angular_within_circle_via_grid_from(
+    mass_obj,
+    radius: float,
+    centre: Tuple[float, float],
+    grid: aa.type.Grid2DLike,
+    sub_size_interior: int = 8,
+    sub_size_edge: int = 16,
+    sub_size_centre: int = 64,
+    centre_refine_pixels: float = 2.0,
+) -> float:
+    """
+    Returns the projected mass inside a circle, in convergence (angular) units, by integrating the
+    convergence of ``mass_obj`` over a uniform grid.
+
+    The convention is: projected mass inside a circle of ``radius`` about ``centre``, in convergence
+    (angular) units (i.e. the integral of the dimensionless convergence over the aperture area, in
+    units of arc-seconds squared), grid-integrated so it is defined for any convergence object
+    including a ``Basis``. Converting to a physical mass (multiplying by the critical surface
+    density) is the caller's job.
+
+    Unlike ``MassProfile.mass_angular_within_circle_from``, which integrates a radial
+    ``convergence_func`` by quadrature about the profile's own centre, this function only requires
+    ``mass_obj`` to expose ``convergence_2d_from(grid=...)``, so it works for a ``MassProfile``, a
+    ``Basis``, a ``Galaxy`` or a ``Galaxies``, and the aperture centre is free.
+
+    The scheme is a weighted sum of the convergence over the pixels of an unmasked uniform grid
+    with the same shape, pixel scales and origin as ``grid``:
+
+    - pixels lying entirely inside the circle are split into
+      ``sub_size_interior x sub_size_interior`` sub-pixels, each contributing its convergence times
+      the sub-pixel area (a modest sub-grid removes the midpoint-rule bias of a convex convergence
+      such as 1/r away from the centre);
+    - pixels crossing the circle edge are split into ``sub_size_edge x sub_size_edge`` sub-pixels
+      and only sub-pixels whose centres are inside the circle contribute (convergence times
+      sub-pixel area);
+    - pixels within ``centre_refine_pixels`` pixel scales of ``centre`` are split into
+      ``sub_size_centre x sub_size_centre`` sub-pixels, so that a central cusp (e.g. the 1/r cusp
+      of an isothermal profile) converges.
+
+    All points are evaluated in a single ``convergence_2d_from`` call on a ``Grid2DIrregular``.
+    The input grid's mask is ignored (only its geometry is used), but the circle must lie within
+    the grid's extent.
+
+    Parameters
+    ----------
+    mass_obj
+        Any object with a ``convergence_2d_from(grid=...)`` method (e.g. a ``MassProfile``,
+        ``Basis``, ``Galaxy`` or ``Galaxies``).
+    radius
+        The radius of the circular aperture, in arc-seconds.
+    centre
+        The (y,x) centre of the circular aperture, in arc-seconds.
+    grid
+        A uniform ``Grid2D`` whose shape, pixel scales and origin define the integration pixels.
+    sub_size_interior
+        The sub-grid size used for pixels entirely inside the circle (away from ``centre``).
+    sub_size_edge
+        The sub-grid size used to refine pixels crossing the circle edge.
+    sub_size_centre
+        The sub-grid size used to refine pixels near ``centre``.
+    centre_refine_pixels
+        Pixels whose nearest point lies within this many (largest) pixel scales of ``centre`` are
+        refined with ``sub_size_centre``.
+
+    Returns
+    -------
+    The projected mass inside the circle, in convergence (angular) units.
+    """
+    pixel_scales = grid.mask.pixel_scales
+    shape_native = grid.mask.shape_native
+    origin = grid.mask.origin
+
+    full_grid = aa.Grid2D.uniform(
+        shape_native=shape_native,
+        pixel_scales=pixel_scales,
+        origin=origin,
+        over_sample_size=1,
+    )
+
+    pixel_y = full_grid.array[:, 0]
+    pixel_x = full_grid.array[:, 1]
+
+    half_y = pixel_scales[0] / 2.0
+    half_x = pixel_scales[1] / 2.0
+
+    centre_y, centre_x = float(centre[0]), float(centre[1])
+
+    if (
+        centre_y + radius > pixel_y.max() + half_y
+        or centre_y - radius < pixel_y.min() - half_y
+        or centre_x + radius > pixel_x.max() + half_x
+        or centre_x - radius < pixel_x.min() - half_x
+    ):
+        raise ValueError(
+            "mass_angular_within_circle_via_grid_from: the circle of radius "
+            f"{radius} about centre {centre} extends beyond the extent of the input grid; "
+            "use a larger grid."
+        )
+
+    offset_y = np.abs(pixel_y - centre_y)
+    offset_x = np.abs(pixel_x - centre_x)
+
+    distance_min = np.hypot(
+        np.maximum(offset_y - half_y, 0.0), np.maximum(offset_x - half_x, 0.0)
+    )
+    distance_max = np.hypot(offset_y + half_y, offset_x + half_x)
+
+    is_outside = distance_min >= radius
+    is_inside = distance_max <= radius
+    is_edge = ~is_outside & ~is_inside
+    is_centre = ~is_outside & (distance_min <= centre_refine_pixels * max(pixel_scales))
+
+    sub_size = np.full(pixel_y.shape[0], int(sub_size_interior), dtype=int)
+    sub_size[is_edge] = np.maximum(sub_size[is_edge], sub_size_edge)
+    sub_size[is_centre] = np.maximum(sub_size[is_centre], sub_size_centre)
+
+    pixel_area = pixel_scales[0] * pixel_scales[1]
+
+    points_list = []
+    weights_list = []
+
+    for size in np.unique(sub_size[~is_outside]):
+        refine = ~is_outside & (sub_size == size)
+
+        fractions = (np.arange(size) + 0.5) / size - 0.5
+        sub_offset_y, sub_offset_x = np.meshgrid(
+            fractions * pixel_scales[0], fractions * pixel_scales[1], indexing="ij"
+        )
+
+        sub_y = (pixel_y[refine][:, None] + sub_offset_y.ravel()[None, :]).ravel()
+        sub_x = (pixel_x[refine][:, None] + sub_offset_x.ravel()[None, :]).ravel()
+
+        sub_area = pixel_area / size**2
+
+        # Fraction of each sub-pixel inside the circle, approximated by a linear ramp of width
+        # one sub-pixel across the circle edge (exactly 1 or 0 away from the edge).
+        fraction = np.clip(
+            0.5
+            + (radius - np.hypot(sub_y - centre_y, sub_x - centre_x))
+            / np.sqrt(sub_area),
+            0.0,
+            1.0,
+        )
+
+        inside = fraction > 0.0
+
+        points_list.append(np.stack([sub_y[inside], sub_x[inside]], axis=-1))
+        weights_list.append(fraction[inside] * sub_area)
+
+    if sum(points.shape[0] for points in points_list) == 0:
+        return 0.0
+
+    points = np.concatenate(points_list, axis=0)
+    weights = np.concatenate(weights_list)
+
+    convergence = mass_obj.convergence_2d_from(grid=aa.Grid2DIrregular(values=points))
+
+    convergence = np.asarray(
+        convergence.array if hasattr(convergence, "array") else convergence
+    )
+
+    return float(np.sum(convergence * weights))

@@ -163,3 +163,125 @@ def test__mass_profile_quantities(grid_2d_7x7, mp_0, mp_1):
     assert convergence_2d.array == pytest.approx(
         convergence_2d_0.array + convergence_2d_1.array, 1.0e-4
     )
+
+
+def test__mass_basis_from__copies_gaussian_fields_with_shared_mass_to_light_ratio():
+    light_basis = ag.lp_basis.Basis(
+        profile_list=[
+            ag.lp.Gaussian(
+                centre=(0.1, -0.2), ell_comps=(0.05, 0.1), intensity=1.5, sigma=0.3
+            ),
+            ag.lp.Gaussian(
+                centre=(0.1, -0.2), ell_comps=(0.05, 0.1), intensity=0.5, sigma=1.2
+            ),
+            ag.lmp.Gaussian(
+                centre=(0.0, 0.1),
+                ell_comps=(-0.1, 0.0),
+                intensity=0.2,
+                sigma=2.0,
+                mass_to_light_ratio=9.0,
+            ),
+        ],
+        regularization=ag.reg.Constant(coefficient=1.0),
+    )
+
+    mass_basis = light_basis.mass_basis_from(mass_to_light_ratio=3.5)
+
+    # The fields `chaining_util.mass_light_dark_basis_from` copies onto each `lmp` model
+    # (centre, ell_comps, intensity, sigma) plus one shared mass_to_light_ratio, built by hand.
+    expected_list = [
+        ag.lmp.Gaussian(
+            centre=(0.1, -0.2),
+            ell_comps=(0.05, 0.1),
+            intensity=1.5,
+            sigma=0.3,
+            mass_to_light_ratio=3.5,
+        ),
+        ag.lmp.Gaussian(
+            centre=(0.1, -0.2),
+            ell_comps=(0.05, 0.1),
+            intensity=0.5,
+            sigma=1.2,
+            mass_to_light_ratio=3.5,
+        ),
+        ag.lmp.Gaussian(
+            centre=(0.0, 0.1),
+            ell_comps=(-0.1, 0.0),
+            intensity=0.2,
+            sigma=2.0,
+            mass_to_light_ratio=3.5,
+        ),
+    ]
+
+    assert isinstance(mass_basis, ag.lp_basis.Basis)
+    assert mass_basis is not light_basis
+    assert mass_basis.regularization is light_basis.regularization
+    assert len(mass_basis.profile_list) == len(expected_list)
+
+    for mass_profile, expected in zip(mass_basis.profile_list, expected_list):
+        assert type(mass_profile) is ag.lmp.Gaussian
+        assert mass_profile.centre == expected.centre
+        assert mass_profile.ell_comps == expected.ell_comps
+        assert mass_profile.intensity == expected.intensity
+        assert mass_profile.sigma == expected.sigma
+        assert mass_profile.mass_to_light_ratio == expected.mass_to_light_ratio
+
+    # The input basis is unchanged.
+    assert light_basis.profile_list[2].mass_to_light_ratio == 9.0
+
+
+def test__mass_basis_from__convergence_is_mass_to_light_ratio_times_image():
+    # No over-sampling, so the image and the convergence are evaluated at the same points.
+    grid = ag.Grid2D.uniform(shape_native=(7, 7), pixel_scales=0.3, over_sample_size=1)
+
+    light_basis = ag.lp_basis.Basis(
+        profile_list=[
+            ag.lp.Gaussian(
+                centre=(0.1, -0.2), ell_comps=(0.05, 0.1), intensity=1.5, sigma=0.3
+            ),
+            ag.lp.Gaussian(
+                centre=(0.0, 0.0), ell_comps=(-0.1, 0.2), intensity=0.5, sigma=1.2
+            ),
+        ]
+    )
+
+    mass_basis = light_basis.mass_basis_from(mass_to_light_ratio=2.5)
+
+    convergence = mass_basis.convergence_2d_from(grid=grid)
+    image = light_basis.image_2d_from(grid=grid)
+
+    assert np.allclose(
+        np.asarray(convergence.array), 2.5 * np.asarray(image.array), rtol=1.0e-10
+    )
+
+    # `mp.Gaussian` floors its axis ratio at 0.9999 (the analytic deflections diverge at q = 1),
+    # so for circular members the identity holds only to that floor's ~1e-4 level.
+    light_basis = ag.lp_basis.Basis(
+        profile_list=[ag.lp.GaussianSph(centre=(0.0, 0.0), intensity=0.5, sigma=1.2)]
+    )
+
+    mass_basis = light_basis.mass_basis_from(mass_to_light_ratio=2.5)
+
+    convergence = mass_basis.convergence_2d_from(grid=grid)
+    image = light_basis.image_2d_from(grid=grid)
+
+    assert np.allclose(
+        np.asarray(convergence.array), 2.5 * np.asarray(image.array), rtol=1.0e-3
+    )
+
+
+@pytest.mark.parametrize(
+    "profile",
+    [
+        ag.lp.Sersic(intensity=0.1),
+        ag.lp_linear.Gaussian(sigma=0.5),
+        ag.mp.Isothermal(),
+    ],
+)
+def test__mass_basis_from__member_without_lmp_gaussian_counterpart__raises(profile):
+    basis = ag.lp_basis.Basis(
+        profile_list=[ag.lp.Gaussian(intensity=1.0, sigma=0.5), profile]
+    )
+
+    with pytest.raises(ag.exc.ProfileException, match=type(profile).__name__):
+        basis.mass_basis_from(mass_to_light_ratio=1.0)
