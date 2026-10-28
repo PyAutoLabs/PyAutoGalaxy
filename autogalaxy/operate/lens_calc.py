@@ -1974,9 +1974,9 @@ def mass_angular_within_circle_via_grid_from(
       ``sub_size_interior x sub_size_interior`` sub-pixels, each contributing its convergence times
       the sub-pixel area (a modest sub-grid removes the midpoint-rule bias of a convex convergence
       such as 1/r away from the centre);
-    - pixels crossing the circle edge are split into ``sub_size_edge x sub_size_edge`` sub-pixels
-      and only sub-pixels whose centres are inside the circle contribute (convergence times
-      sub-pixel area);
+    - pixels crossing the circle edge are split into ``sub_size_edge x sub_size_edge`` sub-pixels,
+      each weighted by the fraction of its area inside the circle (a linear ramp one sub-pixel
+      wide across the edge, exactly 1 or 0 away from it) times the sub-pixel area;
     - pixels within ``centre_refine_pixels`` pixel scales of ``centre`` are split into
       ``sub_size_centre x sub_size_centre`` sub-pixels, so that a central cusp (e.g. the 1/r cusp
       of an isothermal profile) converges.
