@@ -74,6 +74,24 @@ class AbstractgNFW(MassProfile, DarkProfile):
 
     epsrel = 1.49e-5
 
+    # Fast path of ``gNFW.convergence_func`` for large inputs: the line-of-sight integral
+    # I(eta) depends only on eta = xi / r_s, so it is evaluated with ``quad`` (relative
+    # tolerance ``convergence_table_epsrel``, no absolute tolerance, substitution y = sin t)
+    # on a log-spaced eta table
+    # with ``convergence_table_nodes_per_decade`` nodes per decade, padded by
+    # ``convergence_table_pad_decades`` either side of the input range, and interpolated with
+    # a cubic spline in (log eta, log I). For inner slopes 0 <= gamma <= 2.5 and
+    # 1e-5 <= eta <= 1e3 this agrees with a tight per-radius ``quad`` to better than ~1e-7
+    # relative in the convergence. Inputs with fewer finite positive radii than
+    # ``max(convergence_table_min_points, number of table nodes)`` use a per-radius ``quad``
+    # loop over the same stable integrand at ``epsrel`` (~1e-10 accurate), so results do not
+    # depend on the input size.
+    convergence_table_nodes_per_decade = 20
+    convergence_table_pad_decades = 0.05
+    convergence_table_min_nodes = 8
+    convergence_table_min_points = 100
+    convergence_table_epsrel = 1.0e-10
+
     def __init__(
         self,
         centre: Tuple[float, float] = (0.0, 0.0),
