@@ -88,6 +88,21 @@ class gNFW(AbstractgNFW):
         )
 
     def convergence_func(self, grid_radius: float, xp=np) -> float:
+        """
+        Returns the gNFW convergence at the input elliptical radii (see the class docstring
+        for the closed-form expression and its line-of-sight integral I(eta), eta = xi / r_s).
+
+        Small inputs integrate I(eta) with ``scipy.integrate.quad`` once per radius, in the
+        numerically stable form of ``_convergence_integral_from``. When there are at least
+        ``max(convergence_table_min_points, n_nodes)`` finite positive radii in a 1D NumPy
+        input, I(eta) is instead tabulated with the same stable integral (at
+        ``convergence_table_epsrel``) on a log-spaced eta grid of
+        ``convergence_table_nodes_per_decade`` nodes per decade spanning those radii, and
+        interpolated in (log eta, log I) with a cubic spline (see ``AbstractgNFW`` for the
+        accuracy of this scheme); both paths agree to ~1e-7. Radii that are zero, negative or
+        non-finite are always integrated per radius with the original integrand form, so their
+        output is unchanged.
+        """
 
         from scipy.integrate import quad
 
@@ -96,26 +111,124 @@ class gNFW(AbstractgNFW):
 
         grid_radius = xp.array((1.0 / self.scale_radius) * grid_radius.array)
 
-        for index in range(grid_radius.shape[0]):
-            integral_y_value = quad(
-                integral_y,
-                a=0.0,
-                b=1.0,
-                args=grid_radius[index],
-                epsrel=gNFW.epsrel,
-            )[0]
-
-            grid_radius[index] = (
+        def convergence_from(eta, integral_y_value):
+            return (
                 2.0
                 * self.kappa_s
-                * (grid_radius[index] ** (1 - self.inner_slope))
+                * (eta ** (1 - self.inner_slope))
                 * (
-                    (1 + grid_radius[index]) ** (self.inner_slope - 3)
+                    (1 + eta) ** (self.inner_slope - 3)
                     + ((3 - self.inner_slope) * integral_y_value)
                 )
             )
 
+        loop_indexes = range(grid_radius.shape[0])
+
+        if (
+            xp is np
+            and grid_radius.ndim == 1
+            and np.issubdtype(grid_radius.dtype, np.floating)
+        ):
+            usable = np.isfinite(grid_radius) & (grid_radius > 0.0)
+            eta = grid_radius[usable]
+
+            if eta.size > 0:
+                log_eta = np.log(eta)
+                log_min, log_max = log_eta.min(), log_eta.max()
+                pad = self.convergence_table_pad_decades * np.log(10.0)
+                total_decades = (log_max - log_min) / np.log(10.0) + 2.0 * (
+                    self.convergence_table_pad_decades
+                )
+                n_nodes = max(
+                    int(
+                        np.ceil(
+                            total_decades * self.convergence_table_nodes_per_decade
+                        )
+                    )
+                    + 1,
+                    self.convergence_table_min_nodes,
+                )
+
+                if eta.size >= max(self.convergence_table_min_points, n_nodes):
+                    from scipy.interpolate import CubicSpline
+
+                    log_eta_nodes = np.linspace(log_min - pad, log_max + pad, n_nodes)
+                    integral_nodes = np.array(
+                        [
+                            self._convergence_integral_from(
+                                eta=np.exp(log_eta_node),
+                                epsrel=self.convergence_table_epsrel,
+                            )
+                            for log_eta_node in log_eta_nodes
+                        ]
+                    )
+
+                    spline = CubicSpline(log_eta_nodes, np.log(integral_nodes))
+
+                    grid_radius[usable] = convergence_from(
+                        eta, np.exp(spline(log_eta))
+                    )
+
+                    loop_indexes = np.flatnonzero(~usable)
+
+        for index in loop_indexes:
+            eta_index = grid_radius[index]
+
+            if np.ndim(eta_index) == 0 and np.isfinite(eta_index) and eta_index > 0.0:
+                integral_y_value = self._convergence_integral_from(
+                    eta=eta_index, epsrel=gNFW.epsrel
+                )
+            else:
+                integral_y_value = quad(
+                    integral_y,
+                    a=0.0,
+                    b=1.0,
+                    args=eta_index,
+                    epsrel=gNFW.epsrel,
+                )[0]
+
+            grid_radius[index] = convergence_from(
+                grid_radius[index], integral_y_value
+            )
+
         return grid_radius
+
+    def _convergence_integral_from(self, eta: float, epsrel: float) -> float:
+        """
+        Returns I(eta) = int_0^1 (y + eta)^(gamma - 4) (1 - sqrt(1 - y^2)) dy for one finite,
+        positive eta, as used by both the per-radius path and the interpolation-table nodes of
+        ``convergence_func``.
+
+        The integral is evaluated after substituting y = sin(t), which gives the smooth integrand
+        (sin t + eta)^(gamma - 4) 2 sin^2(t / 2) cos(t) on [0, pi / 2]: this removes both the
+        square-root endpoint singularity at y = 1 and the cancellation in 1 - sqrt(1 - y^2) at
+        small y. Breakpoints at eta, 10 eta, 100 eta, ... (below 1) resolve the peak of width
+        ~eta at small eta. No absolute tolerance is used because I(eta) is tiny at large eta.
+        At the class ``epsrel`` (1.49e-5) this is accurate to ~1e-10 relative in the
+        convergence for 0 <= gamma <= 2.5 and 1e-5 <= eta <= 1e3.
+        """
+        from scipy.integrate import quad
+
+        def integrand(t, eta):
+            return (
+                (np.sin(t) + eta) ** (self.inner_slope - 4)
+                * 2.0
+                * np.sin(0.5 * t) ** 2
+                * np.cos(t)
+            )
+
+        points = [eta * 10.0**k for k in range(12) if eta * 10.0**k < 1.0]
+
+        return quad(
+            integrand,
+            a=0.0,
+            b=0.5 * np.pi,
+            args=(eta,),
+            epsrel=epsrel,
+            epsabs=0.0,
+            limit=200,
+            points=points or None,
+        )[0]
 
 
 class gNFWSph(gNFW):
