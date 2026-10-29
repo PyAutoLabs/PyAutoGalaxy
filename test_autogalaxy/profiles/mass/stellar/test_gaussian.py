@@ -347,3 +347,55 @@ def test__deflections_yx_2d_from__spherical_case__is_radial_and_matches_elliptic
     deflections_ell = np.asarray(gaussian_ell.deflections_yx_2d_from(grid=grid).array)
 
     assert deflections_sph == pytest.approx(deflections_ell, rel=1.0e-5)
+
+
+@pytest.mark.parametrize("ell_comps", [(0.0, 0.0), (0.2, -0.1), (0.43, 0.18)])
+def test__potential_2d_from__gradient_is_deflections(ell_comps):
+    gaussian = ag.mp.Gaussian(
+        centre=(0.05, -0.03),
+        ell_comps=ell_comps,
+        intensity=2.0,
+        sigma=0.4,
+        mass_to_light_ratio=1.5,
+    )
+    points = np.array([[0.7, 0.3], [-0.5, 0.9], [1.2, -1.0], [0.2, 0.1]])
+    step = 1e-4
+
+    def potential(values):
+        return np.asarray(
+            gaussian.potential_2d_from(grid=ag.Grid2DIrregular(values)).array
+        )
+
+    gradient_y = (potential(points + [step, 0]) - potential(points - [step, 0])) / (
+        2 * step
+    )
+    gradient_x = (potential(points + [0, step]) - potential(points - [0, step])) / (
+        2 * step
+    )
+    deflections = np.asarray(
+        gaussian.deflections_yx_2d_from(grid=ag.Grid2DIrregular(points)).array
+    )
+
+    assert np.c_[gradient_y, gradient_x] == pytest.approx(deflections, abs=1e-6)
+
+
+def test__potential_2d_from__zero_at_centre_and_basis_is_fast():
+    gaussian = ag.mp.Gaussian(
+        centre=(0.1, 0.2), ell_comps=(0.3, 0.1), intensity=1.0, sigma=0.5
+    )
+    assert gaussian.potential_2d_from(grid=ag.Grid2DIrregular([(0.1, 0.2)])).array[
+        0
+    ] == pytest.approx(0.0, abs=1e-12)
+
+    import time
+
+    basis = ag.lp_basis.Basis(
+        profile_list=[
+            ag.lmp.Gaussian(ell_comps=(0.43, 0.18), intensity=1.0, sigma=sigma)
+            for sigma in np.logspace(-2, 0.5, 40)
+        ]
+    )
+    grid = ag.Grid2D.uniform(shape_native=(50, 50), pixel_scales=0.1)
+    start = time.time()
+    basis.potential_2d_from(grid=grid)
+    assert time.time() - start < 30.0
