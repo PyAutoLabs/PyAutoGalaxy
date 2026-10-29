@@ -199,6 +199,7 @@ def plot_array(
     cb_unit=None,
     ax=None,
     arcsec_after_decimal=None,
+    stretch=None,
 ):
     """Plot an autoarray ``Array2D`` to file or onto an existing ``Axes``.
 
@@ -223,6 +224,9 @@ def plot_array(
     colormap : str
         Matplotlib colormap name, or ``"default"`` to use the autoarray
         default (``"jet"``).
+    stretch : float or None
+        Positive asinh linear-width fraction of the colour range. Smaller
+        values reveal fainter structure. Incompatible with ``use_log10=True``.
     use_log10 : bool
         If ``True`` apply a log₁₀ stretch to the array values.
     vmin, vmax : float or None
@@ -287,6 +291,7 @@ def plot_array(
         use_log10=use_log10,
         vmin=vmin,
         vmax=vmax,
+        stretch=stretch,
         cb_unit=cb_unit,
         arcsec_after_decimal=arcsec_after_decimal,
         output_path=_output_path,
