@@ -94,6 +94,16 @@ class Gaussian(MassProfile, StellarProfile):
 
         """
 
+        return self._deflections_in_frame_from(grid=grid, xp=xp)
+
+    def _deflections_in_frame_from(self, grid: aa.type.Grid2DLike, xp=np):
+        """
+        The (y,x) deflection angles on a ``grid`` already in the profile's reference
+        frame (centred and rotated), without the transform decorators.
+
+        Shared by ``deflections_2d_via_analytic_from`` and ``potential_2d_from`` so the
+        potential is the exact line integral of the same deflection field.
+        """
         if _is_circular(self.ell_comps):
             # A circular Gaussian has an exact real radial form -- take it instead of
             # the complex Faddeeva evaluated at the q = 0.9999 clamp. The predicate
@@ -141,14 +151,32 @@ class Gaussian(MassProfile, StellarProfile):
     @aa.decorators.to_array
     @aa.decorators.transform
     def potential_2d_from(self, grid: aa.type.Grid2DLike, xp=np, **kwargs):
-        radii_min = self.sigma / 100.0
-        radii_max = self.sigma * 20.0
-        sigmas = xp.exp(xp.linspace(xp.log(radii_min), xp.log(radii_max), 100))
-        mge_decomp = MGEDecomposer(mass_profile=self)
-        return mge_decomp.potential_2d_via_mge_from(
-            grid=grid, xp=xp, sigma_log_list=sigmas,
-            ellipticity_convention="circularised", three_D=False,
-        )
+        """
+        The lensing potential, as the line integral of the analytic deflection field
+        from the centre to each grid point,
+
+            psi(x, y) = integral_0^1 alpha(t x, t y) . (x, y) dt,
+
+        with the 20-node Gauss-Legendre rule of ``MGEDecomposer``. A Gaussian is its own
+        one-term MGE, so this needs one Faddeeva evaluation per node rather than a
+        decomposition into many Gaussians. The potential is zero at the centre.
+        """
+        y = xp.asarray(grid.array[:, 0], dtype=xp.float64)
+        x = xp.asarray(grid.array[:, 1], dtype=xp.float64)
+
+        potential = xp.zeros(y.shape[0], dtype=xp.float64)
+
+        for node, weight in zip(
+            MGEDecomposer._GL_NODES_20, MGEDecomposer._GL_WEIGHTS_20
+        ):
+            t = 0.5 * (1.0 + float(node))
+            scaled_grid = aa.Grid2DIrregular(values=xp.stack([t * y, t * x], axis=-1))
+            deflections = self._deflections_in_frame_from(grid=scaled_grid, xp=xp)
+            potential = potential + 0.5 * float(weight) * (
+                deflections[:, 0] * y + deflections[:, 1] * x
+            )
+
+        return potential
 
     def image_2d_via_radii_from(self, grid_radii: np.ndarray, xp=np):
         """Calculate the intensity of the Gaussian light profile on a grid of radial coordinates.
