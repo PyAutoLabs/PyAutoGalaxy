@@ -107,3 +107,86 @@ def test__convergence_2d_from__elliptical_vs_spherical():
     assert elliptical.convergence_2d_from(grid=grid) == pytest.approx(
         spherical.convergence_2d_from(grid=grid).array, 1.0e-4
     )
+
+
+def _potential_gradient_from(mp, points, h=1.0e-4):
+    def potential(shift):
+        return np.asarray(
+            mp.potential_2d_from(grid=ag.Grid2DIrregular(points + shift))
+        )
+
+    gradient_y = (potential([h, 0.0]) - potential([-h, 0.0])) / (2.0 * h)
+    gradient_x = (potential([0.0, h]) - potential([0.0, -h])) / (2.0 * h)
+
+    return np.stack([gradient_y, gradient_x], axis=-1)
+
+
+_potential_points = np.array([[0.7, 0.3], [-0.5, 0.9], [1.2, -1.0], [2.5, 1.5]])
+
+_potential_profiles = [
+    ag.mp.Chameleon(ell_comps=(0.2, -0.1), intensity=1.0),
+    ag.mp.ChameleonSph(intensity=1.0),
+    ag.mp.Chameleon(
+        centre=(0.1, -0.2),
+        ell_comps=(0.2, -0.1),
+        intensity=1.0,
+        core_radius_0=0.1,
+        core_radius_1=0.5,
+        mass_to_light_ratio=2.0,
+    ),
+]
+
+
+@pytest.mark.parametrize("mp", _potential_profiles)
+def test__potential_2d_from__gradient_matches_deflections(mp):
+    deflections = np.asarray(
+        mp.deflections_yx_2d_from(grid=ag.Grid2DIrregular(_potential_points))
+    )
+
+    gradient = _potential_gradient_from(mp=mp, points=_potential_points)
+
+    assert np.max(np.abs(gradient - deflections)) < 1.0e-4 * np.max(
+        np.abs(deflections)
+    )
+
+
+@pytest.mark.parametrize("mp", _potential_profiles)
+def test__potential_2d_from__laplacian_is_twice_convergence(mp):
+    h = 1.0e-3
+
+    def potential(shift):
+        return np.asarray(
+            mp.potential_2d_from(grid=ag.Grid2DIrregular(_potential_points + shift))
+        )
+
+    laplacian = (
+        potential([h, 0.0])
+        + potential([-h, 0.0])
+        + potential([0.0, h])
+        + potential([0.0, -h])
+        - 4.0 * potential([0.0, 0.0])
+    ) / h**2
+
+    convergence = np.asarray(
+        mp.convergence_2d_from(grid=ag.Grid2DIrregular(_potential_points))
+    )
+
+    assert laplacian == pytest.approx(2.0 * convergence, rel=1.0e-3)
+
+
+def test__potential_2d_from():
+    mp = ag.mp.Chameleon(
+        centre=(-0.4, -0.2),
+        ell_comps=(-0.07142, -0.085116),
+        intensity=5.0,
+        core_radius_0=0.2,
+        core_radius_1=0.4,
+        mass_to_light_ratio=3.0,
+    )
+
+    potential = mp.potential_2d_from(
+        grid=ag.Grid2DIrregular([[-0.4, -0.2], [0.1625, 0.1625]])
+    )
+
+    assert potential[0] == pytest.approx(0.0, abs=1.0e-8)
+    assert potential[1] == pytest.approx(1.68326, 1e-4)

@@ -178,16 +178,59 @@ class Chameleon(MassProfile, StellarProfile):
     @aa.decorators.to_array
     @aa.decorators.transform
     def potential_2d_from(self, grid: aa.type.Grid2DLike, xp=np, **kwargs):
-        from autogalaxy.profiles.mass.abstract.mge import MGEDecomposer
+        r"""
+        Calculate the lensing potential at a given set of arc-second gridded coordinates.
 
-        radii_min = self.core_radius_0 / 10.0
-        radii_max = self.core_radius_1 * 200.0
-        sigmas = xp.exp(xp.linspace(xp.log(radii_min), xp.log(radii_max), 30))
-        mge_decomp = MGEDecomposer(mass_profile=self)
-        return mge_decomp.potential_2d_via_mge_from(
-            grid=grid, xp=xp, sigma_log_list=sigmas,
-            ellipticity_convention="circularised", three_D=False,
-        )
+        The potential is analytic: each cored isothermal component has the closed form (Keeton 2001)
+
+        .. math::
+
+            \psi_s = x \alpha_x + y \alpha_y
+                - b q s \ln \sqrt{(\Psi + s)^2 + (1 - q^2) x^2} + b q s \ln \left[ (1 + q) s \right]
+
+        where :math:`\Psi` is given by ``psi_from`` and :math:`\alpha_x, \alpha_y` are the component's
+        deflections, with the same normalisation and core radii as ``deflections_2d_via_analytic_from``.
+        The Chameleon potential is the difference of the two components.
+
+        Parameters
+        ----------
+        grid
+            The grid of (y,x) arc-second coordinates the potential is computed on.
+        """
+        axis_ratio = self.axis_ratio(xp)
+        b = 2.0 * self.mass_to_light_ratio * self.intensity / (1.0 + axis_ratio)
+        sqrt_1_minus_q2 = xp.sqrt(1.0 - axis_ratio**2.0)
+
+        y = grid.array[:, 0]
+        x = grid.array[:, 1]
+
+        def potential_cored_isothermal_from(core_radius):
+            psi = psi_from(
+                grid=grid, axis_ratio=axis_ratio, core_radius=core_radius, xp=xp
+            )
+
+            deflection_y = xp.arctanh(
+                sqrt_1_minus_q2 * y / (psi + axis_ratio**2.0 * core_radius)
+            )
+            deflection_x = xp.arctan(sqrt_1_minus_q2 * x / (psi + core_radius))
+
+            return (
+                b * axis_ratio / sqrt_1_minus_q2 * (y * deflection_y + x * deflection_x)
+                - b
+                * axis_ratio
+                * core_radius
+                * xp.log(
+                    xp.sqrt((psi + core_radius) ** 2.0 + (1.0 - axis_ratio**2.0) * x**2.0)
+                )
+                + b * axis_ratio * core_radius * xp.log((1.0 + axis_ratio) * core_radius)
+            )
+
+        core_radius_0 = 2.0 * self.core_radius_0 / (1.0 + axis_ratio)
+        core_radius_1 = 2.0 * self.core_radius_1 / (1.0 + axis_ratio)
+
+        return potential_cored_isothermal_from(
+            core_radius_0
+        ) - potential_cored_isothermal_from(core_radius_1)
 
     def image_2d_via_radii_from(self, grid_radii: np.ndarray, xp=np):
         """Calculate the intensity of the Chamelon light profile on a grid of radial coordinates.
