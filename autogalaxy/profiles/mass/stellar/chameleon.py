@@ -14,20 +14,22 @@ class Chameleon(MassProfile, StellarProfile):
     Elliptical Chameleon stellar mass profile (Dutton et al. 2011).
 
     The Chameleon profile is the difference of two cored isothermal (pseudo-Jaffe) profiles
-    with core radii :math:`s_0` and :math:`s_0 + s_1`, providing a flexible approximation
+    with core radii :math:`s_0` and :math:`s_1`, providing a flexible approximation
     to a variety of stellar light profiles:
 
     .. math::
 
-        \kappa(\xi) = \Upsilon \, I \left(
-            \frac{1}{\sqrt{\xi^2 + s_0^2}}
-            - \frac{1}{\sqrt{\xi^2 + (s_0 + s_1)^2}}
+        \kappa(\xi) = \frac{\Upsilon \, I}{1 + q} \left(
+            \frac{1}{\sqrt{\xi^2 + 4 s_0^2 / (1 + q)^2}}
+            - \frac{1}{\sqrt{\xi^2 + 4 s_1^2 / (1 + q)^2}}
         \right)
 
-    where :math:`\xi^2 = x^2 + (y/q)^2` is the elliptical radius, :math:`\Upsilon` is
-    the mass-to-light ratio (``mass_to_light_ratio``), :math:`I` is the intensity
-    normalisation (``intensity``), :math:`s_0` = ``core_radius_0``, and
-    :math:`s_1` = ``core_radius_1``.
+    where :math:`\xi^2 = x^2 + (y/q)^2` is the elliptical radius, :math:`q` is the axis
+    ratio, :math:`\Upsilon` is the mass-to-light ratio (``mass_to_light_ratio``),
+    :math:`I` is the intensity normalisation (``intensity``), :math:`s_0` = ``core_radius_0``
+    and :math:`s_1` = ``core_radius_1``. The convergence is positive when
+    :math:`s_1 > s_0`. For :math:`q = 1` the rescaled cores reduce to :math:`s_0` and
+    :math:`s_1` and the prefactor to :math:`\Upsilon I / 2`.
 
     Deflection angles are computed analytically via the cored isothermal deflection
     formula (Eq. 15–16 of Dutton et al. 2011).
@@ -58,9 +60,8 @@ class Chameleon(MassProfile, StellarProfile):
         core_radius_0
             Core radius :math:`s_0` of the first cored isothermal component (arcseconds).
         core_radius_1
-            Additional core size increment :math:`s_1` such that the second component has
-            core radius :math:`s_0 + s_1` (arcseconds).  Using an increment avoids
-            negative parameter values.
+            Core radius :math:`s_1` of the second cored isothermal component (arcseconds),
+            which is subtracted from the first.
         mass_to_light_ratio
             The mass-to-light ratio :math:`\Upsilon` in solar units.
         """
@@ -178,16 +179,59 @@ class Chameleon(MassProfile, StellarProfile):
     @aa.decorators.to_array
     @aa.decorators.transform
     def potential_2d_from(self, grid: aa.type.Grid2DLike, xp=np, **kwargs):
-        from autogalaxy.profiles.mass.abstract.mge import MGEDecomposer
+        r"""
+        Calculate the lensing potential at a given set of arc-second gridded coordinates.
 
-        radii_min = self.core_radius_0 / 10.0
-        radii_max = self.core_radius_1 * 200.0
-        sigmas = xp.exp(xp.linspace(xp.log(radii_min), xp.log(radii_max), 30))
-        mge_decomp = MGEDecomposer(mass_profile=self)
-        return mge_decomp.potential_2d_via_mge_from(
-            grid=grid, xp=xp, sigma_log_list=sigmas,
-            ellipticity_convention="circularised", three_D=False,
-        )
+        The potential is analytic: each cored isothermal component has the closed form (Keeton 2001)
+
+        .. math::
+
+            \psi_s = x \alpha_x + y \alpha_y
+                - b q s \ln \sqrt{(\Psi + s)^2 + (1 - q^2) x^2} + b q s \ln \left[ (1 + q) s \right]
+
+        where :math:`\Psi` is given by ``psi_from`` and :math:`\alpha_x, \alpha_y` are the component's
+        deflections, with the same normalisation and core radii as ``deflections_2d_via_analytic_from``.
+        The Chameleon potential is the difference of the two components.
+
+        Parameters
+        ----------
+        grid
+            The grid of (y,x) arc-second coordinates the potential is computed on.
+        """
+        axis_ratio = self.axis_ratio(xp)
+        b = 2.0 * self.mass_to_light_ratio * self.intensity / (1.0 + axis_ratio)
+        sqrt_1_minus_q2 = xp.sqrt(1.0 - axis_ratio**2.0)
+
+        y = grid.array[:, 0]
+        x = grid.array[:, 1]
+
+        def potential_cored_isothermal_from(core_radius):
+            psi = psi_from(
+                grid=grid, axis_ratio=axis_ratio, core_radius=core_radius, xp=xp
+            )
+
+            deflection_y = xp.arctanh(
+                sqrt_1_minus_q2 * y / (psi + axis_ratio**2.0 * core_radius)
+            )
+            deflection_x = xp.arctan(sqrt_1_minus_q2 * x / (psi + core_radius))
+
+            return (
+                b * axis_ratio / sqrt_1_minus_q2 * (y * deflection_y + x * deflection_x)
+                - b
+                * axis_ratio
+                * core_radius
+                * xp.log(
+                    xp.sqrt((psi + core_radius) ** 2.0 + (1.0 - axis_ratio**2.0) * x**2.0)
+                )
+                + b * axis_ratio * core_radius * xp.log((1.0 + axis_ratio) * core_radius)
+            )
+
+        core_radius_0 = 2.0 * self.core_radius_0 / (1.0 + axis_ratio)
+        core_radius_1 = 2.0 * self.core_radius_1 / (1.0 + axis_ratio)
+
+        return potential_cored_isothermal_from(
+            core_radius_0
+        ) - potential_cored_isothermal_from(core_radius_1)
 
     def image_2d_via_radii_from(self, grid_radii: np.ndarray, xp=np):
         """Calculate the intensity of the Chamelon light profile on a grid of radial coordinates.
@@ -226,7 +270,7 @@ class Chameleon(MassProfile, StellarProfile):
 
     def axis_ratio(self, xp=np):
         axis_ratio = super().axis_ratio(xp=xp)
-        return axis_ratio if axis_ratio < 0.99999 else 0.99999
+        return xp.where(axis_ratio < 0.99999, axis_ratio, 0.99999)
 
 
 class ChameleonSph(Chameleon):
@@ -238,9 +282,9 @@ class ChameleonSph(Chameleon):
 
     .. math::
 
-        \kappa(r) = \Upsilon \, I \left(
+        \kappa(r) = \frac{\Upsilon \, I}{2} \left(
             \frac{1}{\sqrt{r^2 + s_0^2}}
-            - \frac{1}{\sqrt{r^2 + (s_0 + s_1)^2}}
+            - \frac{1}{\sqrt{r^2 + s_1^2}}
         \right)
 
     References
@@ -266,8 +310,8 @@ class ChameleonSph(Chameleon):
         core_radius_0
             Core radius :math:`s_0` of the first cored isothermal component (arcseconds).
         core_radius_1
-            Additional core size increment :math:`s_1` such that the second component has
-            core radius :math:`s_0 + s_1` (arcseconds).
+            Core radius :math:`s_1` of the second cored isothermal component (arcseconds),
+            which is subtracted from the first.
         mass_to_light_ratio
             The mass-to-light ratio :math:`\Upsilon` in solar units.
         """
