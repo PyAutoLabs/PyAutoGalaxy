@@ -190,3 +190,35 @@ def test__potential_2d_from():
 
     assert potential[0] == pytest.approx(0.0, abs=1.0e-8)
     assert potential[1] == pytest.approx(1.68326, 1e-4)
+
+
+def test__jit_over_ell_comps_matches_numpy():
+    jax = pytest.importorskip("jax")
+    import jax.numpy as jnp
+
+    with jax.enable_x64(True):
+        grid = ag.Grid2DIrregular(_potential_points)
+
+        def mp_from(ell_comps):
+            return ag.mp.Chameleon(
+                centre=(0.1, -0.2), ell_comps=ell_comps, intensity=1.0
+            )
+
+        @jax.jit
+        def f(e):
+            mp = mp_from(ell_comps=(e[0], e[1]))
+            return (
+                mp.deflections_yx_2d_from(grid=grid, xp=jnp).array,
+                mp.potential_2d_from(grid=grid, xp=jnp).array,
+            )
+
+        deflections, potential = f(jnp.asarray([0.2, -0.1]))
+
+        mp = mp_from(ell_comps=(0.2, -0.1))
+
+        assert np.asarray(deflections) == pytest.approx(
+            np.asarray(mp.deflections_yx_2d_from(grid=grid)), abs=1.0e-12
+        )
+        assert np.asarray(potential) == pytest.approx(
+            np.asarray(mp.potential_2d_from(grid=grid)), abs=1.0e-12
+        )

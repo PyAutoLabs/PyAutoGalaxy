@@ -14,20 +14,22 @@ class Chameleon(MassProfile, StellarProfile):
     Elliptical Chameleon stellar mass profile (Dutton et al. 2011).
 
     The Chameleon profile is the difference of two cored isothermal (pseudo-Jaffe) profiles
-    with core radii :math:`s_0` and :math:`s_0 + s_1`, providing a flexible approximation
+    with core radii :math:`s_0` and :math:`s_1`, providing a flexible approximation
     to a variety of stellar light profiles:
 
     .. math::
 
-        \kappa(\xi) = \Upsilon \, I \left(
-            \frac{1}{\sqrt{\xi^2 + s_0^2}}
-            - \frac{1}{\sqrt{\xi^2 + (s_0 + s_1)^2}}
+        \kappa(\xi) = \frac{\Upsilon \, I}{1 + q} \left(
+            \frac{1}{\sqrt{\xi^2 + 4 s_0^2 / (1 + q)^2}}
+            - \frac{1}{\sqrt{\xi^2 + 4 s_1^2 / (1 + q)^2}}
         \right)
 
-    where :math:`\xi^2 = x^2 + (y/q)^2` is the elliptical radius, :math:`\Upsilon` is
-    the mass-to-light ratio (``mass_to_light_ratio``), :math:`I` is the intensity
-    normalisation (``intensity``), :math:`s_0` = ``core_radius_0``, and
-    :math:`s_1` = ``core_radius_1``.
+    where :math:`\xi^2 = x^2 + (y/q)^2` is the elliptical radius, :math:`q` is the axis
+    ratio, :math:`\Upsilon` is the mass-to-light ratio (``mass_to_light_ratio``),
+    :math:`I` is the intensity normalisation (``intensity``), :math:`s_0` = ``core_radius_0``
+    and :math:`s_1` = ``core_radius_1``. The convergence is positive when
+    :math:`s_1 > s_0`. For :math:`q = 1` the rescaled cores reduce to :math:`s_0` and
+    :math:`s_1` and the prefactor to :math:`\Upsilon I / 2`.
 
     Deflection angles are computed analytically via the cored isothermal deflection
     formula (Eq. 15–16 of Dutton et al. 2011).
@@ -58,9 +60,8 @@ class Chameleon(MassProfile, StellarProfile):
         core_radius_0
             Core radius :math:`s_0` of the first cored isothermal component (arcseconds).
         core_radius_1
-            Additional core size increment :math:`s_1` such that the second component has
-            core radius :math:`s_0 + s_1` (arcseconds).  Using an increment avoids
-            negative parameter values.
+            Core radius :math:`s_1` of the second cored isothermal component (arcseconds),
+            which is subtracted from the first.
         mass_to_light_ratio
             The mass-to-light ratio :math:`\Upsilon` in solar units.
         """
@@ -269,7 +270,7 @@ class Chameleon(MassProfile, StellarProfile):
 
     def axis_ratio(self, xp=np):
         axis_ratio = super().axis_ratio(xp=xp)
-        return axis_ratio if axis_ratio < 0.99999 else 0.99999
+        return xp.where(axis_ratio < 0.99999, axis_ratio, 0.99999)
 
 
 class ChameleonSph(Chameleon):
@@ -281,9 +282,9 @@ class ChameleonSph(Chameleon):
 
     .. math::
 
-        \kappa(r) = \Upsilon \, I \left(
+        \kappa(r) = \frac{\Upsilon \, I}{2} \left(
             \frac{1}{\sqrt{r^2 + s_0^2}}
-            - \frac{1}{\sqrt{r^2 + (s_0 + s_1)^2}}
+            - \frac{1}{\sqrt{r^2 + s_1^2}}
         \right)
 
     References
@@ -309,8 +310,8 @@ class ChameleonSph(Chameleon):
         core_radius_0
             Core radius :math:`s_0` of the first cored isothermal component (arcseconds).
         core_radius_1
-            Additional core size increment :math:`s_1` such that the second component has
-            core radius :math:`s_0 + s_1` (arcseconds).
+            Core radius :math:`s_1` of the second cored isothermal component (arcseconds),
+            which is subtracted from the first.
         mass_to_light_ratio
             The mass-to-light ratio :math:`\Upsilon` in solar units.
         """

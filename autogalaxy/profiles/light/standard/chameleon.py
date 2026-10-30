@@ -50,7 +50,7 @@ class Chameleon(LightProfile):
         `axis_ratio=1.0`, thus we remove these solutions.
         """
         axis_ratio = super().axis_ratio(xp=xp)
-        return axis_ratio if axis_ratio < 0.99999 else 0.99999
+        return xp.where(axis_ratio < 0.99999, axis_ratio, 0.99999)
 
     def image_2d_via_radii_from(self, grid_radii: np.ndarray, xp=np) -> np.ndarray:
         """
@@ -117,7 +117,7 @@ class Chameleon(LightProfile):
             The image of the Chameleon evaluated at every (y,x) coordinate on the transformed grid.
         """
         return self.image_2d_via_radii_from(
-            self.elliptical_radii_grid_from(grid=grid, xp=xp, **kwargs)
+            self.elliptical_radii_grid_from(grid=grid, xp=xp, **kwargs), xp=xp
         )
 
 
