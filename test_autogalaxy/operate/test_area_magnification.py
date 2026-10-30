@@ -137,3 +137,20 @@ def test__a_mask_spanning_two_images_differs_from_each_image():
     per_image = lens_calc.area_magnification_list_from(mask=mask, sub_size=4)
 
     assert all(abs(whole / mu - 1.0) > 0.01 for mu in per_image)
+
+
+def test__source_plane_area__correct_when_over_sampling_is_capped(monkeypatch):
+    """
+    `PYAUTO_SMALL_DATASETS=1` caps over-sampling at 2 whatever `sub_size` asks for;
+    the sub-pixel area must follow the sub-pixels actually generated.
+    """
+    mask = _annulus_mask(inner=1.5, outer=2.0, pixel_scale=0.05)
+    lens_calc = _lens_calc()
+
+    uncapped = lens_calc.source_plane_area_from(mask=mask, sub_size=4)
+
+    monkeypatch.setenv("PYAUTO_SMALL_DATASETS", "1")
+
+    capped = lens_calc.source_plane_area_from(mask=mask, sub_size=4)
+
+    assert capped == pytest.approx(uncapped, rel=1.0e-3)

@@ -823,7 +823,14 @@ class LensCalc:
             self.magnification_2d_via_hessian_from(grid=sub_pixel_centres)
         )
 
-        sub_pixel_area = mask.pixel_scales[0] * mask.pixel_scales[1] / sub_size**2
+        # From the sub-pixels actually generated, not `sub_size`: the over-sampling can be capped (e.g. to 2
+        # under PYAUTO_SMALL_DATASETS=1), and the areas must still sum to the unmasked pixels' area.
+        sub_pixel_area = (
+            mask.pixel_scales[0]
+            * mask.pixel_scales[1]
+            * grid.shape_slim
+            / sub_pixel_centres.shape[0]
+        )
 
         return magnifications, sub_pixel_area
 
