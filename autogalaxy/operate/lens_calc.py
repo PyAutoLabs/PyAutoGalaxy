@@ -808,6 +808,161 @@ class LensCalc:
             return aa.ArrayIrregular(values=1.0 / det_A)
         return 1.0 / det_A
 
+    def _sub_pixel_magnifications_from(self, mask: aa.Mask2D, sub_size: int):
+        """
+        The signed Hessian magnification at the centre of every sub-pixel of the mask's unmasked pixels, and the area
+        of one sub-pixel, for the area magnification calculations below.
+        """
+        grid = aa.Grid2D.from_mask(mask=mask, over_sample_size=sub_size)
+
+        sub_pixel_centres = aa.Grid2DIrregular(
+            values=np.asarray(grid.over_sampled.array)
+        )
+
+        magnifications = np.asarray(
+            self.magnification_2d_via_hessian_from(grid=sub_pixel_centres)
+        )
+
+        sub_pixel_area = mask.pixel_scales[0] * mask.pixel_scales[1] / sub_size**2
+
+        return magnifications, sub_pixel_area
+
+    def source_plane_area_from(self, mask: aa.Mask2D, sub_size: int = 4) -> float:
+        """
+        Returns the area of the source-plane region that the unmasked pixels of an image-plane mask map from.
+
+        Each small image-plane area `dA` maps from a source-plane area `dA / |mu|`, where `mu` is the local
+        magnification. Splitting every unmasked pixel into `sub_size x sub_size` sub-pixels and summing their areas
+        divided by the Hessian magnification at their centres gives the source-plane area (Eq. 7 of the LEGGOS II
+        paper, arXiv:2606.20804):
+
+        `A_src = sum_i A_pix,i / |mu_i|`
+
+        For a mask that covers one lensed image of a source (e.g. an arc), this is the area of the part of the source
+        that forms that image, which links the area magnification to the physical size of the source.
+
+        A mask covering several images of the same source counts that source once per image; use
+        `area_magnification_list_from` to split it into its images first.
+
+        Parameters
+        ----------
+        mask
+            The image-plane mask whose unmasked pixels define the region (e.g. one image of an arc).
+        sub_size
+            Each unmasked pixel is split into `sub_size x sub_size` sub-pixels, at whose centres the magnification is
+            evaluated. Increase it until the result converges, which matters most for pixels close to a critical
+            curve, where the magnification changes rapidly.
+        """
+        magnifications, sub_pixel_area = self._sub_pixel_magnifications_from(
+            mask=mask, sub_size=sub_size
+        )
+
+        return float(np.sum(sub_pixel_area / np.abs(magnifications)))
+
+    def area_magnification_from(self, mask: aa.Mask2D, sub_size: int = 4) -> float:
+        """
+        Returns the area magnification of the image-plane region defined by a mask: the area of the region divided by
+        the area of the source-plane region it maps from (Eq. 6 of the LEGGOS II paper, arXiv:2606.20804):
+
+        `mu_area = A_img / A_src`,  `A_src = sum_i A_pix,i / |mu_i|`
+
+        This is the standard magnification of an arc in cluster lensing. It needs only the local magnification map
+        (no source model and no forward ray-shooting of the source shape), and it is unsigned.
+
+        The mask must cover ONE lensed image: for a mask spanning several images of the same source, `A_src` counts
+        the source once per image and the ratio is not the magnification of any image. Use
+        `area_magnification_list_from` to split such a mask into its images.
+
+        Parameters
+        ----------
+        mask
+            The image-plane mask whose unmasked pixels define the region (e.g. one image of an arc).
+        sub_size
+            Each unmasked pixel is split into `sub_size x sub_size` sub-pixels, at whose centres the magnification is
+            evaluated (see `source_plane_area_from`).
+        """
+        magnifications, sub_pixel_area = self._sub_pixel_magnifications_from(
+            mask=mask, sub_size=sub_size
+        )
+
+        image_plane_area = sub_pixel_area * magnifications.shape[0]
+        source_plane_area = np.sum(sub_pixel_area / np.abs(magnifications))
+
+        return float(image_plane_area / source_plane_area)
+
+    def image_masks_from(self, mask: aa.Mask2D) -> List[aa.Mask2D]:
+        """
+        Splits the unmasked pixels of an image-plane mask into the separate lensed images they contain.
+
+        Images of a source are separated by critical curves, across which the magnification changes sign (the image
+        parity flips). Pixels are grouped by the sign of the Hessian magnification at their centres, and each group
+        is split into connected regions (pixels sharing an edge). Each region is returned as its own mask, largest
+        first.
+
+        Two images of the same parity that touch, or one image cut by the mask edge into separate pieces, are not
+        distinguished by this rule; check the returned masks for such cases.
+
+        Parameters
+        ----------
+        mask
+            The image-plane mask whose unmasked pixels contain one or more lensed images.
+        """
+        from scipy import ndimage
+
+        grid = aa.Grid2D.from_mask(mask=mask, over_sample_size=1)
+
+        magnifications = np.asarray(
+            self.magnification_2d_via_hessian_from(
+                grid=aa.Grid2DIrregular(values=np.asarray(grid.array))
+            )
+        )
+
+        unmasked = ~np.asarray(mask)
+        parity = np.zeros(mask.shape_native)
+        parity[unmasked] = np.sign(magnifications)
+
+        image_masks = []
+
+        for sign in (1.0, -1.0):
+            labels, total = ndimage.label(parity == sign)
+
+            for label in range(1, total + 1):
+                image_masks.append(
+                    aa.Mask2D(
+                        mask=labels != label,
+                        pixel_scales=mask.pixel_scales,
+                        origin=mask.origin,
+                    )
+                )
+
+        return sorted(
+            image_masks,
+            key=lambda image_mask: np.sum(~np.asarray(image_mask)),
+            reverse=True,
+        )
+
+    def area_magnification_list_from(
+        self, mask: aa.Mask2D, sub_size: int = 4
+    ) -> List[float]:
+        """
+        Returns the area magnification of every lensed image in an image-plane mask, in the order of
+        `image_masks_from` (largest image first).
+
+        The mask is split into its images with `image_masks_from`, and `area_magnification_from` is computed for each.
+
+        Parameters
+        ----------
+        mask
+            The image-plane mask whose unmasked pixels contain one or more lensed images.
+        sub_size
+            Each unmasked pixel is split into `sub_size x sub_size` sub-pixels, at whose centres the magnification is
+            evaluated (see `source_plane_area_from`).
+        """
+        return [
+            self.area_magnification_from(mask=image_mask, sub_size=sub_size)
+            for image_mask in self.image_masks_from(mask=mask)
+        ]
+
     def contour_list_from(self, grid, contour_array):
         grid_contour = aa.Grid2DContour(
             grid=grid,
