@@ -27,20 +27,38 @@
 
 ## Getting Started
 
-### Human-Readable Documentation and Examples
+### Natural Language or Python
 
-The following human-readable documentation and examples are useful for new starters:
+You can use **PyAutoGalaxy** by describing what you want in natural language, through the
+[**PyAutoGalaxy AI Assistant**](https://github.com/PyAutoLabs/autogalaxy_assistant), or by writing Python yourself. Both
+routes use the same software. To start in natural language, paste this prompt into Claude Code, Codex or another AI
+coding agent:
+
+<sub><b>Starting prompt for Claude Code, Codex or other AI coding agent</b></sub>
+
+```text
+I want to study galaxy structure and morphology with PyAutoGalaxy (https://github.com/PyAutoLabs/PyAutoGalaxy)
+and the autogalaxy_assistant (https://github.com/PyAutoLabs/autogalaxy_assistant). First clone that
+repository, cd into it and follow its AGENTS.md.
+
+Begin the "start here" guide for a new user.
+```
+
+The assistant takes you through the [Start Here](https://pyautogalaxy.readthedocs.io/en/latest/overview/overview_1_start_here.html) page as a conversation (grids, light profiles and bulge-plus-disk galaxies, then simulating and fitting a galaxy image), one step at a time, then
+helps you get started on your own galaxies. Claude Code and Codex are recommended, and sustained scientific use
+normally needs paid access to one of them. Free options are listed on the
+[AI Options](https://github.com/PyAutoLabs/PyAutoScientist/blob/main/AI_OPTIONS.md) page.
+[Start Here](https://pyautogalaxy.readthedocs.io/en/latest/overview/overview_1_start_here.html#natural-language-or-python) explains why **PyAutoGalaxy** is designed to be used in natural
+language, and why its Python API is not going anywhere.
+
+### Documentation and Examples
+
+All of the documentation and examples are written for people to read:
 
 - [The PyAutoGalaxy readthedocs](https://pyautogalaxy.readthedocs.io/en/latest), which includes [an overview of PyAutoGalaxy's core features](https://pyautogalaxy.readthedocs.io/en/latest/overview/overview_1_start_here.html), [a new user starting guide](https://pyautogalaxy.readthedocs.io/en/latest/overview/overview_2_new_user_guide.html) and [an installation guide](https://pyautogalaxy.readthedocs.io/en/latest/installation/overview.html).
 - [The introduction Jupyter Notebook on Google Colab](https://colab.research.google.com/github/PyAutoLabs/autogalaxy_workspace/blob/2026.10.29.1/start_here.ipynb), where you can try **PyAutoGalaxy** in a web browser (without installation).
 - [The autogalaxy_workspace GitHub repository](https://github.com/PyAutoLabs/autogalaxy_workspace): example scripts covering every **PyAutoGalaxy** use case.
 - [The HowToGalaxy GitHub repository](https://github.com/PyAutoLabs/HowToGalaxy): a Jupyter notebook lecture series teaching galaxy modeling from the ground up.
-
-### PyAutoGalaxy AI Assistant
-
-The [**PyAutoGalaxy AI Assistant**](https://github.com/PyAutoLabs/autogalaxy_assistant) lets you do galaxy structure and morphology science in natural language from inside an AI coding agent. You can get started simply by asking it a question about galaxy structure or describing the task you would like to perform with **PyAutoGalaxy**. See the assistant for its full scope and instructions.
-
-**The assistant runs inside an AI coding agent: Claude Code or Codex are recommended. Sustained scientific use normally needs paid access to one of them (a personal subscription, institutional access or API billing). OpenCode is an experimental alternative whose client is free but whose model access, cost and capability depend on the provider. Browser chat routes (ChatGPT or Claude with a GitHub connector) are no longer supported.**
 
 ## Core Aims
 

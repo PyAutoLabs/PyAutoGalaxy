@@ -2,20 +2,17 @@
 
 # New User Guide
 
-## Human-Readable Guide
-
 **PyAutoGalaxy** can analyse galaxies for different types of data (e.g. CCD imaging and interferometer observations)
 and across a range of system scales (a single galaxy, blended multi-galaxy systems, and cluster fields).
 Depending on the data you use and the scale of your system, the analysis you perform may differ significantly.
 
 The autogalaxy_workspace contains a suite of example Jupyter Notebooks, organised by dataset type and system scale.
-To help you find the most appropriate starting point, answer two simple questions:
+To help you find the most appropriate starting point, answer two simple questions.
 
-## PyAutoGalaxy AI Assistant
-
-The [**PyAutoGalaxy AI Assistant**](https://github.com/PyAutoLabs/autogalaxy_assistant) lets you do galaxy structure and morphology science in natural language from inside an AI coding agent. You can get started simply by asking it a question about galaxy structure or describing the task you would like to perform with **PyAutoGalaxy**. See the assistant for its full scope and instructions.
-
-**The assistant runs inside an AI coding agent: Claude Code or Codex are recommended. Sustained scientific use normally needs paid access to one of them (a personal subscription, institutional access or API billing). OpenCode is an experimental alternative whose client is free but whose model access, cost and capability depend on the provider. Browser chat routes (ChatGPT or Claude with a GitHub connector) are no longer supported.**
+**In natural language:** if you are using the [PyAutoGalaxy AI Assistant](https://github.com/PyAutoLabs/autogalaxy_assistant), you can skip
+the questions below: describe your galaxies and your data type to the assistant and it will pick the matching
+example and work through it with you. The examples below are what the assistant uses, and they remain the best place
+to see the Python.
 
 ## What Scale System?
 
