@@ -33,6 +33,8 @@ from autogalaxy.galaxy.plot.galaxies_plots import (
     plot_magnification_2d,
     plot_magnification_source_plane,
     plot_magnification_source_plane_grid,
+    plot_magnification_uncertainty_2d,
+    magnification_fractional_error_2d_from,
 )
 
 from autogalaxy.galaxy.plot.adapt_plots import (

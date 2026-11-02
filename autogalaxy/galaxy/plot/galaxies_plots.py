@@ -592,3 +592,136 @@ def plot_magnification_source_plane_grid(
     if owns_figure:
         tight_layout()
         _save_subplot(fig, output_path, output_filename, output_format)
+
+
+def magnification_fractional_error_2d_from(magnification_list, magnification_best) -> aa.Array2D:
+    """Return the fractional error of the magnification at every pixel, over a set of posterior draws.
+
+    For each pixel the error is half the range between the 16th and 84th percentiles of |mu| over the draws (the
+    1 sigma error for a Gaussian), divided by |mu| of the best-fit model. This is the quantity mapped in the
+    magnification uncertainty maps of cluster lens models (e.g. LEGGOS II, Abedi et al. 2026, figure 4).
+
+    Next to a critical curve the magnification diverges and its sign differs between draws, so the fractional error
+    there is large and not meaningful; plots should cap the colour range.
+
+    Parameters
+    ----------
+    magnification_list
+        The magnification map (``Array2D``) of every posterior draw, all on the same grid, e.g. from
+        ``LensCalc.magnification_2d_from``.
+    magnification_best
+        The magnification map of the best-fit model on that grid.
+    """
+    magnifications = np.abs(
+        np.asarray([np.asarray(magnification.slim.array) for magnification in magnification_list])
+    )
+    best = np.abs(np.asarray(magnification_best.slim.array))
+
+    lower, upper = np.percentile(magnifications, [16.0, 84.0], axis=0)
+
+    fractional_error = np.divide(
+        0.5 * (upper - lower), best, out=np.full(best.shape, np.inf), where=best > 0.0
+    )
+
+    return aa.Array2D(values=fractional_error, mask=magnification_best.mask)
+
+
+def plot_magnification_uncertainty_2d(
+    magnification_list,
+    magnification_best,
+    grid: aa.type.Grid2DLike,
+    mass_obj=None,
+    contour_levels=(2.0, 5.0, 10.0, 20.0, 50.0, 100.0),
+    include_critical_curves: bool = True,
+    tangential_critical_curves=None,
+    radial_critical_curves=None,
+    vmin: float = 0.0,
+    vmax=None,
+    title: str = r"Fractional Magnification Error $\sigma_\mu / |\mu|$",
+    colormap="default",
+    output_path=None,
+    output_filename: str = "magnification_uncertainty_2d",
+    output_format=None,
+    ax=None,
+):
+    """Plot the fractional error of the magnification at every image-plane pixel, over a set of posterior draws.
+
+    The error map is ``magnification_fractional_error_2d_from``: half the 16th-84th percentile range of |mu| over the
+    draws, divided by the best-fit |mu|. Contours of constant |mu| from the best-fit map (labelled as in
+    ``plot_magnification_2d``) and, optionally, the best-fit critical curves are drawn on top, as in the magnification
+    uncertainty maps of cluster lens models (e.g. LEGGOS II, Abedi et al. 2026, figure 4).
+
+    The fractional error diverges on the critical curves, so by default the colour range runs from 0 to the 95th
+    percentile of the map, and pixels above it are shown at the top of the scale.
+
+    Parameters
+    ----------
+    magnification_list
+        The magnification map (``Array2D``) of every posterior draw, all on ``grid``.
+    magnification_best
+        The magnification map of the best-fit model on ``grid``.
+    grid
+        The image-plane grid the maps are on.
+    mass_obj
+        The best-fit mass object (``Galaxies`` or a ``Tracer``), used for the critical curves. ``None`` draws none.
+    contour_levels
+        The |mu| values of the best-fit contours. ``None`` or an empty sequence draws no contours.
+    include_critical_curves
+        If ``True`` and ``mass_obj`` is given (or critical curves are passed in), overlay them.
+    tangential_critical_curves, radial_critical_curves
+        Pre-computed critical curves; ``None`` computes them from ``mass_obj``.
+    vmin, vmax
+        Colour-bar limits on the fractional error. ``vmax=None`` uses the 95th percentile of the finite values.
+    title, colormap, output_path, output_filename, output_format, ax
+        As for ``plot_magnification_2d``.
+    """
+    fractional_error = magnification_fractional_error_2d_from(
+        magnification_list=magnification_list, magnification_best=magnification_best
+    )
+
+    values = np.asarray(fractional_error.slim.array, dtype=float)
+    finite = np.isfinite(values)
+
+    if vmax is None:
+        vmax = float(np.percentile(values[finite], 95.0)) if np.any(finite) else 1.0
+
+    values = np.where(finite, np.minimum(values, vmax), vmax)
+
+    with np.errstate(divide="ignore"):
+        log_abs_mu_best = np.log10(np.abs(np.asarray(magnification_best.slim.array)))
+    log_abs_mu_best[~np.isfinite(log_abs_mu_best)] = np.nan
+
+    lines = None
+    if include_critical_curves and (
+        mass_obj is not None or tangential_critical_curves is not None
+    ):
+        tc, rc = _critical_curves_from(
+            mass_obj, grid, tc=tangential_critical_curves, rc=radial_critical_curves
+        )
+        lines = _to_lines(tc, rc)
+
+    owns_figure = ax is None
+    if owns_figure:
+        fig, ax = subplots(1, 1, figsize=conf_subplot_figsize(1, 1))
+
+    plot_array(
+        array=aa.Array2D(values=values, mask=grid.mask),
+        title=title,
+        colormap=colormap,
+        vmin=vmin,
+        vmax=vmax,
+        lines=lines,
+        cb_unit="",
+        ax=ax,
+    )
+
+    _magnification_contours(
+        ax=ax,
+        log_abs_mu_array=aa.Array2D(values=log_abs_mu_best, mask=grid.mask),
+        grid=grid,
+        contour_levels=contour_levels,
+    )
+
+    if owns_figure:
+        tight_layout()
+        _save_subplot(fig, output_path, output_filename, output_format)
