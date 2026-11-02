@@ -30,6 +30,7 @@ from autogalaxy.galaxy.plot.galaxy_plots import (
 from autogalaxy.galaxy.plot.galaxies_plots import (
     subplot_galaxies,
     subplot_galaxy_images,
+    plot_magnification_2d,
 )
 
 from autogalaxy.galaxy.plot.adapt_plots import (

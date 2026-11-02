@@ -251,3 +251,152 @@ def fits_galaxy_images(
         header_dict=grid.mask.header_dict,
     )
     hdu_list.writeto(Path(output_path) / "galaxy_images.fits", overwrite=True)
+
+
+def plot_magnification_2d(
+    mass_obj,
+    grid: aa.type.Grid2DLike,
+    contour_levels=(2.0, 5.0, 10.0, 20.0, 50.0, 100.0),
+    include_critical_curves: bool = True,
+    tangential_critical_curves=None,
+    radial_critical_curves=None,
+    vmin=None,
+    vmax=None,
+    title: str = r"Magnification $\log_{10}|\mu|$",
+    colormap="default",
+    output_path=None,
+    output_filename: str = "magnification_2d",
+    output_format=None,
+    ax=None,
+):
+    """Plot the image-plane magnification map of a mass object, with constant-magnification contours.
+
+    Every pixel shows log10 |mu| at its centre, where mu = 1 / det(A) is the signed magnification computed from the
+    Hessian of the lensing potential. The magnification diverges on the critical curves, so a linear colour scale is
+    dominated by the few pixels next to them; the log scale and a colour range set by the 1st and 99th percentiles
+    of log10 |mu| keep the rest of the map readable.
+
+    Contour lines are drawn at constant |mu| (by default 2, 5, 10, 20, 50 and 100), labelled with their |mu| value,
+    as in the magnification maps of cluster lens models (e.g. LEGGOS II, Abedi et al. 2026, figure 4). Levels outside
+    the range of the map are skipped. The critical curves can be overlaid, computed with the method configured in
+    ``visualize/general.yaml``.
+
+    The mass object can be anything ``LensCalc.from_mass_obj`` accepts (a ``Galaxy``, ``Galaxies`` or a ``Tracer``),
+    so the same map is made for a single galaxy, a group or a cluster.
+
+    Parameters
+    ----------
+    mass_obj
+        The mass object whose magnification is plotted.
+    grid
+        The image-plane grid on which the magnification is evaluated, for example ``dataset.grid`` or a
+        ``Grid2D.uniform``.
+    contour_levels
+        The |mu| values at which contour lines are drawn. ``None`` or an empty sequence draws no contours.
+    include_critical_curves
+        If ``True``, overlay the tangential and radial critical curves.
+    tangential_critical_curves, radial_critical_curves
+        Pre-computed critical curves; ``None`` computes them when ``include_critical_curves`` is ``True``.
+    vmin, vmax
+        Explicit colour-bar limits in log10 |mu|. ``None`` uses the 1st and 99th percentiles of the map.
+    title
+        Title displayed above the panel.
+    colormap
+        Matplotlib colormap name, or ``"default"``.
+    output_path
+        Directory in which to save the figure. ``None`` shows it instead.
+    output_filename
+        Stem of the output file name.
+    output_format
+        File format, e.g. ``"png"``.
+    ax
+        An existing ``Axes`` to draw into. When given the figure is not saved; the caller saves it.
+    """
+    from autogalaxy.operate.lens_calc import LensCalc
+
+    magnification = LensCalc.from_mass_obj(mass_obj).magnification_2d_from(grid=grid)
+
+    with np.errstate(divide="ignore"):
+        log_abs_mu = np.log10(np.abs(np.asarray(magnification.slim)))
+
+    finite = np.isfinite(log_abs_mu)
+    log_abs_mu[~finite] = np.nanmax(log_abs_mu[finite]) if np.any(finite) else 0.0
+
+    if vmin is None:
+        vmin = float(np.percentile(log_abs_mu, 1.0))
+    if vmax is None:
+        vmax = float(np.percentile(log_abs_mu, 99.0))
+
+    log_abs_mu_array = aa.Array2D(values=log_abs_mu, mask=grid.mask)
+
+    lines = None
+    if include_critical_curves:
+        tc, rc = _critical_curves_from(
+            mass_obj, grid, tc=tangential_critical_curves, rc=radial_critical_curves
+        )
+        lines = _to_lines(tc, rc)
+
+    owns_figure = ax is None
+    if owns_figure:
+        fig, ax = subplots(1, 1, figsize=conf_subplot_figsize(1, 1))
+
+    plot_array(
+        array=log_abs_mu_array,
+        title=title,
+        colormap=colormap,
+        vmin=vmin,
+        vmax=vmax,
+        lines=lines,
+        ax=ax,
+    )
+
+    _magnification_contours(
+        ax=ax, log_abs_mu_array=log_abs_mu_array, grid=grid, contour_levels=contour_levels
+    )
+
+    if owns_figure:
+        tight_layout()
+        _save_subplot(fig, output_path, output_filename, output_format)
+
+
+def _magnification_contours(ax, log_abs_mu_array, grid, contour_levels):
+    """Draw labelled contour lines of constant |mu| over a log10 |mu| map on ``ax``.
+
+    The contours are drawn in arcsecond coordinates from the grid's native (y, x) values, so they line up with the
+    image however ``plot_array`` zoomed it. The axes limits are restored afterwards so the contours never widen the
+    panel.
+
+    Parameters
+    ----------
+    ax
+        The ``Axes`` the map was drawn on.
+    log_abs_mu_array
+        The ``Array2D`` of log10 |mu| that was plotted.
+    grid
+        The grid the magnification was evaluated on.
+    contour_levels
+        The |mu| values at which to draw contours; values outside the range of the map are skipped.
+    """
+    if not contour_levels:
+        return
+
+    values = np.asarray(log_abs_mu_array.native.array, dtype=float)
+    values[np.asarray(grid.mask)] = np.nan
+
+    levels = np.log10(np.asarray(sorted(contour_levels), dtype=float))
+    levels = levels[(levels > np.nanmin(values)) & (levels < np.nanmax(values))]
+
+    if len(levels) == 0:
+        return
+
+    native = np.asarray(grid.native.array)
+
+    xlim, ylim = ax.get_xlim(), ax.get_ylim()
+
+    contours = ax.contour(
+        native[:, :, 1], native[:, :, 0], values, levels=levels, colors="k", linewidths=0.8
+    )
+    ax.clabel(contours, fmt=lambda level: f"{10.0 ** level:g}", fontsize=8)
+
+    ax.set_xlim(xlim)
+    ax.set_ylim(ylim)
