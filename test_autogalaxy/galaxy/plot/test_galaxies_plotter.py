@@ -104,3 +104,49 @@ def test__plot_magnification_source_plane_grid__output(
         output_format="png",
     )
     assert str(plot_path / "magnification_source_plane_grid.png") in plot_patch.paths
+
+
+def test__magnification_fractional_error_2d_from():
+    import numpy as np
+
+    import autogalaxy as ag
+
+    mask = ag.Mask2D.all_false(shape_native=(2, 2), pixel_scales=0.1)
+    best = ag.Array2D(values=np.array([2.0, -4.0, 10.0, 0.0]), mask=mask)
+
+    constant = [best for _ in range(20)]
+
+    assert np.allclose(
+        aplt.magnification_fractional_error_2d_from(constant, best).slim.array[:3], 0.0
+    )
+
+    # |mu| uniform over a symmetric spread: the 16th-84th percentile half-range is 0.68 of the half-width.
+    spread = np.linspace(-1.0, 1.0, 10001)
+    draws = [
+        ag.Array2D(values=np.array([2.0, -4.0, 10.0, 0.0]) * (1.0 + 0.1 * s), mask=mask)
+        for s in spread
+    ]
+
+    fractional_error = aplt.magnification_fractional_error_2d_from(draws, best).slim.array
+
+    assert fractional_error[:3] == pytest.approx([0.068, 0.068, 0.068], rel=1.0e-3)
+    assert np.isinf(fractional_error[3])
+
+
+def test__plot_magnification_uncertainty_2d__output(
+    galaxies_x2_7x7, grid_2d_7x7, plot_path, plot_patch
+):
+    import autogalaxy as ag
+
+    lens_calc = ag.LensCalc.from_mass_obj(galaxies_x2_7x7)
+    best = lens_calc.magnification_2d_from(grid=grid_2d_7x7)
+
+    aplt.plot_magnification_uncertainty_2d(
+        magnification_list=[best * 0.95, best, best * 1.05],
+        magnification_best=best,
+        grid=grid_2d_7x7,
+        mass_obj=galaxies_x2_7x7,
+        output_path=plot_path,
+        output_format="png",
+    )
+    assert str(plot_path / "magnification_uncertainty_2d.png") in plot_patch.paths
