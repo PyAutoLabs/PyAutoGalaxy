@@ -31,6 +31,8 @@ from autogalaxy.galaxy.plot.galaxies_plots import (
     subplot_galaxies,
     subplot_galaxy_images,
     plot_magnification_2d,
+    plot_magnification_source_plane,
+    plot_magnification_source_plane_grid,
 )
 
 from autogalaxy.galaxy.plot.adapt_plots import (

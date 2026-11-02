@@ -21,7 +21,7 @@ import importlib
 import logging
 import warnings
 import numpy as np
-from typing import List, Tuple, Union
+from typing import List, Optional, Tuple, Union
 
 from autonerves import conf
 
@@ -969,6 +969,85 @@ class LensCalc:
             self.area_magnification_from(mask=image_mask, sub_size=sub_size)
             for image_mask in self.image_masks_from(mask=mask)
         ]
+
+    def source_plane_magnification_from(
+        self,
+        mask: aa.Mask2D,
+        source_shape_native: Tuple[int, int] = (50, 50),
+        source_extent: Optional[Tuple[float, float, float, float]] = None,
+        sub_size: int = 16,
+    ) -> aa.Array2D:
+        """
+        Returns the source-plane magnification on a uniform grid of square source-plane pixels.
+
+        Every unmasked pixel of `mask` is split into `sub_size x sub_size` sub-pixels, which are traced to the source
+        plane (the grid minus the deflection angles). The image-plane area landing in each square source-plane pixel,
+        divided by that pixel's area, is its magnification: how much the lens magnifies that region of the source,
+        summed over all of its images. It is the square-pixel counterpart of a pixelized source's
+        `Mapper.mesh_magnification`.
+
+        The map is a count of traced sub-pixels, so it is noisy where few land in a source pixel: a source pixel of
+        magnification `mu` and side `s` receives about `mu * s**2 / (pixel_scale / sub_size)**2` of them. The
+        defaults give a few hundred for `mu ~ 5` on a 0.1" image over a ~2.5" source-plane box.
+
+        Only image-plane area inside `mask` is counted, so the mask should contain every image of the source region
+        of interest; a source pixel whose images fall partly outside it is underestimated. Source pixels no image
+        area lands in have a magnification of zero.
+
+        Parameters
+        ----------
+        mask
+            The image-plane mask whose unmasked area is traced to the source plane.
+        source_shape_native
+            The number of square source-plane pixels along (y, x). The pixels are square, so the shorter side of the
+            extent is padded.
+        source_extent
+            The `[xmin, xmax, ymin, ymax]` of the source-plane grid. `None` uses the box containing the central 98%
+            of the traced sub-pixels along each axis.
+        sub_size
+            The number of sub-pixels per image pixel along each axis.
+        """
+        image_grid = aa.Grid2D.from_mask(mask=mask, over_sample_size=sub_size)
+        sub_grid = np.asarray(image_grid.over_sampled.array)
+
+        deflections = self.deflections_yx_2d_from(
+            grid=aa.Grid2DIrregular(values=sub_grid)
+        )
+        traced = sub_grid - np.asarray(deflections)
+
+        if source_extent is None:
+            y_lo, y_hi = np.percentile(traced[:, 0], [1.0, 99.0])
+            x_lo, x_hi = np.percentile(traced[:, 1], [1.0, 99.0])
+        else:
+            x_lo, x_hi, y_lo, y_hi = source_extent
+
+        pixel_scale = max(
+            (y_hi - y_lo) / source_shape_native[0],
+            (x_hi - x_lo) / source_shape_native[1],
+        )
+        origin = (0.5 * (y_lo + y_hi), 0.5 * (x_lo + x_hi))
+        half_y = 0.5 * pixel_scale * source_shape_native[0]
+        half_x = 0.5 * pixel_scale * source_shape_native[1]
+
+        sub_area = mask.pixel_scales[0] * mask.pixel_scales[1] / sub_size**2
+
+        image_area, _, _ = np.histogram2d(
+            traced[:, 0],
+            traced[:, 1],
+            bins=source_shape_native,
+            range=[
+                [origin[0] - half_y, origin[0] + half_y],
+                [origin[1] - half_x, origin[1] + half_x],
+            ],
+            weights=np.full(traced.shape[0], sub_area),
+        )
+
+        # `histogram2d` puts the lowest y in its first row; an `Array2D` puts the highest y first.
+        return aa.Array2D.no_mask(
+            values=image_area[::-1, :] / pixel_scale**2,
+            pixel_scales=float(pixel_scale),
+            origin=origin,
+        )
 
     def contour_list_from(self, grid, contour_array):
         grid_contour = aa.Grid2DContour(

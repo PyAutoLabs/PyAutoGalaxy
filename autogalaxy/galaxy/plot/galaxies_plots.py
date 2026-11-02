@@ -3,7 +3,7 @@ import numpy as np
 import autoarray as aa
 
 from autogalaxy.galaxy.galaxies import Galaxies
-from autogalaxy.util.plot_utils import _to_lines, _to_positions, plot_array, plot_grid, _save_subplot, _critical_curves_from
+from autogalaxy.util.plot_utils import _to_lines, _to_positions, plot_array, plot_grid, _save_subplot, _critical_curves_from, _caustics_from
 from autoarray.plot.utils import subplots, hide_unused_axes, conf_subplot_figsize, tight_layout
 from autogalaxy import exc
 
@@ -347,6 +347,7 @@ def plot_magnification_2d(
         vmin=vmin,
         vmax=vmax,
         lines=lines,
+        cb_unit="",
         ax=ax,
     )
 
@@ -400,3 +401,194 @@ def _magnification_contours(ax, log_abs_mu_array, grid, contour_levels):
 
     ax.set_xlim(xlim)
     ax.set_ylim(ylim)
+
+
+def plot_magnification_source_plane(
+    mapper,
+    mass_obj=None,
+    grid: aa.type.Grid2DLike = None,
+    include_caustics: bool = True,
+    tangential_caustics=None,
+    radial_caustics=None,
+    vmin=None,
+    vmax=None,
+    title: str = r"Source-Plane Magnification $\mu$",
+    colormap="default",
+    output_path=None,
+    output_filename: str = "magnification_source_plane",
+    output_format=None,
+    ax=None,
+):
+    """Plot the magnification of every pixel of a source reconstruction's mesh.
+
+    Each mesh pixel is coloured by ``mapper.mesh_magnification``: the image-plane area that maps to it divided by
+    its source-plane area, i.e. how much the lens magnifies that region of the source, summed over all of its images.
+    The colour scale is logarithmic, because the magnification is largest next to the caustics. Pixels with no image
+    area (or no source-plane area) have zero magnification and are left blank.
+
+    It is the source-plane counterpart of ``plot_magnification_2d``. For parametric or Multi Gaussian Expansion
+    sources, which have no mesh, ``plot_magnification_source_plane_grid`` makes the same map on square pixels.
+
+    Parameters
+    ----------
+    mapper
+        The mapper of the pixelized source, e.g. ``inversion.cls_list_from(cls=aa.Mapper)[0]``.
+    mass_obj
+        The mass object (``Galaxies`` or a ``Tracer``) the caustics are computed from. ``None`` draws no caustics.
+    grid
+        The image-plane grid passed to the caustic calculation (used by the ``"marching_squares"`` method).
+    include_caustics
+        If ``True`` and ``mass_obj`` is given (or caustics are passed in), overlay the caustics.
+    tangential_caustics, radial_caustics
+        Pre-computed caustics; ``None`` computes them from ``mass_obj``.
+    vmin, vmax
+        Explicit colour-bar limits on the magnification. ``None`` uses the 1st and 99th percentiles of the non-zero
+        pixels.
+    title
+        Title displayed above the panel.
+    colormap
+        Matplotlib colormap name, or ``"default"``.
+    output_path
+        Directory in which to save the figure. ``None`` shows it instead.
+    output_filename
+        Stem of the output file name.
+    output_format
+        File format, e.g. ``"png"``.
+    ax
+        An existing ``Axes`` to draw into. When given the figure is not saved; the caller saves it.
+    """
+    from autoarray.plot.inversion import plot_inversion_reconstruction
+
+    mesh_magnification = np.asarray(mapper.mesh_magnification, dtype=float)
+
+    positive = mesh_magnification[mesh_magnification > 0.0]
+    if vmin is None and positive.size:
+        vmin = float(np.percentile(positive, 1.0))
+    if vmax is None and positive.size:
+        vmax = float(np.percentile(positive, 99.0))
+
+    lines = None
+    if include_caustics and (mass_obj is not None or tangential_caustics is not None):
+        if tangential_caustics is None:
+            tangential_caustics, radial_caustics = _caustics_from(mass_obj, grid)
+        lines = _to_lines(tangential_caustics, radial_caustics)
+
+    plot_inversion_reconstruction(
+        pixel_values=mesh_magnification,
+        mapper=mapper,
+        ax=ax,
+        title=title,
+        colormap=None if colormap == "default" else colormap,
+        vmin=vmin,
+        vmax=vmax,
+        use_log10=True,
+        cb_unit="",
+        zoom_to_brightest=False,
+        lines=lines,
+        output_path=output_path,
+        output_filename=output_filename,
+        output_format=output_format,
+    )
+
+
+def plot_magnification_source_plane_grid(
+    mass_obj,
+    grid: aa.type.Grid2DLike,
+    source_shape_native=(50, 50),
+    source_extent=None,
+    sub_size: int = 16,
+    contour_levels=(2.0, 5.0, 10.0, 20.0, 50.0, 100.0),
+    include_caustics: bool = True,
+    tangential_caustics=None,
+    radial_caustics=None,
+    vmin=None,
+    vmax=None,
+    title: str = r"Source-Plane Magnification $\log_{10}\mu$",
+    colormap="default",
+    output_path=None,
+    output_filename: str = "magnification_source_plane_grid",
+    output_format=None,
+    ax=None,
+):
+    """Plot the source-plane magnification on square pixels, for sources without a mesh.
+
+    The map is computed by ``LensCalc.source_plane_magnification_from`` (image-plane sub-pixels traced to the
+    source plane and binned into square source pixels) and plotted as log10 mu with labelled contours of constant mu and,
+    optionally, the caustics, following the conventions of ``plot_magnification_2d``. Source pixels no image area
+    lands in are shown at the bottom of the colour scale.
+
+    This is the map to use for parametric and Multi Gaussian Expansion sources; for a pixelized source,
+    ``plot_magnification_source_plane`` shows the magnification on the reconstruction's own mesh.
+
+    Parameters
+    ----------
+    mass_obj
+        The mass object (``Galaxy``, ``Galaxies`` or a ``Tracer``).
+    grid
+        The image-plane grid whose mask defines the image area that is traced.
+    source_shape_native, source_extent, sub_size
+        See ``LensCalc.source_plane_magnification_from``.
+    contour_levels
+        The mu values at which contour lines are drawn. ``None`` or an empty sequence draws no contours.
+    include_caustics
+        If ``True``, overlay the tangential and radial caustics.
+    tangential_caustics, radial_caustics
+        Pre-computed caustics; ``None`` computes them when ``include_caustics`` is ``True``.
+    vmin, vmax
+        Explicit colour-bar limits in log10 mu. ``None`` uses the 1st and 99th percentiles of the non-zero pixels.
+    title, colormap, output_path, output_filename, output_format, ax
+        As for ``plot_magnification_2d``.
+    """
+    from autogalaxy.operate.lens_calc import LensCalc
+
+    magnification = LensCalc.from_mass_obj(mass_obj).source_plane_magnification_from(
+        mask=grid.mask,
+        source_shape_native=source_shape_native,
+        source_extent=source_extent,
+        sub_size=sub_size,
+    )
+
+    values = np.asarray(magnification.slim.array, dtype=float)
+    positive = values > 0.0
+
+    log_mu = np.full(values.shape, np.nan)
+    log_mu[positive] = np.log10(values[positive])
+
+    if vmin is None:
+        vmin = float(np.percentile(log_mu[positive], 1.0)) if np.any(positive) else 0.0
+    if vmax is None:
+        vmax = float(np.percentile(log_mu[positive], 99.0)) if np.any(positive) else 1.0
+
+    log_mu[~positive] = vmin
+
+    log_mu_array = aa.Array2D(values=log_mu, mask=magnification.mask)
+    source_grid = aa.Grid2D.from_mask(mask=magnification.mask)
+
+    lines = None
+    if include_caustics:
+        if tangential_caustics is None:
+            tangential_caustics, radial_caustics = _caustics_from(mass_obj, grid)
+        lines = _to_lines(tangential_caustics, radial_caustics)
+
+    owns_figure = ax is None
+    if owns_figure:
+        fig, ax = subplots(1, 1, figsize=conf_subplot_figsize(1, 1))
+
+    plot_array(
+        array=log_mu_array,
+        title=title,
+        colormap=colormap,
+        vmin=vmin,
+        vmax=vmax,
+        lines=lines,
+        cb_unit="",
+        ax=ax,
+    )
+
+    _magnification_contours(
+        ax=ax, log_abs_mu_array=log_mu_array, grid=source_grid, contour_levels=contour_levels
+    )
+
+    if owns_figure:
+        tight_layout()
+        _save_subplot(fig, output_path, output_filename, output_format)

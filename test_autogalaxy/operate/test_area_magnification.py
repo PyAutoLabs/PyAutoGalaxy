@@ -154,3 +154,50 @@ def test__source_plane_area__correct_when_over_sampling_is_capped(monkeypatch):
     capped = lens_calc.source_plane_area_from(mask=mask, sub_size=4)
 
     assert capped == pytest.approx(uncapped, rel=1.0e-3)
+
+
+def test__source_plane_magnification__sis_total_magnification_inside_the_caustic():
+    """
+    A source at distance `beta < theta_E` from a singular isothermal sphere has two images, at `beta + theta_E` and
+    `theta_E - beta`, with magnifications `(beta + theta_E) / beta` and `(theta_E - beta) / beta`. Their sum,
+    `2 theta_E / beta`, is the source-plane magnification, provided the mask contains both images.
+    """
+    mask = aa.Mask2D.circular(shape_native=(120, 120), pixel_scales=0.05, radius=2.9)
+
+    magnification = _lens_calc().source_plane_magnification_from(
+        mask=mask,
+        source_shape_native=(60, 60),
+        source_extent=(-0.9, 0.9, -0.9, 0.9),
+        sub_size=8,
+    )
+
+    grid = np.asarray(aa.Grid2D.from_mask(mask=magnification.mask).array)
+    beta = np.hypot(grid[:, 0], grid[:, 1])
+    values = np.asarray(magnification.slim.array)
+
+    assert magnification.shape_native == (60, 60)
+
+    for radius in (0.4, 0.6, 0.8):
+        ring = np.abs(beta - radius) < 0.03
+        assert np.median(values[ring]) == pytest.approx(
+            2.0 * EINSTEIN_RADIUS / radius, rel=0.02
+        )
+
+
+def test__source_plane_magnification__area_is_conserved():
+    mask = aa.Mask2D.circular(shape_native=(60, 60), pixel_scales=0.1, radius=2.5)
+
+    magnification = _lens_calc().source_plane_magnification_from(
+        mask=mask,
+        source_shape_native=(40, 40),
+        source_extent=(-2.0, 2.0, -2.0, 2.0),
+        sub_size=4,
+    )
+
+    source_pixel_area = magnification.pixel_scales[0] ** 2
+    image_area = mask.pixels_in_mask * 0.1**2
+
+    # every traced sub-pixel of this mask lands inside the 4" box
+    assert np.sum(magnification.slim.array) * source_pixel_area == pytest.approx(
+        image_area, rel=1.0e-10
+    )

@@ -77,3 +77,30 @@ def test__plot_magnification_2d__contours_at_constant_mu_levels_in_range():
     assert _contour_levels_on(ax) == []
 
     plt.close("all")
+
+
+def test__plot_magnification_source_plane__mesh_output(
+    rectangular_mapper_7x7_3x3, galaxies_x2_7x7, grid_2d_7x7, plot_path, plot_patch
+):
+    aplt.plot_magnification_source_plane(
+        mapper=rectangular_mapper_7x7_3x3,
+        mass_obj=galaxies_x2_7x7,
+        grid=grid_2d_7x7,
+        output_path=plot_path,
+        output_format="png",
+    )
+    assert str(plot_path / "magnification_source_plane.png") in plot_patch.paths
+
+
+def test__plot_magnification_source_plane_grid__output(
+    galaxies_x2_7x7, grid_2d_7x7, plot_path, plot_patch
+):
+    aplt.plot_magnification_source_plane_grid(
+        mass_obj=galaxies_x2_7x7,
+        grid=grid_2d_7x7,
+        source_shape_native=(10, 10),
+        sub_size=2,
+        output_path=plot_path,
+        output_format="png",
+    )
+    assert str(plot_path / "magnification_source_plane_grid.png") in plot_patch.paths
