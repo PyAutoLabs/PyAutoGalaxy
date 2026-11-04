@@ -6,14 +6,19 @@ The best way to learn **PyAutoGalaxy** is by going through the **HowToGalaxy** l
 repository at [PyAutoLabs/HowToGalaxy](https://github.com/PyAutoLabs/HowToGalaxy).
 
 The lectures are provided as Jupyter notebooks (and Python scripts), and they are linked to via this readthedocs. The
-lectures are composed of four chapters
+lectures are composed of four chapters:
 
 - **Introduction** - An introduction to galaxy morphology and structure using **PyAutoGalaxy**.
 - **Modeling** - How to model galaxies, including a primer on Bayesian non-linear analysis and
   non-linear search chaining.
-- **Pixelizations** - How to perform pixelized reconstructions of a galaxy, including the Bayesian
-  formalism behind them.
+- **Pixelizations** - Reconstruct complex galaxy light, choose regularization using Bayesian evidence,
+  diagnose fit problems and adapt the mesh and smoothing to the light distribution.
 - **Scaling Up Galaxies** - Extra galaxies, blended multi-galaxy systems, and cluster fields.
+
+Optional tutorials cover alternative searches and runtime, with prior passing retained as historical background.
+
+The tutorial links open the current course on `main`. For the notebooks associated with a particular release,
+select that release tag in the [HowToGalaxy repository](https://github.com/PyAutoLabs/HowToGalaxy/tags).
 
 ## How to Tackle HowToGalaxy
 
@@ -37,7 +42,7 @@ Notebooks are a different way to write, view and use Python code. Compared to th
 - Images and visualization from a code to be displayed directly underneath it.
 - Text script to appear between the blocks of code.
 
-This makes them an ideal way for us to present the HowToFit lecture series, therefore I recommend you get yourself
+This makes them an ideal way for us to present the HowToGalaxy lecture series, therefore I recommend you get yourself
 a Jupyter notebook viewer (<https://jupyter.org/>) if you havent done so already.
 
 If you *really* want to use Python scripts, all tutorials are also supplied as `.py` files in the `scripts` folder
