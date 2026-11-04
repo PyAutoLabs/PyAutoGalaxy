@@ -1,23 +1,20 @@
 # Chapter 3: Pixelizations
 
-In chapter 3, we use **Pixelizations** to reconstruct the light of complex galaxies on pixelized grids.
+In chapter 3, we reconstruct complex galaxy light on pixelized grids. We use Bayesian evidence to choose the smoothing strength, investigate fits that remain inadequate, and adapt the mesh and regularization to the light distribution.
 
 The chapter contains the following tutorials:
 
-[Tutorial 1: Pixelizations](https://colab.research.google.com/github/PyAutoLabs/HowToGalaxy/blob/2026.11.1.1/notebooks/chapter_3_pixelizations/tutorial_1_pixelizations.ipynb)
-\- Creating a pixel-grid to reconstruct a galaxy's light.
+[Tutorial 1: Pixelizations, Mappers and Inversions](https://colab.research.google.com/github/PyAutoLabs/HowToGalaxy/blob/main/notebooks/chapter_3_pixelizations/tutorial_1_pixelizations.ipynb)
+\- Connect mesh points to image pixels and reconstruct complex galaxy light with a linear inversion.
 
-[Tutorial 2: Mappers](https://colab.research.google.com/github/PyAutoLabs/HowToGalaxy/blob/2026.11.1.1/notebooks/chapter_3_pixelizations/tutorial_2_mappers.ipynb)
-\- How a pixelization maps its pixels to image-pixels.
+[Tutorial 2: Bayesian Regularization](https://colab.research.google.com/github/PyAutoLabs/HowToGalaxy/blob/main/notebooks/chapter_3_pixelizations/tutorial_2_bayesian_regularization.ipynb)
+\- Compare log evidences to choose the regularization strength and examine its dependence on mesh resolution.
 
-[Tutorial 3: Inversions](https://colab.research.google.com/github/PyAutoLabs/HowToGalaxy/blob/2026.11.1.1/notebooks/chapter_3_pixelizations/tutorial_3_inversions.ipynb)
-\- Inverting the mappings to reconstruct the galaxy's light.
+[Tutorial 3: Fit Problems](https://colab.research.google.com/github/PyAutoLabs/HowToGalaxy/blob/main/notebooks/chapter_3_pixelizations/tutorial_3_fit_problems.ipynb)
+\- See why compact galaxy light challenges mesh resolution and constant regularization, even after choosing the coefficient using evidence.
 
-[Tutorial 4: Bayesian Regularization](https://colab.research.google.com/github/PyAutoLabs/HowToGalaxy/blob/2026.11.1.1/notebooks/chapter_3_pixelizations/tutorial_4_bayesian_regularization.ipynb)
-\- Smoothing the reconstruction within a Bayesian framework.
+[Tutorial 4: Adaptive Reconstruction](https://colab.research.google.com/github/PyAutoLabs/HowToGalaxy/blob/main/notebooks/chapter_3_pixelizations/tutorial_4_adaptive_reconstruction.ipynb)
+\- Combine Delaunay meshes, Hilbert brightness adaptation and adaptive Split regularization for directly observed galaxies.
 
-[Tutorial 5: Bayesian Formalism](https://colab.research.google.com/github/PyAutoLabs/HowToGalaxy/blob/2026.11.1.1/notebooks/chapter_3_pixelizations/tutorial_5_bayesian_formalism.ipynb)
-\- The linear algebra and Bayesian evidence equations behind pixelized galaxy reconstruction.
-
-[Tutorial 6: Model Fit](https://colab.research.google.com/github/PyAutoLabs/HowToGalaxy/blob/2026.11.1.1/notebooks/chapter_3_pixelizations/tutorial_6_model_fit.ipynb)
-\- An example modeling pipeline which uses an inversion.
+[Tutorial 5: Model Fit](https://colab.research.google.com/github/PyAutoLabs/HowToGalaxy/blob/main/notebooks/chapter_3_pixelizations/tutorial_5_model_fit.ipynb)
+\- Combine a smooth analytic light component with a pixelization in a model fit.
