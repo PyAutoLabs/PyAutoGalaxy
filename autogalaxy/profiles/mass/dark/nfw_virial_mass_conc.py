@@ -3,6 +3,7 @@ import numpy as np
 
 
 from autogalaxy.profiles.mass.dark.nfw import NFWSph
+from autogalaxy.profiles.mass.dark.gnfw_virial_mass_conc import is_jax
 from autogalaxy.cosmology.model import Planck15
 
 
@@ -16,7 +17,9 @@ def kappa_s_and_scale_radius(
     """
     Computes kappa_s and scale radius for an NFW halo given virial mass and concentration.
 
-    No astropy.units required.
+    No astropy.units required. JAX-traceable: when ``virial_mass`` or
+    ``concentration`` is a JAX array or tracer the computation uses ``jax.numpy``,
+    otherwise NumPy.
 
     Assumes:
     - virial_mass in Msun
@@ -25,29 +28,34 @@ def kappa_s_and_scale_radius(
     - kpc_per_arcsec in kpc / arcsec
     """
 
+    if is_jax(virial_mass) or is_jax(concentration):
+        import jax.numpy as xp
+    else:
+        xp = np
+
     cosmology = Planck15()
 
     # Msun / kpc^3
-    cosmic_average_density = cosmology.critical_density(redshift_object, xp=np)
+    cosmic_average_density = cosmology.critical_density(redshift_object, xp=xp)
 
     # Msun / kpc^2
     critical_surface_density = (
         cosmology.critical_surface_density_between_redshifts_solar_mass_per_kpc2_from(
             redshift_0=redshift_object,
             redshift_1=redshift_source,
-            xp=np,
+            xp=xp,
         )
     )
 
     # kpc / arcsec
     kpc_per_arcsec = cosmology.kpc_per_arcsec_from(
         redshift=redshift_object,
-        xp=np,
+        xp=xp,
     )
 
     # Virial radius r_vir in kpc
     virial_radius = (
-        virial_mass / (virial_overdens * cosmic_average_density * (4.0 * np.pi / 3.0))
+        virial_mass / (virial_overdens * cosmic_average_density * (4.0 * xp.pi / 3.0))
     ) ** (1.0 / 3.0)
 
     # Characteristic overdensity factor
@@ -56,7 +64,7 @@ def kappa_s_and_scale_radius(
         / 3.0
         * (
             concentration**3
-            / (np.log(1.0 + concentration) - concentration / (1.0 + concentration))
+            / (xp.log(1.0 + concentration) - concentration / (1.0 + concentration))
         )
     )
 
