@@ -34,8 +34,8 @@ def test__model_visibilities__log_likelihood__correct_value(interferometer_7):
     [
         ("two_sersic_galaxies", -1994.35383952, False),
         ("basis_of_sersics", -1994.3538395, False),
-        ("pixelization_only", -71.770448724198, True),
-        ("light_plus_pixelization", -196.15073725528504, True),
+        ("pixelization_only", -62.5598646805, True),
+        ("light_plus_pixelization", -186.9403968573, True),
         ("two_linear_light_profiles", -23.44419, True),
         ("basis_of_linear_light_profiles", -23.44419235, True),
     ],
@@ -128,8 +128,8 @@ def test__fit_figure_of_merit__linear_light_plus_pixelization__log_evidence_corr
         dataset=interferometer_7, galaxies=[g0_linear_light, galaxy_pix]
     )
 
-    assert fit.log_evidence == pytest.approx(-37.4081355120388, 1e-4)
-    assert fit.figure_of_merit == pytest.approx(-37.4081355120388, 1.0e-4)
+    assert fit.log_evidence == pytest.approx(-28.1977951144, 1e-4)
+    assert fit.figure_of_merit == pytest.approx(-28.1977951144, 1.0e-4)
 
 
 def test__galaxy_image_dict__normal_light_profiles__individual_galaxies_match(

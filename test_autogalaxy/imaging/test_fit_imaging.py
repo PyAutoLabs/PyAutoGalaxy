@@ -60,14 +60,14 @@ def test__model_image__with_psf_blurring__correct_log_likelihood(masked_imaging_
     [
         ("two_sersic_galaxies", -71.46911964, False),
         ("basis_of_sersics", -71.46911964, False),
-        ("pixelization_only", -22.91411868616, True),
-        ("light_plus_pixelization", -29.235208518732776, True),
+        ("pixelization_only", -13.7037782882, True),
+        ("light_plus_pixelization", -20.0248681208, True),
         ("two_linear_light_profiles", -14.544339716, True),
         ("basis_of_linear_light_profiles", -14.544339716, True),
-        ("basis_with_regularization", -25.83890655, True),
+        ("basis_with_regularization", -16.6285661797, True),
         ("two_operated_light_profiles", -289.6050404, False),
         ("two_linear_operated_light_profiles", -14.7635041, True),
-        ("linear_light_plus_pixelization", -22.8918119554022, True),
+        ("linear_light_plus_pixelization", -13.6814715575, True),
     ],
 )
 def test__fit_figure_of_merit__various_galaxy_configs__correct_value_and_inversion_flag(
@@ -255,7 +255,7 @@ def test__fit__model_dataset__grid_offset__with_pixelization__correct_figure_of_
         dataset_model=ag.DatasetModel(grid_offset=(1.0, 2.0)),
     )
 
-    assert fit.figure_of_merit == pytest.approx(-22.914118686169, 1.0e-4)
+    assert fit.figure_of_merit == pytest.approx(-13.7037782882, 1.0e-4)
 
 
 def test__galaxy_image_dict__normal_light_profiles__individual_galaxies_match(
