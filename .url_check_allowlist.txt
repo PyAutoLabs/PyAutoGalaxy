@@ -7,10 +7,8 @@
 # To accept new breakage: append the URL here. To force a fix: leave it out.
 
 # Academic citations (paywall / DOI / journal)
-https://academic.oup.com/mnras/article/488/1/1387/5526256  # autogalaxy/profiles/mass/abstract/mge.py:12
 
 # Code of Conduct boilerplate
-http://geekfeminism.wikia.com/wiki/Conference_anti-harassment/Policy  # CODE_OF_CONDUCT.md:305
 
 # External dead / paywalled / departmental pages
 http://www.astro.uvic.ca/~simard/GIM2D/  # paper/paper.md:188
@@ -22,4 +20,3 @@ https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/imaging/a
 # Internal PyAuto docs — pages renamed, need editorial fix
 https://pyautogalaxy.readthedocs.io/en/latest/api/mass.html  # docs/general/model_cookbook.md:190
 https://pyautogalaxy.readthedocs.io/en/latest/general/installation.html#installation-with-pip  # docs/general/workspace.md:7
-https://pyautogalaxy.readthedocs.io/en/latest/overview/lensing.html  # docs/index.md:53

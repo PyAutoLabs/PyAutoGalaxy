@@ -8,7 +8,7 @@ in [.tex format here](https://github.com/PyAutoLabs/PyAutoGalaxy/blob/main/files
 As shown in the examples, we would greatly appreciate it if you mention **PyAutoGalaxy** by name and include a link to
 our GitHub page!
 
-**PyAutoGalaxy** is published in the [Journal of Open Source Software](https://joss.theoj.org/papers/10.21105/joss.02825#) and its
+**PyAutoGalaxy** is published in the [Journal of Open Source Software](https://joss.theoj.org/papers/10.21105/joss.04475) and its
 entry in the above .bib file is under the citation key `pyautogalaxy`.
 
 You should also specify the non-linear search(es) you use in your analysis (e.g. Nautilus, Dynesty, Emcee, Zeus, etc) in
