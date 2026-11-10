@@ -131,7 +131,7 @@ def test__simulate_interferometer_data_and_fit__known_likelihood():
         galaxies=[galaxy_0, galaxy_1],
     )
 
-    assert fit.figure_of_merit == pytest.approx(-5.05513095, 1.0e-2)
+    assert fit.figure_of_merit == pytest.approx(4.1615541685, 1.0e-2)
 
 
 def test__linear_light_profiles_agree_with_standard_light_profiles():

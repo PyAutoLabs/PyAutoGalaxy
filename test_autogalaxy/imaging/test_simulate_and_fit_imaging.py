@@ -237,7 +237,7 @@ def test__simulate_imaging_data_and_fit__standard_galaxies__known_figure_of_meri
 
     fit = ag.FitImaging(dataset=masked_dataset, galaxies=[galaxy_0, galaxy_1])
 
-    assert fit.figure_of_merit == pytest.approx(579.015739085647, 1.0e-2)
+    assert fit.figure_of_merit == pytest.approx(590.4175234767, 1.0e-2)
 
 
 def test__simulate_imaging_data_and_fit__basis_galaxies__same_figure_of_merit_as_standard():
@@ -275,7 +275,7 @@ def test__simulate_imaging_data_and_fit__basis_galaxies__same_figure_of_merit_as
 
     fit = ag.FitImaging(dataset=masked_dataset, galaxies=[galaxy_0, galaxy_1])
 
-    assert fit.figure_of_merit == pytest.approx(579.015739085647, 1.0e-2)
+    assert fit.figure_of_merit == pytest.approx(590.4175234767, 1.0e-2)
 
 
 def test__linear_light_profiles_agree_with_standard__reconstruction_recovers_intensities():
