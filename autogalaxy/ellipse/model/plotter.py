@@ -65,17 +65,14 @@ class PlotterEllipse(Plotter):
         ``config/visualize/plots.yaml``.  Outputs data images with ellipse
         overlays, ellipse residual plots, and a combined fit subplot.
 
-        Each data-image variant is written to its own file so none overwrites
-        another:
+        The ``data`` toggle writes two images of the data with the fitted
+        ellipses overlaid, each to its own file:
 
-        - ``ellipse_fit`` -- the data with the fitted ellipses overlaid
-          (``data``).
-        - ``ellipse_fit_log10`` -- the same, on a log10 colour scale
-          (``data``).
-        - ``ellipse_fit_no_ellipse`` -- the data without the ellipse overlays
-          (``data_no_ellipse``).
-        - ``ellipse_fit_no_ellipse_log10`` -- the same, on a log10 colour
-          scale (``data_no_ellipse``).
+        - ``ellipse_fit`` -- linear colour scale.
+        - ``ellipse_fit_log10`` -- log10 colour scale.
+
+        The ``ellipse_residuals`` toggle writes ``ellipse_residuals`` and the
+        ``subplot_fit_ellipse`` toggle writes the ``fit_ellipse`` subplot.
 
         Parameters
         ----------
@@ -101,16 +98,6 @@ class PlotterEllipse(Plotter):
                 output_format=self.fmt,
             )
 
-        if should_plot("data_no_ellipse"):
-            fit_ellipse_plots._plot_data(
-                fit_list=fit_list,
-                output_path=self.image_path,
-                output_format=self.fmt,
-                disable_data_contours=True,
-                title_prefix=self.title_prefix,
-                suffix="_no_ellipse",
-            )
-
         if should_plot("subplot_fit_ellipse"):
             fit_ellipse_plots.subplot_fit_ellipse(
                 fit_list=fit_list,
@@ -127,15 +114,4 @@ class PlotterEllipse(Plotter):
                 use_log10=True,
                 title_prefix=self.title_prefix,
                 suffix="_log10",
-            )
-
-        if should_plot("data_no_ellipse"):
-            fit_ellipse_plots._plot_data(
-                fit_list=fit_list,
-                output_path=self.image_path,
-                output_format=self.fmt,
-                use_log10=True,
-                disable_data_contours=True,
-                title_prefix=self.title_prefix,
-                suffix="_no_ellipse_log10",
             )

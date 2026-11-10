@@ -18,7 +18,6 @@ def _plot_data(
     output_format=None,
     colormap="default",
     use_log10=False,
-    disable_data_contours: bool = False,
     suffix: str = "",
     ax=None,
     title_prefix: str = None,
@@ -44,8 +43,6 @@ def _plot_data(
         Matplotlib colormap name, or ``"default"``.
     use_log10 : bool
         Apply a log₁₀ stretch to the image values.
-    disable_data_contours : bool
-        Reserved for future contour-suppression support (currently unused).
     suffix : str
         Optional suffix appended to *output_filename* before the extension.
     ax : matplotlib.axes.Axes or None
@@ -127,7 +124,6 @@ def subplot_fit_ellipse(
     output_format=None,
     colormap="default",
     use_log10=False,
-    disable_data_contours: bool = False,
     title_prefix: str = None,
 ):
     """Create a two-panel subplot summarising a list of ellipse fits.
@@ -148,8 +144,6 @@ def subplot_fit_ellipse(
         Matplotlib colormap name, or ``"default"``.
     use_log10 : bool
         Apply a log₁₀ stretch to the image values in the left panel.
-    disable_data_contours : bool
-        If ``True``, suppress ellipse contour overlays on the image panel.
     """
     fig, axes = subplots(1, 2, figsize=conf_subplot_figsize(1, 2))
 
@@ -157,7 +151,6 @@ def subplot_fit_ellipse(
         fit_list=fit_list,
         colormap=colormap,
         use_log10=use_log10,
-        disable_data_contours=disable_data_contours,
         ax=axes[0],
         title_prefix=title_prefix,
     )
@@ -231,7 +224,9 @@ def subplot_ellipse_errors(
 
         try:
             median_arr = np.array(
-                median_ellipse.array if hasattr(median_ellipse, "array") else median_ellipse
+                median_ellipse.array
+                if hasattr(median_ellipse, "array")
+                else median_ellipse
             )
             lines = [median_arr] if median_arr.ndim == 2 else None
         except Exception:
