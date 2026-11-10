@@ -25,6 +25,7 @@ class PlotterEllipse(Plotter):
         dataset
             The imaging dataset to visualize.
         """
+
         def should_plot(name):
             return plot_setting(section=["dataset", "imaging"], name=name)
 
@@ -64,11 +65,24 @@ class PlotterEllipse(Plotter):
         ``config/visualize/plots.yaml``.  Outputs data images with ellipse
         overlays, ellipse residual plots, and a combined fit subplot.
 
+        Each data-image variant is written to its own file so none overwrites
+        another:
+
+        - ``ellipse_fit`` -- the data with the fitted ellipses overlaid
+          (``data``).
+        - ``ellipse_fit_log10`` -- the same, on a log10 colour scale
+          (``data``).
+        - ``ellipse_fit_no_ellipse`` -- the data without the ellipse overlays
+          (``data_no_ellipse``).
+        - ``ellipse_fit_no_ellipse_log10`` -- the same, on a log10 colour
+          scale (``data_no_ellipse``).
+
         Parameters
         ----------
         fit_list
             The list of ellipse fits to visualize (one per ellipse).
         """
+
         def should_plot(name):
             return plot_setting(section=["fit", "fit_ellipse"], name=name)
 
@@ -94,6 +108,7 @@ class PlotterEllipse(Plotter):
                 output_format=self.fmt,
                 disable_data_contours=True,
                 title_prefix=self.title_prefix,
+                suffix="_no_ellipse",
             )
 
         if should_plot("subplot_fit_ellipse"):
@@ -104,13 +119,15 @@ class PlotterEllipse(Plotter):
                 title_prefix=self.title_prefix,
             )
 
-        fit_ellipse_plots._plot_data(
-            fit_list=fit_list,
-            output_path=self.image_path,
-            output_format=self.fmt,
-            use_log10=True,
-            title_prefix=self.title_prefix,
-        )
+        if should_plot("data"):
+            fit_ellipse_plots._plot_data(
+                fit_list=fit_list,
+                output_path=self.image_path,
+                output_format=self.fmt,
+                use_log10=True,
+                title_prefix=self.title_prefix,
+                suffix="_log10",
+            )
 
         if should_plot("data_no_ellipse"):
             fit_ellipse_plots._plot_data(
@@ -120,4 +137,5 @@ class PlotterEllipse(Plotter):
                 use_log10=True,
                 disable_data_contours=True,
                 title_prefix=self.title_prefix,
+                suffix="_no_ellipse_log10",
             )
