@@ -2,291 +2,71 @@
 
 # Features
 
-This page provides an overview of the advanced features of **PyAutoGalaxy**.
+<span id="choose-a-feature-by-dataset"></span><span id="imaging"></span><span id="interferometer"></span><span id="multiple-datasets"></span><span id="blended-galaxies"></span>
 
-Firstly, brief one sentence descriptions of each feature are given, with more detailed descriptions below including
-links to the relevant workspace examples.
+Explore the modelling tools you can add to your analysis. Each introduction explains the scientific use cases and links to worked examples.
 
-**Linear Light Profiles**: Solve brightnesses while sampling galaxy geometry.
+For your first dataset and starting notebook, use the [New User Guide](https://autogalaxy.readthedocs.io/en/latest/overview/overview_2_new_user_guide.html).
 
-**Extra Galaxies**: Model neighbouring light that overlaps the target.
+<table class="feature-gallery"><tbody><tr><td width="25%"><a href="#multi-gaussian-expansion-mge"><img src="https://raw.githubusercontent.com/PyAutoLabs/PyAutoGalaxy/main/docs/overview/images/overview_3/mge_illustration.png" alt="Multi Gaussian Expansion (MGE) illustration" width="220"><br>MGE</a></td><td width="25%"><a href="#pixelizations"><img src="https://raw.githubusercontent.com/PyAutoLabs/PyAutoGalaxy/main/docs/overview/images/overview_3/pixelization_illustration.png" alt="Pixelizations illustration" width="220"><br>Pixelizations</a></td><td width="25%"><a href="#shapelets"><img src="https://raw.githubusercontent.com/PyAutoLabs/PyAutoGalaxy/main/docs/overview/images/overview_3/shapelets_illustration.png" alt="Shapelets illustration" width="220"><br>Shapelets</a></td><td width="25%"><a href="#ellipse-fitting"><img src="https://raw.githubusercontent.com/PyAutoLabs/PyAutoGalaxy/main/docs/overview/images/overview_3/ellipse.png" alt="Ellipse Fitting illustration" width="220"><br>Ellipse Fitting</a></td></tr></tbody></table>
 
-**Point Source**: Simulate unresolved nuclear emission in an extended host.
+*Conceptual illustrations, not measured data or guaranteed reconstructions.*
 
-**Interferometry**: Modeling of interferometer data (e.g. ALMA, LOFAR) directly in the uv-plane.
+<details class="feature-more-images"><summary>More feature illustrations</summary><table class="feature-gallery"><tbody><tr><td width="25%"><a href="#linear-light-profiles"><img src="https://raw.githubusercontent.com/PyAutoLabs/PyAutoGalaxy/main/docs/overview/images/overview_3/linear_light_profiles.png" alt="Linear Light Profiles illustration" width="220"><br>Linear Light Profiles</a></td><td width="25%"><a href="#extra-galaxies"><img src="https://raw.githubusercontent.com/PyAutoLabs/PyAutoGalaxy/main/docs/overview/images/overview_2/galaxy_systems.png" alt="Extra Galaxies illustration" width="220"><br>Extra Galaxies</a></td><td width="25%"><a href="#point-source"><img src="https://raw.githubusercontent.com/PyAutoLabs/PyAutoGalaxy/main/docs/overview/images/overview_3/point_source.png" alt="Point Source illustration" width="220"><br>Point Source</a></td><td width="25%"><a href="#operated-light-profiles"><img src="https://raw.githubusercontent.com/PyAutoLabs/PyAutoGalaxy/main/docs/overview/images/overview_3/operated_light_profile.png" alt="Operated Light Profiles illustration" width="220"><br>Operated Light Profiles</a></td></tr><tr><td width="25%"><a href="#sky-background"><img src="https://raw.githubusercontent.com/PyAutoLabs/PyAutoGalaxy/main/docs/overview/images/overview_3/sky_background.png" alt="Sky Background illustration" width="220"><br>Sky Background</a></td><td width="25%"><a href="#interferometry"><img src="https://raw.githubusercontent.com/PyAutoLabs/PyAutoGalaxy/main/docs/overview/images/overview_2/galaxy_interferometry.png" alt="Interferometry illustration" width="220"><br>Interferometry</a></td><td width="25%"><a href="#multi-wavelength"><img src="https://raw.githubusercontent.com/PyAutoLabs/PyAutoGalaxy/main/docs/overview/images/overview_2/galaxy_multi_wavelength.png" alt="Multi-Wavelength illustration" width="220"><br>Multi-Wavelength</a></td></tr></tbody></table></details>
 
-**Multi-Wavelength**: Simultaneous analysis of imaging and / or interferometer datasets observed at different wavelengths.
+## Measure galaxy structure
 
-**Ellipse Fitting**: Fitting ellipses to determine a galaxy's ellipticity, position angle and centre.
+<div id="multi-gaussian-expansion-mge" class="feature-entry"><h3>Multi Gaussian Expansion (MGE)</h3><p>Describe central and extended galaxy light with a sum of Gaussians. An MGE captures changes in shape with radius while solving component brightnesses together, providing a flexible alternative to a small set of light profiles.</p>
+<p><a href="https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/imaging/features/multi_gaussian_expansion/start_here.ipynb">Explore multi gaussian expansion (mge)</a>.</p>
+</div>
 
-**Multi Gaussian Expansion (MGE)**: Describe central and extended galaxy light with a flexible sum of Gaussian components.
+<div id="pixelizations" class="feature-entry"><h3>Pixelizations</h3><p>Reconstruct clumpy or asymmetric galaxy light on a mesh when a few analytic profiles are too restrictive. The data, mesh and regularization determine which structures can be recovered.</p>
+<p><a href="https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/imaging/features/pixelization/start_here.ipynb">Start with pixelization</a>.</p>
+</div>
 
-**Shapelets**: Decomposing a galaxy into a set of shapelet orthogonal basis functions, capturing more complex structures than simple light profiles.
+<div id="shapelets" class="feature-entry"><h3>Shapelets</h3><p>Study asymmetric morphology and structured residuals using a sum of spatial basis functions. Shapelet order, scale and geometry control the flexibility; assess the combined brightness distribution rather than treating individual basis modes as physical components.</p>
+<p><a href="https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/imaging/features/shapelets/start_here.ipynb">Explore shapelets</a>.</p>
+</div>
 
-**Sky Background**: Fit uncertain sky levels alongside faint galaxy outskirts.
+<div id="ellipse-fitting" class="feature-entry"><h3>Ellipse Fitting</h3><p>Measure how a galaxy’s ellipticity, position angle and centre change with radius without imposing a radial light-profile law. Add multipoles to study lopsided or non-elliptical isophotes. This dedicated PyAutoGalaxy capability fits observed light; the examples do not convolve a light model with the PSF.</p>
+<p><a href="https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/ellipse/fit.ipynb">Explore ellipse fitting</a>.</p>
+<p>Continue to <a href="https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/ellipse/modeling.ipynb">modeling</a> and <a href="https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/ellipse/multipoles.ipynb">multipoles</a>.</p>
+</div>
 
-**Operated Light Profiles**: Fit compact imaging emission whose profile already includes its PSF response.
+## Separate light components
 
-**Pixelizations**: Reconstruct irregular galaxy light on a regularized mesh.
+<div id="linear-light-profiles" class="feature-entry"><h3>Linear Light Profiles</h3><p>Fit galaxy geometry with fewer sampled parameters by solving component brightnesses together at each likelihood evaluation. This is especially useful for bulge–disc decomposition and models with many overlapping light components.</p>
+<p><a href="https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/imaging/features/linear_light_profiles/start_here.ipynb">Explore linear light profiles</a>.</p>
+</div>
 
-## Interferometry
+<div id="extra-galaxies" class="feature-entry"><h3>Extra Galaxies</h3><p>Measure a target galaxy in a crowded field by fitting neighbouring light alongside it. Separating overlapping emission helps protect the inferred size, shape and flux of the target.</p>
+<p><a href="https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/imaging/features/extra_galaxies/start_here.ipynb">Explore extra galaxies</a>.</p>
+</div>
 
-Study the radio and submillimeter structure of galaxies by modeling interferometer data from submillimeter (e.g. ALMA) and radio (e.g. LOFAR) observatories:
+<div id="point-source" class="feature-entry"><h3>Point Source</h3><p>Simulate an unresolved nucleus inside an extended host galaxy. This example shows how compact and extended light combine after the instrumental response; it is a simulator, not a point-source fitting workflow.</p>
+<p><a href="https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/imaging/features/point_source/start_here.ipynb">Explore point source</a>.</p>
+</div>
 
-```{image} https://raw.githubusercontent.com/PyAutoLabs/PyAutoGalaxy/main/paper/almacombined.png
-:alt: Alternative text
-:width: 600
-```
+<div id="operated-light-profiles" class="feature-entry"><h3>Operated Light Profiles</h3><p>Separate compact nuclear emission from an extended host with a component that already includes the imaging PSF response. For interferometer data, the compact sky model is still transformed into visibilities.</p>
+<p><a href="https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/imaging/features/operated_light_profile/start_here.ipynb">Explore operated light profiles</a>.</p>
+</div>
 
-Visibilities data is fitted directly in the uv-plane, circumventing issues that arise when fitting a dirty image
-such as correlated noise. This uses the non-uniform fast fourier transform algorithm
-\[nufftax\](<https://github.com/GragasLab/nufftax>) to efficiently map the galaxy model images to the uv-plane.
+<div id="sky-background" class="feature-entry"><h3>Sky Background</h3><p>Measure faint galaxy outskirts while fitting an uncertain sky level alongside the galaxy light. The example fits a constant background; estimating its mean does not remove photon noise.</p>
+<p><a href="https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/imaging/features/sky_background/start_here.ipynb">Explore sky background</a>.</p>
+</div>
 
-Checkout the `autogalaxy_workspace/*/interferometer` package to get started.
+## Combine observations and samples
 
-For flexible galaxy-light modeling, see [MGE](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/interferometer/features/multi_gaussian_expansion/start_here.ipynb) and [pixelization](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/interferometer/features/pixelization/start_here.ipynb).
-Inspect the sky reconstruction as well as the visibility fit; a dirty image is not the likelihood dataset.
+<div id="interferometry" class="feature-entry"><h3>Interferometry</h3><p>Extend visibility modelling with MGE, shapelets or pixelized galaxy light to investigate complex emission.</p>
+<p><a href="https://github.com/PyAutoLabs/autogalaxy_workspace/tree/main/notebooks/interferometer/features">Interferometer features</a>.</p>
+</div>
 
+<div id="multi-wavelength" class="feature-entry"><h3>Multi-Wavelength</h3><p>Compare galaxy structure across bands and distinguish components such as a red bulge and blue disc, or stellar and dust emission. Fit datasets together with shared or wavelength-dependent parameters while preserving their individual responses and noise.</p>
+<p><a href="https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/multi_dataset/start_here.ipynb">Explore multi-wavelength</a>.</p>
+</div>
 
-## Multi-Wavelength
+<div id="graphical-models" class="feature-entry"><h3>Graphical Models</h3><p>Infer population trends by fitting galaxy datasets with shared parameters. Hierarchical models describe distributions of properties such as size or Sersic index, helping study how galaxy structure varies with mass or redshift.</p>
+<p>See the <a href="https://github.com/PyAutoLabs/autofit_workspace/tree/main/notebooks/features">PyAutoFit graphical-model examples</a> for the shared-parameter API.</p>
+</div>
 
-Modeling imaging datasets observed at different wavelengths (e.g. HST F814W and F150W) simultaneously or simultaneously
-analysing imaging and interferometer data:
-
-```{image} https://raw.githubusercontent.com/PyAutoLabs/PyAutoGalaxy/main/docs/overview/images/overview_3/g_image.png
-:alt: Alternative text
-:width: 400
-```
-
-```{image} https://raw.githubusercontent.com/PyAutoLabs/PyAutoGalaxy/main/docs/overview/images/overview_3/r_image.png
-:alt: Alternative text
-:width: 400
-```
-
-The appearance of the galaxy changes as a function of wavelength, therefore multi-wavelength analysis means we can learn
-more about the different components in a galaxy (e.g a redder bulge and bluer disk) or when imaging and interferometer
-data are combined, we can compare the emission from stars and dust.
-
-Checkout the `autogalaxy_workspace/*/multi_dataset` package to get started, however combining datasets is a more advanced
-feature and it is recommended you first get to grips with the core API.
-
-![Imaging, visibility sampling and multi-band observations](images/overview_2/dataset_types.png)
-
-Reused new-user-guide schematic, not observed data. Visibility sampling positions are distinct from
-measured amplitudes, and separate bands need not share the same light distribution.
-
-Use [wavelength dependence](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/multi_dataset/features/wavelength_dependence/start_here.ipynb) for linked bulge and disk radii, [pixelization](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/multi_dataset/features/pixelization/start_here.ipynb) for per-band
-light reconstructions, or [imaging and interferometer](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/multi_dataset/features/imaging_and_interferometer/start_here.ipynb) for complementary emission.
-The [one-by-one example](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/multi_dataset/features/one_by_one/start_here.ipynb) shows parameter transfer; fixing an earlier estimate does not propagate its full uncertainty.
-
-
-## Ellipse Fitting
-
-Measure how a galaxy's light changes shape with radius: its ellipticity, position angle and centre,
-including isophotal twists and departures from elliptical symmetry. Ellipse fitting complements a
-Sersic or multi-component light model by tracing isophotes without prescribing a radial light-profile law.
-
-This is a dedicated capability of **PyAutoGalaxy**, implemented in `autogalaxy.ellipse` and exposed through
-`Ellipse`, `FitEllipse` and `AnalysisEllipse`. The worked examples live in `autogalaxy_workspace/notebooks/ellipse/`.
-
-```{image} https://raw.githubusercontent.com/PyAutoLabs/PyAutoGalaxy/main/docs/overview/images/overview_3/ellipse.png
-:alt: Ellipses tracing the shape of galaxy light
-:width: 600
-```
-
-At each radius, the fit samples the image along an ellipse and compares the sampled brightness with its
-mean. Multipole extensions describe deviations from elliptical isophotes, including lopsided structure.
-[Amvrosiadis et al. (2024)](https://arxiv.org/abs/2407.12983) illustrate the use of the m=1 multipole to
-measure lopsidedness in early-type galaxies and discuss its relevance to lens mass models.
-
-These examples fit observed isophotes without PSF convolution of a light model. Interpret structures close
-to the PSF scale accordingly, and mask contaminating light when measuring a galaxy's morphology.
-
-Start with [how the ellipse fit works](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/ellipse/fit.ipynb), then
-[fit ellipse parameters](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/ellipse/modeling.ipynb) and
-[add multipoles](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/ellipse/multipoles.ipynb).
-
-
-## Linear Light Profiles
-
-Fit galaxy structure with fewer sampled parameters by solving component brightnesses at every likelihood evaluation. This is especially useful for bulge–disk decomposition and models containing many overlapping light components: the search explores their geometry while their intensities are solved together.
-
-![Linear Light Profiles](images/overview_3/linear_light_profiles.png)
-
-Conceptual illustration: the paths symbolize different sampled parameter spaces, not measured convergence rates or removal of physical degeneracies.
-
-Read the [feature introduction](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/imaging/features/linear_light_profiles/start_here.ipynb) for the scientific use cases,
-model assumptions and worked-example routes.
-
-## Extra Galaxies
-
-Measure a target galaxy's light in a crowded field by modeling the neighbouring galaxies whose emission overlaps the fitted region. Separating those contributions helps protect the target's inferred size, shape and flux from contamination.
-
-![Single, blended and cluster-field galaxy-light environments](images/overview_2/galaxy_systems.png)
-
-Reused new-user-guide schematic: these are light-modeling environments, not gravitational-lensing mass models.
-
-See [the imaging introduction](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/imaging/features/extra_galaxies/start_here.ipynb) and [the multi-galaxy introduction](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/multi_galaxy/features/extra_galaxies/start_here.ipynb) for component choices and fixed-centre companions.
-
-## Point Source
-
-Explore how an unresolved nucleus contributes to a galaxy image and affects measurements of its extended host. The point-source component supplies a position and flux; the instrumental response determines its observed footprint.
-
-![Point Source](images/overview_3/point_source.png)
-
-Conceptual illustration of added unresolved nuclear emission. The bright footprint is set by the response; it does not resolve the intrinsic nucleus.
-
-Read the [feature introduction](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/imaging/features/point_source/start_here.ipynb) for the scientific use cases,
-model assumptions and worked-example routes.
-
-The point-source folder currently supplies a simulator, not a complete inference workflow. It demonstrates
-an unresolved nuclear component in an extended host; the PSF determines its observed footprint.
-
-## Multi Gaussian Expansion (MGE)
-
-Describe a galaxy's central light and extended envelope with a flexible sum of Gaussian profiles. An MGE is useful when one simple profile leaves structured residuals, or when you need a smooth light model from which to measure the combined luminosity and radial structure.
-
-![Multi Gaussian Expansion](images/overview_3/mge_illustration.png)
-
-Conceptual illustration: the displayed Gaussians are components of one light model. The inset is a decomposition, not a spatial magnification of the galaxy core.
-
-Read the [feature introduction](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/imaging/features/multi_gaussian_expansion/start_here.ipynb) for the scientific use cases,
-model assumptions and worked-example routes.
-
-The teaching figures below show the Gaussian components and their model structure. Narrow basis widths
-can represent compact light; they do not establish spatial resolution finer than the data support. The model
-solves component intensities rather than sampling them individually.
-
-```{image} https://raw.githubusercontent.com/PyAutoLabs/PyAutoGalaxy/main/docs/overview/images/overview_3/mge.png
-:alt: Alternative text
-:width: 600
-```
-
-```{image} https://raw.githubusercontent.com/PyAutoLabs/PyAutoGalaxy/main/docs/overview/images/overview_3/mge_model.png
-:alt: The MGE galaxy model, whose sixty Gaussians are drawn as two plates of thirty components.
-:width: 600
-```
-
-
-## Shapelets
-
-Describe departures from a smooth galaxy profile with a flexible set of spatial basis functions. Shapelets are useful for studying asymmetric morphology and structured residuals while retaining a compact parameterization of the basis geometry.
-
-![Shapelets](images/overview_3/shapelets_illustration.png)
-
-Reused conceptual illustration. “Source model” here means the emitting galaxy; there is no gravitational-lensing source plane. The summed basis represents light, not separate physical structures.
-
-Read the [feature introduction](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/imaging/features/shapelets/start_here.ipynb) for the scientific use cases,
-model assumptions and worked-example routes.
-
-![Shapelet basis teaching grid](images/overview_3/shapelets_basis.png)
-
-Keep the basis grid alongside the conceptual illustration. Signed basis coefficients need not imply
-negative total light; inspect the sum. The basis order, scale and shared geometry determine its flexibility.
-
-
-## Sky Background
-
-Measure faint galaxy outskirts while fitting an uncertain sky level alongside the galaxy light. This is useful for retained backgrounds and residual sky-subtraction offsets, where a small background error can otherwise alter the inferred size or outer profile.
-
-![Sky Background](images/overview_3/sky_background.png)
-
-Conceptual illustration: the separated layers are additive light and background components, not physical planes in space.
-
-Read the [feature introduction](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/imaging/features/sky_background/start_here.ipynb) for the scientific use cases,
-model assumptions and worked-example routes.
-
-The example fits a constant sky level. Fitting its mean does not remove photon noise. The supplied
-simulation uses 5.0 electrons per second, at the upper edge of the example prior [0.0, 5.0]; choose
-appropriate bounds when adapting the analysis.
-
-
-## Operated Light Profiles
-
-Separate compact nuclear emission from an extended host using a profile whose imaging PSF response is already included. This is useful when the component you want to fit describes the observed compact glow, rather than an intrinsic light distribution that still needs to be blurred.
-
-![Operated Light Profile](images/overview_3/operated_light_profile.png)
-
-Conceptual illustration of the imaging response: the compact component already includes its PSF blur. The extended galaxy is still treated with its appropriate response.
-
-Read the [feature introduction](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/imaging/features/operated_light_profile/start_here.ipynb) for the scientific use cases,
-model assumptions and worked-example routes.
-
-This PSF interpretation applies to imaging. In the [interferometer example](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/interferometer/features/operated_light_profile/start_here.ipynb),
-the compact sky profile is Fourier transformed into visibilities; there is no imaging PSF convolution to bypass.
-
-
-## Pixelizations
-
-Reconstruct galaxy light that is difficult to describe with a small set of analytic profiles, such as asymmetric or clumpy emission. A pixelization solves brightness on a mesh, allowing the morphology of the emission to be studied while accounting for the observation's response and noise.
-
-![Pixelization](images/overview_3/pixelization_illustration.png)
-
-Conceptual illustration, not a fitted reconstruction. The two views represent the same galaxy brightness; the schematic triangular overlay is not a claim about the mesh used in every example.
-
-Read the [feature introduction](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/imaging/features/pixelization/start_here.ipynb) for the scientific use cases,
-model assumptions and worked-example routes.
-
-Start with the smooth-bulge-plus-pixelized-light imaging example for irregular galaxy emission. The
-linked galaxy_reconstruction.py shows how to inspect and export the inferred light. Regularization and
-mesh choices affect what structure the data can support.
-
-The existing Hubble Ultra Deep Field teaching figure illustrates a combined parametric and pixelized model:
-
-```{image} https://raw.githubusercontent.com/PyAutoLabs/PyAutoGalaxy/main/paper/hstcombined.png
-:alt: Combined light-profile and pixelized reconstruction of galaxy emission.
-:width: 600
-```
-
-
-## Graphical Models
-
-The examples above fit each galaxy dataset one-by-one. However, many galaxy properties are shared across a
-sample (e.g. the population's distribution of Sersic indices or sizes), and fitting galaxies independently does
-not exploit this shared structure.
-
-Graphical models fit multiple datasets simultaneously, explicitly defining which parameters are unique to each
-galaxy and which are shared across the sample. Hierarchical extensions assume parameters are drawn from a parent
-distribution, whose properties are inferred from the full sample, extracting significantly more information
-than one-by-one fitting. This is a powerful tool for galaxy evolution studies of large samples, for example
-measuring how the galaxy population's structural properties vary with mass or redshift.
-
-Checkout `autofit_workspace/*/features/graphical_models.py` to learn how to compose and fit a graphical model;
-the API applies directly to the galaxy fits shown throughout this workspace.
-
-## Choose a Feature by Dataset
-
-Each introduction below explains the scientific use cases, teaching concepts and example-specific choices.
-
-### Imaging
-
-- [Extra Galaxies](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/imaging/features/extra_galaxies/start_here.ipynb)
-- [Linear Light Profiles](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/imaging/features/linear_light_profiles/start_here.ipynb)
-- [Multi Gaussian Expansion](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/imaging/features/multi_gaussian_expansion/start_here.ipynb)
-- [Operated Light Profile](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/imaging/features/operated_light_profile/start_here.ipynb)
-- [Pixelization](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/imaging/features/pixelization/start_here.ipynb)
-- [Point Source](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/imaging/features/point_source/start_here.ipynb)
-- [Shapelets](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/imaging/features/shapelets/start_here.ipynb)
-- [Sky Background](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/imaging/features/sky_background/start_here.ipynb)
-
-### Interferometer
-
-- [Extra Galaxies](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/interferometer/features/extra_galaxies/start_here.ipynb)
-- [Linear Light Profiles](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/interferometer/features/linear_light_profiles/start_here.ipynb)
-- [Multi Gaussian Expansion](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/interferometer/features/multi_gaussian_expansion/start_here.ipynb)
-- [Operated Light Profile](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/interferometer/features/operated_light_profile/start_here.ipynb)
-- [Pixelization](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/interferometer/features/pixelization/start_here.ipynb)
-- [Shapelets](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/interferometer/features/shapelets/start_here.ipynb)
-
-### Multiple Datasets
-
-- [Dataset Offsets](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/multi_dataset/features/dataset_offsets/start_here.ipynb)
-- [Imaging And Interferometer](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/multi_dataset/features/imaging_and_interferometer/start_here.ipynb)
-- [One By One](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/multi_dataset/features/one_by_one/start_here.ipynb)
-- [Pixelization](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/multi_dataset/features/pixelization/start_here.ipynb)
-- [Same Wavelength](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/multi_dataset/features/same_wavelength/start_here.ipynb)
-- [Wavelength Dependence](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/multi_dataset/features/wavelength_dependence/start_here.ipynb)
-
-### Blended Galaxies
-
-- [Extra Galaxies](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/multi_galaxy/features/extra_galaxies/start_here.ipynb)
+<section class="directory" id="directory"><h2>All workspace links</h2><p class="minor">Choose your dataset to browse every feature introduction.</p><details><summary>Imaging · 8 introductions</summary><ul><li><a href="https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/imaging/features/extra_galaxies/start_here.ipynb">Extra Galaxies</a></li><li><a href="https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/imaging/features/linear_light_profiles/start_here.ipynb">Linear Light Profiles</a></li><li><a href="https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/imaging/features/multi_gaussian_expansion/start_here.ipynb">Multi Gaussian Expansion</a></li><li><a href="https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/imaging/features/operated_light_profile/start_here.ipynb">Operated Light Profile</a></li><li><a href="https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/imaging/features/pixelization/start_here.ipynb">Pixelization</a></li><li><a href="https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/imaging/features/point_source/start_here.ipynb">Point Source</a></li><li><a href="https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/imaging/features/shapelets/start_here.ipynb">Shapelets</a></li><li><a href="https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/imaging/features/sky_background/start_here.ipynb">Sky Background</a></li></ul></details><details><summary>Interferometer · 6 introductions</summary><ul><li><a href="https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/interferometer/features/extra_galaxies/start_here.ipynb">Extra Galaxies</a></li><li><a href="https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/interferometer/features/linear_light_profiles/start_here.ipynb">Linear Light Profiles</a></li><li><a href="https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/interferometer/features/multi_gaussian_expansion/start_here.ipynb">Multi Gaussian Expansion</a></li><li><a href="https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/interferometer/features/operated_light_profile/start_here.ipynb">Operated Light Profile</a></li><li><a href="https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/interferometer/features/pixelization/start_here.ipynb">Pixelization</a></li><li><a href="https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/interferometer/features/shapelets/start_here.ipynb">Shapelets</a></li></ul></details><details><summary>Multi dataset · 6 introductions</summary><ul><li><a href="https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/multi_dataset/features/dataset_offsets/start_here.ipynb">Dataset Offsets</a></li><li><a href="https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/multi_dataset/features/imaging_and_interferometer/start_here.ipynb">Imaging And Interferometer</a></li><li><a href="https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/multi_dataset/features/one_by_one/start_here.ipynb">One By One</a></li><li><a href="https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/multi_dataset/features/pixelization/start_here.ipynb">Pixelization</a></li><li><a href="https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/multi_dataset/features/same_wavelength/start_here.ipynb">Same Wavelength</a></li><li><a href="https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/multi_dataset/features/wavelength_dependence/start_here.ipynb">Wavelength Dependence</a></li></ul></details><details><summary>Multi galaxy · 1 introductions</summary><ul><li><a href="https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/multi_galaxy/features/extra_galaxies/start_here.ipynb">Extra Galaxies</a></li></ul></details></section>

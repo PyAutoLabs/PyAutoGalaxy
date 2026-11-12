@@ -46,6 +46,8 @@ This cluster example models the galaxies’ light. For strong-lensing mass model
 
 ## What dataset type?
 
+The illustrations below are conceptual, not observations; telescope and sky scales are schematic.
+
 For a single galaxy, choose the example for your observations. For blended galaxies or cluster fields, begin with the system-specific guide above.
 
 ![A pixelated galaxy image, interferometer sampling points in the u–v plane, and illustrative views of the same galaxy in three wavebands.](images/overview_2/dataset_types.png)
@@ -63,12 +65,16 @@ Images from Hubble, JWST or ground-based telescopes. Model the distribution of s
 :::
 
 :::{grid-item-card} Interferometer
+![Conceptual illustration of interferometer](images/overview_2/galaxy_interferometry.png)
+
 Radio or submillimetre observations, such as ALMA data. Fit the measured visibilities directly.
 
 [Notebook ](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/interferometer/start_here.ipynb)·[Google Colab ](https://colab.research.google.com/github/PyAutoLabs/autogalaxy_workspace/blob/2026.11.12.1/notebooks/interferometer/start_here.ipynb)
 :::
 
 :::{grid-item-card} Multi-band imaging
+![Conceptual illustration of multi-band imaging](images/overview_2/galaxy_multi_wavelength.png)
+
 Images of the same galaxy in several wavebands. Fit them together to study colour gradients and wavelength-dependent structure.
 
 [Notebook ](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/multi_dataset/start_here.ipynb)·[Google Colab ](https://colab.research.google.com/github/PyAutoLabs/autogalaxy_workspace/blob/2026.11.12.1/notebooks/multi_dataset/start_here.ipynb)
