@@ -1,150 +1,54 @@
 (source)=
 
-# Building From Source
+<span id="building-from-source"></span>
 
-Building from source means that you clone (or fork) the **PyAutoGalaxy** GitHub repository and run **PyAutoGalaxy** from
-there. Unlike `conda` and `pip` this provides a build of the source code that you can edit and change, to
-contribute the development **PyAutoGalaxy** or experiment with yourself!
+<span id="packages"></span>
 
-A large amount of **PyAutoGalaxy** functionality is contained in its parent projects:
+# Install from source
 
-**PyAutoFit** <https://github.com/PyAutoLabs/PyAutoFit>
+Use this route when you want to edit PyAutoGalaxy. For running examples, use [conda](conda.md) or [pip](pip.md).
 
-**PyAutoArray** <https://github.com/PyAutoLabs/PyAutoArray>
+<span id="building-only-pyautogalaxy"></span>
 
-If you wish to build from source all code you may need to build from source these 3 additional
-projects. We include below instructions for building just **PyAutoGalaxy** from source or building all projects.
+## Edit PyAutoGalaxy
 
-## Building Only PyAutoGalaxy
-
-We upgrade pip to ensure certain libraries install:
+In an active Python environment:
 
 ```bash
-pip install --upgrade pip
+git clone https://github.com/PyAutoLabs/PyAutoGalaxy.git
+cd PyAutoGalaxy
+python -m pip install --upgrade pip
+python -m pip install -e ".[dev]"
+python -m pip check
+python -c "import autogalaxy; print(autogalaxy.__file__)"
 ```
 
-First, clone (or fork) the **PyAutoGalaxy** GitHub repository:
+An editable install uses the code in your checkout. Dependencies are installed from PyPI; you do not need `conda-develop` or a manual `PYTHONPATH` entry. The printed path should point into your checkout.
+
+<span id="building-all-projects"></span>
+
+## Edit several PyAuto libraries
+
+If your change also touches a parent library, install those checkouts together. From a folder containing none of these repositories yet:
 
 ```bash
-git clone https://github.com/PyAutoLabs/PyAutoGalaxy
+git clone https://github.com/PyAutoLabs/PyAutoNerves.git
+git clone https://github.com/PyAutoLabs/PyAutoFit.git
+git clone https://github.com/PyAutoLabs/PyAutoArray.git
+git clone https://github.com/PyAutoLabs/PyAutoGalaxy.git
+python -m pip install -e ./PyAutoNerves -e ./PyAutoFit -e ./PyAutoArray -e ./PyAutoGalaxy
+python -m pip check
 ```
 
-Next, install the **PyAuto** parent projects via pip:
+Use compatible branches or release tags across the repositories. A development branch can depend on changes that are not yet published.
+
+## Run tests
+
+From the PyAutoGalaxy checkout:
 
 ```bash
-pip install autonerves
-pip install autofit
-pip install autoarray
+python -m pip install -e ".[dev]"
+python -m pytest test_autogalaxy/
 ```
 
-Next, install the **PyAutoGalaxy** dependencies via pip:
-
-```bash
-pip install -r PyAutoGalaxy/requirements.txt
-```
-
-Next, install the optional dependency numba via pip (see [this link](https://pyautogalaxy.readthedocs.io/en/latest/installation/numba.html) for a description of numba):
-
-```bash
-pip install numba
-```
-
-For unit tests to pass you will also need the following optional requirements:
-
-```bash
-pip install nufftax
-```
-
-If you are using a `conda` environment, add the source repository as follows:
-
-\[NOTE: Certain versions of conda use the command `conda develop` (without a dash) instead of those shown below.\]
-
-```bash
-conda-develop PyAutoGalaxy
-```
-
-Alternatively, if you are using a Python environment include the **PyAutoGalaxy** source repository in your PYTHONPATH
-(noting that you must replace the text `/path/to` with the path to the **PyAutoGalaxy** directory on your computer):
-
-```bash
-export PYTHONPATH=$PYTHONPATH:/path/to/PyAutoGalaxy
-```
-
-Finally, check the **PyAutoGalaxy** unit tests run and pass (you may need to install pytest via `pip install pytest`):
-
-```bash
-cd /path/to/PyAutoGalaxy
-python3 -m pytest
-```
-
-## Building All Projects
-
-We upgrade pip to ensure certain libraries install:
-
-```bash
-pip install --upgrade pip
-```
-
-First, clone (or fork) all 4 GitHub repositories:
-
-```bash
-git clone https://github.com/PyAutoLabs/PyAutoFit
-git clone https://github.com/PyAutoLabs/PyAutoArray
-git clone https://github.com/PyAutoLabs/PyAutoGalaxy
-```
-
-Next, install **PyAutoNerves** via pip:
-
-```bash
-pip install autonerves
-```
-
-Next, install the source build dependencies of each project via pip:
-
-```bash
-pip install -r PyAutoFit/requirements.txt
-pip install -r PyAutoArray/requirements.txt
-pip install -r PyAutoGalaxy/requirements.txt
-```
-
-Next, install the optional dependency numba via pip (see [this link](https://pyautogalaxy.readthedocs.io/en/latest/installation/numba.html) for a description of numba):
-
-```bash
-pip install numba
-```
-
-For unit tests to pass you will also need the following optional requirements:
-
-```bash
-pip install -r PyAutoArray/optional_requirements.txt
-```
-
-If you are using a `conda` environment, add each source repository as follows:
-
-\[NOTE: Certain versions of conda use the command `conda develop` (without a dash) instead of those shown below.\]
-
-```bash
-conda-develop PyAutoFit
-conda-develop PyAutoArray
-conda-develop PyAutoGalaxy
-```
-
-Alternatively, if you are using a Python environment include each source repository in your PYTHONPATH
-(noting that you must replace the text `/path/to` with the path to the each directory on your computer):
-
-```bash
-export PYTHONPATH=$PYTHONPATH:/path/to/PyAutoFit
-export PYTHONPATH=$PYTHONPATH:/path/to/PyAutoArray
-export PYTHONPATH=$PYTHONPATH:/path/to/PyAutoGalaxy
-```
-
-Finally, check the unit tests run and pass for each project (you may need to install pytest via `pip install pytest`):
-
-```bash
-cd /path/to/PyAutoFit
-python3 -m pytest
-cd ../PyAutoArray
-python3 -m pytest
-cd ../PyAutoGalaxy
-python3 -m pytest
-```
+Some tests need additional packages or test data; follow the repository’s contributor instructions for the full test environment.
