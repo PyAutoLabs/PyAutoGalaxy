@@ -1,67 +1,37 @@
 (howtogalaxy)=
 
-# HowToGalaxy Lectures
+# HowToGalaxy
 
-The best way to learn **PyAutoGalaxy** is by going through the **HowToGalaxy** lecture series, which lives in its own
-repository at [PyAutoLabs/HowToGalaxy](https://github.com/PyAutoLabs/HowToGalaxy).
+Learn galaxy structure and Bayesian modelling through worked Python notebooks with **PyAutoGalaxy**. The course starts with simple models and builds towards fitting observations and analysing more complex systems.
 
-The lectures are provided as Jupyter notebooks (and Python scripts), and they are linked to via this readthedocs. The
-lectures are composed of four chapters:
+Basic Python familiarity is useful. You do not need previous experience with galaxy modelling or Bayesian statistics.
 
-- **Introduction** - An introduction to galaxy morphology and structure using **PyAutoGalaxy**.
-- **Modeling** - How to model galaxies, including a primer on Bayesian non-linear analysis and
-  non-linear search chaining.
-- **Pixelizations** - Reconstruct complex galaxy light, choose regularization using Bayesian evidence,
-  diagnose fit problems and adapt the mesh and smoothing to the light distribution.
-- **Scaling Up Galaxies** - Extra galaxies, blended multi-galaxy systems, and cluster fields.
+## Start here
 
-Optional tutorials cover alternative searches and runtime, with prior passing retained as historical background.
+**Tutorial 0: Visualization** — [GitHub](https://github.com/PyAutoLabs/HowToGalaxy/blob/main/notebooks/chapter_1_introduction/tutorial_0_visualization.ipynb) / [Colab](https://colab.research.google.com/github/PyAutoLabs/HowToGalaxy/blob/main/notebooks/chapter_1_introduction/tutorial_0_visualization.ipynb)
 
-The tutorial links open the current course on `main`. For the notebooks associated with a particular release,
-select that release tag in the [HowToGalaxy repository](https://github.com/PyAutoLabs/HowToGalaxy/tags).
+Check your setup and learn how to display figures. In Colab, run the setup cell first, then work through the notebook in order.
 
-## How to Tackle HowToGalaxy
+You can also run the notebooks locally or use the [Python scripts](https://github.com/PyAutoLabs/HowToGalaxy/tree/main/scripts).
 
-The **HowToGalaxy** lecture series current sits at 4 chapters, and each will take a day or so to go through
-properly. You probably want to be modeling galaxies faster than that! Furthermore, the concepts
-in the later chapters are pretty challenging, and familiarity and modeling is desirable before
-you tackle them.
+## Choose a chapter
 
-Therefore, we recommend that you complete chapters 1 & 2 and then apply what you've learnt to the modeling of simulated
-and real galaxy data, using the scripts found in the
-[autogalaxy_workspace](https://github.com/PyAutoLabs/autogalaxy_workspace). Once you're happy
-with the results and confident with your use of **PyAutoGalaxy**, you can then begin to cover the advanced functionality
-covered in chapters 3 & 4.
+GitHub opens the chapter’s notebook folder. Colab opens its first tutorial; the optional section opens Alternative Searches.
 
-## Jupyter Notebooks
+| Chapter | What you’ll learn | Before you start | Open |
+| --- | --- | --- | --- |
+| <span id="chapter_1_introduction"></span>1. Galaxies | Build light profiles, simulate observations and compare model images with data. | Basic Python; galaxy-modelling concepts are introduced as you go. | [GitHub](https://github.com/PyAutoLabs/HowToGalaxy/tree/main/notebooks/chapter_1_introduction) / [Colab](https://colab.research.google.com/github/PyAutoLabs/HowToGalaxy/blob/main/notebooks/chapter_1_introduction/tutorial_0_visualization.ipynb) |
+| <span id="chapter_2_modeling"></span>2. Modeling | Fit models with Bayesian searches, inspect results and fit components in stages. | Chapter 1: profiles, data, residuals and likelihoods. | [GitHub](https://github.com/PyAutoLabs/HowToGalaxy/tree/main/notebooks/chapter_2_modeling) / [Colab](https://colab.research.google.com/github/PyAutoLabs/HowToGalaxy/blob/main/notebooks/chapter_2_modeling/tutorial_1_non_linear_search.ipynb) |
+| <span id="chapter_3_pixelizations"></span>3. Pixelizations | Reconstruct complex galaxy light on a mesh; choose smoothing using Bayesian evidence and diagnose inadequate fits. | Chapter 2: model fitting and Bayesian inference. | [GitHub](https://github.com/PyAutoLabs/HowToGalaxy/tree/main/notebooks/chapter_3_pixelizations) / [Colab](https://colab.research.google.com/github/PyAutoLabs/HowToGalaxy/blob/main/notebooks/chapter_3_pixelizations/tutorial_1_pixelizations.ipynb) |
+| <span id="chapter_4_scaling_up_galaxies"></span>4. Scaling Up Galaxies | Model neighbouring galaxies, blended systems and galaxy light in cluster fields. | Chapter 2; familiarity with Chapter 3’s reconstruction methods is useful. | [GitHub](https://github.com/PyAutoLabs/HowToGalaxy/tree/main/notebooks/chapter_4_scaling_up_galaxies) / [Colab](https://colab.research.google.com/github/PyAutoLabs/HowToGalaxy/blob/main/notebooks/chapter_4_scaling_up_galaxies/tutorial_1_extra_galaxies.ipynb) |
+| <span id="chapter_optional"></span>Optional tutorials | Explore alternative searches and runtime. Prior passing is historical background. | Chapter 2. | [GitHub](https://github.com/PyAutoLabs/HowToGalaxy/tree/main/notebooks/chapter_optional) / [Colab](https://colab.research.google.com/github/PyAutoLabs/HowToGalaxy/blob/main/notebooks/chapter_optional/tutorial_searches.ipynb) |
 
-The tutorials are supplied as Jupyter Notebooks, which come with a '.ipynb' suffix. For those new to Python, Jupyter
-Notebooks are a different way to write, view and use Python code. Compared to the traditional Python scripts, they allow:
+**Chapter 1 note:** Tutorial 4: Methods is not yet written. Continue from Tutorial 3 to Tutorial 5: Summary.
 
-- Small blocks of code to be viewed and run at a time
-- Images and visualization from a code to be displayed directly underneath it.
-- Text script to appear between the blocks of code.
+Work through Chapters 1 and 2, then practise with the [workspace examples](https://github.com/PyAutoLabs/autogalaxy_workspace#find-your-examples). Return to Chapters 3 and 4 when you need their methods.
 
-This makes them an ideal way for us to present the HowToGalaxy lecture series, therefore I recommend you get yourself
-a Jupyter notebook viewer (<https://jupyter.org/>) if you havent done so already.
+These links follow the current course on `main`. For a particular release, choose its tag in the [course repository](https://github.com/PyAutoLabs/HowToGalaxy/tags).
 
-If you *really* want to use Python scripts, all tutorials are also supplied as `.py` files in the `scripts` folder
-of the [HowToGalaxy repository](https://github.com/PyAutoLabs/HowToGalaxy).
+## Help as you learn
 
-## Visualization
-
-Before beginning the **HowToGalaxy** lecture series, in chapter 1 you should do 'tutorial_0_visualization'. This will
-take you through how **PyAutoGalaxy** interfaces with matplotlib to perform visualization and will get you setup such
-that images and figures display correctly in your Jupyter notebooks.
-
-## Code Style and Formatting
-
-You may notice the style and formatting of our Python code looks different to what you are used to. For example, it
-is common for brackets to be placed on their own line at the end of function calls, the inputs of a function or
-class may be listed over many separate lines and the code in general takes up a lot more space then you are used to.
-
-This is intentional, because we believe it makes the cleanest, most readable code possible. In fact, lots of people do,
-which is why we use an auto-formatter to produce the code in a standardized format. If you're interested in the style
-and would like to adapt it to your own code, check out the Python auto-code formatter 'black'.
-
-<https://github.com/python/black>
+If you want AI-guided help, the [PyAutoGalaxy AI Assistant](https://github.com/PyAutoLabs/autogalaxy_assistant) can discuss the concepts, code and figures as you work through the notebooks.
