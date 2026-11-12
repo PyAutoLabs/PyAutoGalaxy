@@ -113,6 +113,7 @@ general/configs
 general/model_cookbook
 general/likelihood_function
 general/citations
+general/papers
 general/credits
 general/community
 ```

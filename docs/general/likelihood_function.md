@@ -1,20 +1,28 @@
 (likelihood-function)=
+# Likelihood functions
 
-# Likelihood Function
+The workspace notebooks show how a model is compared with your observations, step by step. Start with the base likelihood for your dataset, then read the guide for any additional model components.
 
-The `autogalaxy_workspace` contains Jupyter notebooks describing the (log) likelihood functions used by **PyAutoGalaxy**.
+## Imaging
 
-The notebooks provide a step-by-step guide of how **PyAutoGalaxy** fits galaxy data, with the aim to make
-the analysis clear to readers without background experience in galaxy modeling and make the modeling less
-of a "black box".
+| Example | Guide |
+|---|---|
+| linear light profiles | [Likelihood walkthrough](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/imaging/features/linear_light_profiles/likelihood_function.ipynb) |
+| multi gaussian expansion | [Likelihood walkthrough](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/imaging/features/multi_gaussian_expansion/likelihood_function.ipynb) |
+| pixelization | [Likelihood walkthrough](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/imaging/features/pixelization/likelihood_function.ipynb) |
+| Base likelihood | [Likelihood walkthrough](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/imaging/likelihood_function.ipynb) |
 
-We recommend that when writing a paper using **PyAutoGalaxy** the author links to this GitHub repository when describing
-their likelihood function.
+## Interferometer
 
-Links to every notebook are provided at the GitHub repository linked to below. We recommend authors link to this
-GitHub repository (as opposed to direct links to each) because the URLs to notebooks on the `autogalaxy_workspace`
-may change after papers are published.
+| Example | Guide |
+|---|---|
+| linear light profiles | [Likelihood walkthrough](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/interferometer/features/linear_light_profiles/likelihood_function.ipynb) |
+| multi gaussian expansion | [Likelihood walkthrough](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/interferometer/features/multi_gaussian_expansion/likelihood_function.ipynb) |
+| pixelization | [Likelihood walkthrough](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/interferometer/features/pixelization/likelihood_function.ipynb) |
+| Base likelihood | [Likelihood walkthrough](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/interferometer/likelihood_function.ipynb) |
 
-By linking to this repository a permanent URL is provided.
+## Citing your analysis
 
-<https://github.com/Jammy2211/autogalaxy_likelihood_function>
+Give the software version, model, data and noise assumptions used in your fit. Link to the relevant explanation and cite the methods you used. For a reproducible code reference, link to the notebook at the release tag or commit used for your analysis; the `main` links above follow the current examples.
+
+See [Citations and references](citations.md) for software and method references.

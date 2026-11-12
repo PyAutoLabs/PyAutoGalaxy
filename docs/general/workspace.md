@@ -1,53 +1,44 @@
 (workspace)=
+# Workspace tour
 
-# Workspace Tour
+The [autogalaxy workspace](https://github.com/PyAutoLabs/autogalaxy_workspace) contains examples and datasets for modelling galaxy light. Use this page to find where things live; the [workspace README](https://github.com/PyAutoLabs/autogalaxy_workspace#readme) has the full directory guide.
 
-You should have downloaded and configured the [autogalaxy workspace](https://github.com/PyAutoLabs/autogalaxy_workspace)
-when you installed **PyAutoGalaxy**. If you didn't, checkout the
-[installation instructions](https://pyautogalaxy.readthedocs.io/en/latest/general/installation.html#installation-with-pip)
-for how to downloaded and configure the workspace.
+<span id="scripts--notebooks"></span>
+<span id="scripts-notebooks"></span>
 
-The `README.md` files distributed throughout the workspace describe every folder and file, and specify if
-examples are for beginner or advanced users.
 
-New users should begin by checking out the following parts of the workspace.
+## Find an example
 
-## Scripts / Notebooks
+Start with the [New User Guide](https://pyautogalaxy.readthedocs.io/en/latest/overview/overview_2_new_user_guide.html) to choose an example for your observations. Open its notebook to read and run it, or use the matching Python script where provided.
 
-There are numerous example describing how to perform calculations, galaxy modeling, and many other
-**PyAutoGalaxy** features. All examples are provided as Python scripts and Jupyter notebooks.
+<span id="config"></span>
 
-A full description of the scripts available is given on
-the [autogalaxy workspace GitHub page](https://github.com/PyAutoLabs/autogalaxy_workspace).
+<span id="dataset"></span>
 
-## Config
+<span id="output"></span>
 
-Here, you'll find the configuration files which customize:
+## Where files live
 
-> - The default settings used by every non-linear search.
-> - Visualization, including the backend used by *matplotlib*.
-> - The priors and notation configs associated with the light and mass profiles used for lens modeling.
-> - The behaviour of different (y,x) Cartesian grids used to perform lens calculations.
-> - The generaltrue config which customizes other aspects of **PyAutoGalaxy**.
+| Folder | What you use it for |
+|---|---|
+| [`notebooks/`](https://github.com/PyAutoLabs/autogalaxy_workspace/tree/main/notebooks) | Worked examples with explanations, code and figures. |
+| [`scripts/`](https://github.com/PyAutoLabs/autogalaxy_workspace/tree/main/scripts) | Python versions to run and adapt for your analysis. |
+| [`dataset/`](https://github.com/PyAutoLabs/autogalaxy_workspace/tree/main/dataset) | Example observations and inputs used by the scripts. |
+| [`config/`](https://github.com/PyAutoLabs/autogalaxy_workspace/tree/main/config) | Overrides for priors, plots, output and other defaults. See [Configuration](configs.md). |
+| `output/` | Results written when you run a fit. The search's name and path settings organize each analysis. |
 
-Descriptions of every configuration file and their input parameters are provided in the `README.md` in
-the [config directory of the workspace](https://github.com/PyAutoLabs/autogalaxy_workspace/tree/main/config)
+Run local examples from the workspace root so their relative dataset and configuration paths resolve. If you need to set up the workspace, follow the existing [installation guide](https://pyautogalaxy.readthedocs.io/en/latest/installation/overview.html).
 
-## Dataset
+<span id="howtolens"></span>
 
-Contains the dataset's used to perform lens modeling. Example datasets using simulators included with the workspace
-are included here by default.
+<span id="howtogalaxy"></span>
 
-## Output
+## Next steps
 
-The folder where modeling results are stored.
+- Change plotting or output defaults in [Configuration](configs.md).
+- Build and inspect your model with the [Model cookbook](model_cookbook.md).
+- Work through [HowToGalaxy](https://github.com/PyAutoLabs/HowToGalaxy) for the science behind the examples.
 
-## HowToGalaxy
+If you use the [AI Assistant](https://github.com/PyAutoLabs/autogalaxy_assistant), you can ask:
 
-The **HowToGalaxy** lecture series is a collection of Jupyter notebooks describing how to build a **PyAutoGalaxy** model
-fitting project and giving illustrations of different statistical methods and techniques. It ships as a standalone
-repository at [PyAutoLabs/HowToGalaxy](https://github.com/PyAutoLabs/HowToGalaxy) (separate from the workspace).
-
-Checkout the
-[tutorials section](https://pyautogalaxy.readthedocs.io/en/latest/howtogalaxy/howtogalaxy.html) for a
-full description of the lectures and online examples of every notebook.
+> I have [describe your observations] and want to model [describe the objects]. Find a matching workspace example, explain its inputs, and show me which parts I need to adapt.

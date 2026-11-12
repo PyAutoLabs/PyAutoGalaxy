@@ -1,12 +1,13 @@
 (model-cookbook)=
 
-# Model Cookbook
+# Model cookbook
 
-The model cookbook provides a concise reference to model composition tools, specifically the `Model`
-and `Collection` objects.
+Build a model with `af.Model` and `af.Collection`, inspect its parameters, and adapt it to your observations. The examples below show which parameters are sampled, fixed, shared or solved during a fit.
 
-Examples using different **PyAutoGalaxy** API’s for model composition are provided, which produce more concise and
-readable code for different use-cases.
+```python
+import autofit as af
+import autogalaxy as ag
+```
 
 ## Simple Model
 
@@ -69,7 +70,7 @@ parameter.
 af.ModelPlotter(model).figure()
 ```
 
-```{image} https://raw.githubusercontent.com/PyAutoLabs/PyAutoGalaxy/main/docs/general/images/model_cookbook/simple.png
+```{image} images/model_cookbook/simple.png
 :alt: A galaxy with a single linear Sersic bulge, drawn as nested component cards.
 :width: 600
 ```
@@ -101,7 +102,7 @@ model = af.Collection(galaxies=af.Collection(galaxy=galaxy))
 af.ModelPlotter(model).figure()
 ```
 
-```{image} https://raw.githubusercontent.com/PyAutoLabs/PyAutoGalaxy/main/docs/general/images/model_cookbook/complex.png
+```{image} images/model_cookbook/complex.png
 :alt: A galaxy with a bulge, a disk and a bar, each a linear light profile.
 :width: 600
 ```
@@ -138,7 +139,7 @@ model = af.Collection(
 af.ModelPlotter(model).figure()
 ```
 
-```{image} https://raw.githubusercontent.com/PyAutoLabs/PyAutoGalaxy/main/docs/general/images/model_cookbook/two_galaxies.png
+```{image} images/model_cookbook/two_galaxies.png
 :alt: A model with two galaxies, each with its own linear Sersic bulge.
 :width: 600
 ```
@@ -167,7 +168,7 @@ model = af.Collection(galaxies=af.Collection(galaxy=galaxy))
 af.ModelPlotter(model).figure()
 ```
 
-```{image} https://raw.githubusercontent.com/PyAutoLabs/PyAutoGalaxy/main/docs/general/images/model_cookbook/concise.png
+```{image} images/model_cookbook/concise.png
 :alt: The bulge, disk and bar model composed with the concise API.
 :width: 600
 ```
@@ -198,7 +199,7 @@ model = af.Collection(galaxies=af.Collection(galaxy=galaxy))
 af.ModelPlotter(model).figure()
 ```
 
-```{image} https://raw.githubusercontent.com/PyAutoLabs/PyAutoGalaxy/main/docs/general/images/model_cookbook/prior_custom.png
+```{image} images/model_cookbook/prior_custom.png
 :alt: A galaxy model whose centre and sersic index priors have been customized.
 :width: 600
 ```
@@ -239,7 +240,8 @@ galaxy = af.Model(
 
 model = af.Collection(galaxies=af.Collection(galaxy=galaxy))
 
-# Assert that the effective radius of the bulge is larger than that of the disk.
+# The offset already makes the bulge larger than the disk; this assertion
+# is redundant here, but illustrates how to express an inequality.
 # (Assertions can only be added at the end of model composition, after all components
 # have been brought together in a `Collection`.
 model.add_assertion(model.galaxies.galaxy.bulge.effective_radius > model.galaxies.galaxy.disk.effective_radius)
@@ -250,30 +252,33 @@ model.add_assertion(model.galaxies.galaxy.bulge.effective_radius < 3.0)
 af.ModelPlotter(model).figure()
 ```
 
-```{image} https://raw.githubusercontent.com/PyAutoLabs/PyAutoGalaxy/main/docs/general/images/model_cookbook/model_custom.png
+```{image} images/model_cookbook/model_custom.png
 :alt: A customized galaxy model showing a paired centre, a fixed sersic index, an offset relation and two assertions.
 :width: 600
 ```
 
 The `disk` reuses the `bulge`'s `centre` rather than having one of its own, the `sersic_index` is fixed, the
-`effective_radius` of the disk is defined by an expression offsetting it from the bulge's, and the model carries two
+`effective_radius` of the bulge is defined by an expression offsetting it from the disk's, and the model carries two
 assertions relating its parameters.
 
-## Available Model Components
+## Available model components
 
 The light profiles, mass profiles and other components that can be used for galaxy modeling are given at the following
 API documentation pages:
 
 > - <https://pyautogalaxy.readthedocs.io/en/latest/api/light.html>
-> - <https://pyautogalaxy.readthedocs.io/en/latest/api/mass.html>
+> - [Shared mass profiles (PyAutoLens API)](https://pyautolens.readthedocs.io/en/latest/api/mass.html)
 > - <https://pyautogalaxy.readthedocs.io/en/latest/api/pixelization.html>
 
-## JSon Outputs
+<span id="json-outputs"></span>
+
+## Save and load a model
 
 After a model is composed, it can easily be output to a .json file on hard-disk in a readable structure:
 
 ```python
 import os
+from os import path
 import json
 
 model_path = path.join("path", "to", "model", "json")
@@ -311,7 +316,7 @@ When performing non-linear search chaining, the inferred model of one phase can 
 
 The following example notebooks show how to compose and fit these models:
 
-<https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/imaging/advanced/chaining/start_here.ipynb>
+<https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/guides/modeling/chaining.ipynb>
 
 ## Across Datasets (Advanced)
 
@@ -341,6 +346,8 @@ The **PyAutoFit** model composition cookbooks detail this API in more detail:
 <https://pyautofit.readthedocs.io/en/latest/cookbooks/model.html>
 <https://pyautofit.readthedocs.io/en/latest/cookbooks/multi_level_model.html>
 
-## Wrap Up
+<span id="wrap-up"></span>
 
-This cookbook shows how to compose simple models using the `af.Model()` and `af.Collection()` objects.
+## Next steps
+
+Use a workspace modelling example to fit your model, then inspect both the posterior and the fit residuals. The [likelihood guide](likelihood_function.md) explains the calculations behind the fit.
