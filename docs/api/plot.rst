@@ -1,25 +1,34 @@
-========
 Plotting
 ========
 
-**PyAutoGalaxy** custom visualization library.
+Use ``autogalaxy.plot`` to inspect datasets, models and fits. Functions produce individual figures or diagnostic subplots; pass plotting options directly to the function you call.
 
-Step-by-step Juypter notebook guides illustrating all objects listed on this page are
-provided on the `autogalaxy_workspace: plot tutorials <https://github.com/PyAutoLabs/autogalaxy_workspace/tree/main/notebooks/guides/plot>`_ and
-it is strongly recommended you use those to learn plot customization.
+For a runnable introduction and customization examples, open the `plotting guide <https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/guides/plot/start_here.ipynb>`_.
 
-**Examples / Tutorials:**
+Plot an image
+-------------
 
-- `autogalaxy_workspace: plot tutorials <https://github.com/PyAutoLabs/autogalaxy_workspace/tree/main/notebooks/guides/plot>`_
+Given an existing ``Array2D`` called ``image``:
 
-Plotters [aplt]
----------------
+.. code-block:: python
 
-Create figures and subplots showing quantities of standard **PyAutoGalaxy** objects.
+    import autogalaxy.plot as aplt
+
+    aplt.plot_array(array=image, title="Image", colormap="gray")
+
+.. _plotters-aplt:
+
+Choose a plot
+-------------
+
+Choose the group that matches the object or result you want to inspect. The linked references give each function’s arguments.
 
 .. currentmodule:: autogalaxy.plot
 
-**Basic Plot Functions:**
+Basic plots
+~~~~~~~~~~~
+
+Display an array or a grid of coordinates.
 
 .. autosummary::
    :toctree: _autosummary
@@ -27,7 +36,10 @@ Create figures and subplots showing quantities of standard **PyAutoGalaxy** obje
     plot_array
     plot_grid
 
-**Galaxy and Light / Mass Profile Subplots:**
+Galaxy and Light and Mass Profile subplots
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Inspect profile components, combined galaxy images, basis profiles and adapt images.
 
 .. autosummary::
    :toctree: _autosummary
@@ -39,7 +51,10 @@ Create figures and subplots showing quantities of standard **PyAutoGalaxy** obje
     subplot_galaxy_images
     subplot_adapt_images
 
-**Imaging Fit Subplots:**
+Imaging Fit subplots
+~~~~~~~~~~~~~~~~~~~~
+
+Compare the image data and fitted model, and inspect residuals and other fit diagnostics.
 
 .. autosummary::
    :toctree: _autosummary
@@ -47,7 +62,10 @@ Create figures and subplots showing quantities of standard **PyAutoGalaxy** obje
     subplot_fit_imaging
     subplot_fit_imaging_of_galaxy
 
-**Interferometer Fit Subplots:**
+Interferometer Fit subplots
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Inspect visibility-space fit diagnostics alongside real-space and dirty-image views.
 
 .. autosummary::
    :toctree: _autosummary
@@ -56,7 +74,10 @@ Create figures and subplots showing quantities of standard **PyAutoGalaxy** obje
     subplot_fit_dirty_images
     subplot_fit_real_space
 
-**Ellipse Fit Subplots:**
+Ellipse Fit subplots
+~~~~~~~~~~~~~~~~~~~~
+
+Inspect fitted isophotes and the errors associated with the ellipse fits.
 
 .. autosummary::
    :toctree: _autosummary
@@ -64,10 +85,12 @@ Create figures and subplots showing quantities of standard **PyAutoGalaxy** obje
     subplot_fit_ellipse
     subplot_ellipse_errors
 
-Non-linear Search Plot Functions [aplt]
----------------------------------------
+.. _non-linear-search-plot-functions-aplt:
 
-Module-level functions for visualizing non-linear search results.
+Search results
+--------------
+
+These functions visualize samples and search progress. They are implemented by **PyAutoFit** and re-exported through ``aplt``.
 
 .. currentmodule:: autofit.plot
 
@@ -79,47 +102,39 @@ Module-level functions for visualizing non-linear search results.
    subplot_parameters
    log_likelihood_vs_iteration
 
-Plot Customization [aplt]
--------------------------
+.. _plot-customization-aplt:
 
-The plotting API is **functional**: customization is done by passing keyword
-arguments directly to any ``aplt`` plotting function. There is no ``MatPlot2D``
-object anymore (nor the old ``Cmap`` / ``Visuals`` / ``Units`` / matplotlib-wrapper
-classes) — these were removed in favour of the keyword-argument interface below.
+Customize a plot
+----------------
 
-Every figure and subplot function accepts:
+Options depend on the function. For ``plot_array``, you can set:
 
-- ``title`` — the figure title.
-- ``colormap`` — the matplotlib colormap name (e.g. ``"jet"``, ``"hot"``, ``"gray"``).
-- ``use_log10`` — if ``True``, plot the colormap on a ``log10`` scale.
-- ``output_path`` — directory to save the figure to (omit to display it interactively).
-- ``output_filename`` — the saved file's name.
-- ``output_format`` — the saved file's format, e.g. ``"png"`` or ``"pdf"``.
+- ``title``: the figure title.
+- ``colormap``: a Matplotlib colormap, such as ``"gray"`` or ``"viridis"``.
+- ``use_log10``: request logarithmic colour scaling. Use a linear or suitable signed scale when inspecting quantities that can be negative, such as residuals.
+- ``output_path``, ``output_filename`` and ``output_format``: the output directory, filename and format.
 
-For example:
+Subplot functions may use different options. For example, ``subplot_fit_ellipse`` accepts ``title_prefix`` rather than ``title`` and does not expose ``output_filename``. Check the linked signature before transferring options between functions.
+
+Defaults such as figure size, fonts and colours are configured through the workspace’s ``config/visualize`` YAML files. See `Configuration <https://pyautogalaxy.readthedocs.io/en/latest/general/configs.html>`_ for the configuration workflow.
+
+.. _figure-output-aplt:
+
+Save figures
+------------
+
+For ``plot_array``, save the existing image to ``output/image.png`` with:
 
 .. code-block:: python
 
-    import autogalaxy.plot as aplt
-
-    # Customize the appearance:
-    aplt.plot_array(array=image, title="Image", colormap="jet", use_log10=True)
-
-    # Save to disk instead of displaying:
     aplt.plot_array(
-        array=image, output_path="output", output_filename="image", output_format="png"
+        array=image,
+        output_path="output",
+        output_filename="image",
+        output_format="png",
     )
 
-Default plotting values (figure size, fonts, colormaps, ticks, labels, ...) are set
-via the workspace ``config/visualize`` YAML files rather than in code, so most figures
-need no customization at all.
-
-Figure Output [aplt]
---------------------
-
-The ``Output`` object gives lower-level control of how and where figures are written
-to disk, and is accepted by the plotting functions in place of the individual
-``output_*`` keyword arguments.
+The functions above use the output keywords documented in their signatures. ``Output`` is a lower-level **PyAutoArray** helper; it is not a replacement argument for these public plotting functions. Its reference remains available for code that uses it directly.
 
 .. currentmodule:: autoarray.plot
 
