@@ -1,8 +1,8 @@
-# PyAutoGalaxy: Open-Source Galaxy Structure and Morphology
+# PyAutoGalaxy: Automated, Autodifferentiable and Autonomous Galaxy Modelling
 
 ![Galaxy modeling examples](https://github.com/PyAutoLabs/PyAutoGalaxy/blob/main/paper/hstcombined.png?raw=true)
 
-**PyAutoGalaxy** lets you simulate and model galaxy structure and morphology using imaging and interferometer observations. Fit individual galaxies or large samples, combine observations across wavebands, and use JAX to accelerate modeling on GPUs.
+**PyAutoGalaxy** models galaxy structure and morphology, from bulge–disc decomposition to comparisons across wavebands. Its JAX numerical backend provides automatic differentiation and GPU acceleration, while the PyAutoGalaxy Assistant helps you develop and run analyses through conversation.
 
 ## Getting Started
 

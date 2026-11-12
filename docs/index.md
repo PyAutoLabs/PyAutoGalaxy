@@ -10,7 +10,7 @@ substitutions:
 
 # What is PyAutoGalaxy?
 
-**PyAutoGalaxy** is software for analysing the morphologies and structures of galaxies:
+**PyAutoGalaxy** models galaxy structure and morphology, from bulge–disc decomposition to comparisons across wavebands. Its JAX numerical backend provides automatic differentiation and GPU acceleration, while the PyAutoGalaxy Assistant helps you develop and run analyses through conversation.
 
 {{ pic1 }}
 
