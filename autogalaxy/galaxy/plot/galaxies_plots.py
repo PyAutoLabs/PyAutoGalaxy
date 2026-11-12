@@ -260,9 +260,11 @@ def plot_magnification_2d(
     include_critical_curves: bool = True,
     tangential_critical_curves=None,
     radial_critical_curves=None,
+    lines=None,
+    line_colors=None,
     vmin=None,
     vmax=None,
-    title: str = r"Magnification $\log_{10}|\mu|$",
+    title: str = r"Magnification $|\mu|$",
     colormap="default",
     output_path=None,
     output_filename: str = "magnification_2d",
@@ -271,10 +273,11 @@ def plot_magnification_2d(
 ):
     """Plot the image-plane magnification map of a mass object, with constant-magnification contours.
 
-    Every pixel shows log10 |mu| at its centre, where mu = 1 / det(A) is the signed magnification computed from the
-    Hessian of the lensing potential. The magnification diverges on the critical curves, so a linear colour scale is
-    dominated by the few pixels next to them; the log scale and a colour range set by the 1st and 99th percentiles
-    of log10 |mu| keep the rest of the map readable.
+    Every pixel shows |mu| at its centre, where mu = 1 / det(A) is the signed magnification computed from the
+    Hessian of the lensing potential, on a logarithmic colour scale whose colour-bar ticks are values of |mu|. The
+    magnification diverges on the critical curves, so a linear colour scale is dominated by the few pixels next to
+    them; the log scale and a colour range set by the 1st and 99th percentiles of |mu| keep the rest of the map
+    readable.
 
     Contour lines are drawn at constant |mu| (by default 2, 5, 10, 20, 50 and 100), labelled with their |mu| value,
     as in the magnification maps of cluster lens models (e.g. LEGGOS II, Abedi et al. 2026, figure 4). Levels outside
@@ -297,8 +300,11 @@ def plot_magnification_2d(
         If ``True``, overlay the tangential and radial critical curves.
     tangential_critical_curves, radial_critical_curves
         Pre-computed critical curves; ``None`` computes them when ``include_critical_curves`` is ``True``.
+    lines, line_colors
+        Pre-computed overlay lines (and their colours), e.g. the critical curves a subplot has already computed.
+        When given they are drawn instead of computing the critical curves.
     vmin, vmax
-        Explicit colour-bar limits in log10 |mu|. ``None`` uses the 1st and 99th percentiles of the map.
+        Explicit colour-bar limits on |mu|. ``None`` uses the 1st and 99th percentiles of the map.
     title
         Title displayed above the panel.
     colormap
@@ -316,21 +322,18 @@ def plot_magnification_2d(
 
     magnification = LensCalc.from_mass_obj(mass_obj).magnification_2d_from(grid=grid)
 
-    with np.errstate(divide="ignore"):
-        log_abs_mu = np.log10(np.abs(np.asarray(magnification.slim)))
+    abs_mu = np.abs(np.asarray(magnification.slim, dtype=float))
 
-    finite = np.isfinite(log_abs_mu)
-    log_abs_mu[~finite] = np.nanmax(log_abs_mu[finite]) if np.any(finite) else 0.0
+    usable = np.isfinite(abs_mu) & (abs_mu > 0.0)
+    abs_mu[~np.isfinite(abs_mu)] = np.max(abs_mu[usable]) if np.any(usable) else 1.0
+    abs_mu[abs_mu <= 0.0] = np.min(abs_mu[usable]) if np.any(usable) else 1.0
 
     if vmin is None:
-        vmin = float(np.percentile(log_abs_mu, 1.0))
+        vmin = float(np.percentile(abs_mu, 1.0))
     if vmax is None:
-        vmax = float(np.percentile(log_abs_mu, 99.0))
+        vmax = float(np.percentile(abs_mu, 99.0))
 
-    log_abs_mu_array = aa.Array2D(values=log_abs_mu, mask=grid.mask)
-
-    lines = None
-    if include_critical_curves:
+    if lines is None and include_critical_curves:
         tc, rc = _critical_curves_from(
             mass_obj, grid, tc=tangential_critical_curves, rc=radial_critical_curves
         )
@@ -341,18 +344,24 @@ def plot_magnification_2d(
         fig, ax = subplots(1, 1, figsize=conf_subplot_figsize(1, 1))
 
     plot_array(
-        array=log_abs_mu_array,
+        array=aa.Array2D(values=abs_mu, mask=grid.mask),
         title=title,
         colormap=colormap,
+        use_log10=True,
+        contours=0,
         vmin=vmin,
         vmax=vmax,
         lines=lines,
+        line_colors=line_colors,
         cb_unit="",
         ax=ax,
     )
 
     _magnification_contours(
-        ax=ax, log_abs_mu_array=log_abs_mu_array, grid=grid, contour_levels=contour_levels
+        ax=ax,
+        log_abs_mu_array=aa.Array2D(values=np.log10(abs_mu), mask=grid.mask),
+        grid=grid,
+        contour_levels=contour_levels,
     )
 
     if owns_figure:
@@ -361,7 +370,7 @@ def plot_magnification_2d(
 
 
 def _magnification_contours(ax, log_abs_mu_array, grid, contour_levels):
-    """Draw labelled contour lines of constant |mu| over a log10 |mu| map on ``ax``.
+    """Draw labelled contour lines of constant |mu| over a magnification map on ``ax``.
 
     The contours are drawn in arcsecond coordinates from the grid's native (y, x) values, so they line up with the
     image however ``plot_array`` zoomed it. The axes limits are restored afterwards so the contours never widen the
@@ -372,7 +381,7 @@ def _magnification_contours(ax, log_abs_mu_array, grid, contour_levels):
     ax
         The ``Axes`` the map was drawn on.
     log_abs_mu_array
-        The ``Array2D`` of log10 |mu| that was plotted.
+        The ``Array2D`` of log10 |mu| of the plotted map (the contours are drawn on it).
     grid
         The grid the magnification was evaluated on.
     contour_levels
@@ -503,7 +512,7 @@ def plot_magnification_source_plane_grid(
     radial_caustics=None,
     vmin=None,
     vmax=None,
-    title: str = r"Source-Plane Magnification $\log_{10}\mu$",
+    title: str = r"Source-Plane Magnification $\mu$",
     colormap="default",
     output_path=None,
     output_filename: str = "magnification_source_plane_grid",
@@ -512,10 +521,10 @@ def plot_magnification_source_plane_grid(
 ):
     """Plot the source-plane magnification on square pixels, for sources without a mesh.
 
-    The map is computed by ``LensCalc.source_plane_magnification_from`` (image-plane sub-pixels traced to the
-    source plane and binned into square source pixels) and plotted as log10 mu with labelled contours of constant mu and,
-    optionally, the caustics, following the conventions of ``plot_magnification_2d``. Source pixels no image area
-    lands in are shown at the bottom of the colour scale.
+    The map is computed by ``LensCalc.source_plane_magnification_from`` (image-plane sub-pixels traced to the source
+    plane and binned into square source pixels) and plotted on a logarithmic colour scale with labelled contours of
+    constant mu and, optionally, the caustics, following the conventions of ``plot_magnification_2d``. Source pixels
+    no image area lands in are shown at the bottom of the colour scale.
 
     This is the map to use for parametric and Multi Gaussian Expansion sources; for a pixelized source,
     ``plot_magnification_source_plane`` shows the magnification on the reconstruction's own mesh.
@@ -535,7 +544,7 @@ def plot_magnification_source_plane_grid(
     tangential_caustics, radial_caustics
         Pre-computed caustics; ``None`` computes them when ``include_caustics`` is ``True``.
     vmin, vmax
-        Explicit colour-bar limits in log10 mu. ``None`` uses the 1st and 99th percentiles of the non-zero pixels.
+        Explicit colour-bar limits on mu. ``None`` uses the 1st and 99th percentiles of the non-zero pixels.
     title, colormap, output_path, output_filename, output_format, ax
         As for ``plot_magnification_2d``.
     """
@@ -551,17 +560,12 @@ def plot_magnification_source_plane_grid(
     values = np.asarray(magnification.slim.array, dtype=float)
     positive = values > 0.0
 
-    log_mu = np.full(values.shape, np.nan)
-    log_mu[positive] = np.log10(values[positive])
-
     if vmin is None:
-        vmin = float(np.percentile(log_mu[positive], 1.0)) if np.any(positive) else 0.0
+        vmin = float(np.percentile(values[positive], 1.0)) if np.any(positive) else 0.1
     if vmax is None:
-        vmax = float(np.percentile(log_mu[positive], 99.0)) if np.any(positive) else 1.0
+        vmax = float(np.percentile(values[positive], 99.0)) if np.any(positive) else 1.0
 
-    log_mu[~positive] = vmin
-
-    log_mu_array = aa.Array2D(values=log_mu, mask=magnification.mask)
+    values[~positive] = vmin
     source_grid = aa.Grid2D.from_mask(mask=magnification.mask)
 
     lines = None
@@ -575,9 +579,11 @@ def plot_magnification_source_plane_grid(
         fig, ax = subplots(1, 1, figsize=conf_subplot_figsize(1, 1))
 
     plot_array(
-        array=log_mu_array,
+        array=aa.Array2D(values=values, mask=magnification.mask),
         title=title,
         colormap=colormap,
+        use_log10=True,
+        contours=0,
         vmin=vmin,
         vmax=vmax,
         lines=lines,
@@ -586,7 +592,10 @@ def plot_magnification_source_plane_grid(
     )
 
     _magnification_contours(
-        ax=ax, log_abs_mu_array=log_mu_array, grid=source_grid, contour_levels=contour_levels
+        ax=ax,
+        log_abs_mu_array=aa.Array2D(values=np.log10(values), mask=magnification.mask),
+        grid=source_grid,
+        contour_levels=contour_levels,
     )
 
     if owns_figure:

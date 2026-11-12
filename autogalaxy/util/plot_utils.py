@@ -200,6 +200,7 @@ def plot_array(
     ax=None,
     arcsec_after_decimal=None,
     stretch=None,
+    contours=None,
 ):
     """Plot an autoarray ``Array2D`` to file or onto an existing ``Axes``.
 
@@ -255,6 +256,9 @@ def plot_array(
         the decimal point (``3.″8``) instead of suffixing it (``3.8"``); when
         ``False`` the suffix form is forced.  ``None`` (the default) reads the
         config.
+    contours : int or None
+        Number of contour levels. ``None`` draws log-spaced contours on a ``use_log10`` plot and none otherwise;
+        ``0`` draws none.
     """
     from autoarray.plot import plot_array as _aa_plot_array
 
@@ -293,6 +297,7 @@ def plot_array(
         vmax=vmax,
         stretch=stretch,
         cb_unit=cb_unit,
+        contours=contours,
         arcsec_after_decimal=arcsec_after_decimal,
         output_path=_output_path,
         output_filename=output_filename,
