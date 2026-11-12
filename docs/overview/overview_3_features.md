@@ -82,23 +82,30 @@ The [one-by-one example](https://github.com/PyAutoLabs/autogalaxy_workspace/blob
 
 ## Ellipse Fitting
 
-Ellipse fitting is a technique which fits many ellipses to a galaxy's emission to determine its ellipticity, position
-angle and centre, without assuming a parametric form for its light (e.g. a Sersic profile):
+Measure how a galaxy's light changes shape with radius: its ellipticity, position angle and centre,
+including isophotal twists and departures from elliptical symmetry. Ellipse fitting complements a
+Sersic or multi-component light model by tracing isophotes without prescribing a radial light-profile law.
+
+This is a dedicated capability of **PyAutoGalaxy**, implemented in `autogalaxy.ellipse` and exposed through
+`Ellipse`, `FitEllipse` and `AnalysisEllipse`. The worked examples live in `autogalaxy_workspace/notebooks/ellipse/`.
 
 ```{image} https://raw.githubusercontent.com/PyAutoLabs/PyAutoGalaxy/main/docs/overview/images/overview_3/ellipse.png
-:alt: Alternative text
+:alt: Ellipses tracing the shape of galaxy light
 :width: 600
 ```
 
-This provides complementary information to parametric light profile fitting, for example giving insights on whether
-the ellipticity and position angle are constant with radius or if the galaxy's emission is lopsided.
+At each radius, the fit samples the image along an ellipse and compares the sampled brightness with its
+mean. Multipole extensions describe deviations from elliptical isophotes, including lopsided structure.
+[Amvrosiadis et al. (2024)](https://arxiv.org/abs/2407.12983) illustrate the use of the m=1 multipole to
+measure lopsidedness in early-type galaxies and discuss its relevance to lens mass models.
 
-There are also multipole moment extensions to ellipse fitting, which determine higher order deviations from elliptical
-symmetry providing even more information on the galaxy's structure.
+These examples fit observed isophotes without PSF convolution of a light model. Interpret structures close
+to the PSF scale accordingly, and mask contaminating light when measuring a galaxy's morphology.
 
-The following paper describes the technique in detail: <https://arxiv.org/html/2407.12983v1>
+Start with [how the ellipse fit works](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/ellipse/fit.ipynb), then
+[fit ellipse parameters](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/ellipse/modeling.ipynb) and
+[add multipoles](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/ellipse/multipoles.ipynb).
 
-Checkout `autogalaxy_workspace/notebooks/features/ellipse_fitting.ipynb` to learn how to use ellipse fitting.
 
 ## Linear Light Profiles
 
