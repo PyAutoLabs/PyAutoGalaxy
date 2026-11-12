@@ -1,55 +1,34 @@
 (overview)=
 
-# Overview
+<span id="id1"></span>
 
-**PyAutoGalaxy** requires Python 3.12 or later and supports the Linux, MacOS and Windows operating systems.
+# Install PyAutoGalaxy
 
-**PyAutoGalaxy** can be installed via the Python distribution [Anaconda](https://www.anaconda.com/) or using
-[PyPI](https://pypi.org/) to `pip install autogalaxy` into your Python distribution.
+Use Python 3.12 or later in a separate environment. The guides below use Python 3.12.
 
-We recommend Anaconda as it manages the installation of many major libraries (e.g. numpy, scipy,
-matplotlib, etc.) making installation more straight forward. Windows users must use Anaconda.
+| Your setup | Start here |
+| --- | --- |
+| You use conda, or need it to manage Python | [Install with conda](conda.md) |
+| You already have Python installed | [Install with pip](pip.md) |
+| You want to edit the library code | [Install from source](source.md) |
 
-The installation guide for both approaches can be found at:
+Both the conda and pip routes install `autogalaxy` from PyPI. A GPU is optional; start with the standard installation, or see [GPU setup](acceleration.md) if you plan to use one.
 
-- [Anaconda installation guide](https://pyautogalaxy.readthedocs.io/en/latest/installation/conda.html)
-- [PyPI installation guide](https://pyautogalaxy.readthedocs.io/en/latest/installation/pip.html)
+Prefer to try the software without installing it? Open an example in [Google Colab](https://pyautogalaxy.readthedocs.io/en/latest/overview/overview_2_new_user_guide.html).
 
-Users who wish to build **PyAutoGalaxy** from source (e.g. via a `git clone`) should follow
-our [building from source installation guide](https://pyautogalaxy.readthedocs.io/en/latest/installation/source.html).
+<details>
+<summary>Install with help from an AI agent</summary>
+
+Paste this into Claude Code, Codex or another AI coding agent:
+
+> Help me install PyAutoGalaxy and set up autogalaxy_workspace. Use the current installation guide at https://pyautogalaxy.readthedocs.io/en/latest/installation/overview.html. Check my operating system and Python version, create an isolated environment, verify the installation and help me run the first example. Ask before changing an existing environment or installing system software.
+
+The [PyAutoGalaxy AI Assistant](https://github.com/PyAutoLabs/autogalaxy_assistant) can help with the examples once you are set up.
+
+</details>
+
+After installing, [run your first example](workspace.md).
 
 ## Dependencies
 
-**PyAutoGalaxy** has the following dependencies:
-
-**PyAutoNerves** <https://github.com/PyAutoLabs/PyAutoNerves>
-
-**PyAutoFit** <https://github.com/PyAutoLabs/PyAutoFit>
-
-**PyAutoArray** <https://github.com/PyAutoLabs/PyAutoArray>
-
-**dynesty** <https://github.com/joshspeagle/dynesty>
-
-**emcee** <https://github.com/dfm/emcee>
-
-**colossus**: <https://bdiemer.bitbucket.io/colossus/>
-
-**astropy** <https://www.astropy.org/>
-
-**corner.py** <https://github.com/dfm/corner.py>
-
-**matplotlib** <https://matplotlib.org/>
-
-**numba** <https://github.com/numba/numba>
-
-**numpy** <https://numpy.org/>
-
-**scipy** <https://www.scipy.org/>
-
-**scikit-image**: <https://github.com/scikit-image/scikit-image>
-
-**scikit-learn**: <https://github.com/scikit-learn/scikit-learn>
-
-And the following optional dependencies:
-
-**nufftax**: <https://github.com/GragasLab/nufftax>
+The installer resolves the required packages automatically. See [optional packages](acceleration.md) for additions needed by particular workflows.
