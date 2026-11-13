@@ -54,15 +54,13 @@ For a single galaxy, choose the notebook that matches your observations. A teles
 
 Each notebook begins with example data and introduces the relevant model and fitting steps. If you do not have your own dataset yet, choose the example closest to your interests. For blended galaxies or cluster fields, begin with the system-specific guide above.
 
-![A pixelated galaxy image, interferometer sampling points in the u–v plane, and illustrative views of the same galaxy in three wavebands.](images/overview_2/dataset_types.png)
-
-*AI-generated schematic, not measured data. The interferometer panel shows sampling locations; multi-band images illustrate how the relative prominence of a galaxy’s components can change with wavelength.*
-
 ::::{grid} 1 1 3 3
 :gutter: 3
 
 
 :::{grid-item-card} Imaging
+![Conceptual telescope image of a galaxy](images/overview_2/galaxy_imaging.png)
+
 Galaxy images from Hubble, JWST or ground-based telescopes.
 
 [Notebook](https://github.com/PyAutoLabs/autogalaxy_workspace/blob/main/notebooks/imaging/start_here.ipynb) · [Google Colab](https://colab.research.google.com/github/PyAutoLabs/autogalaxy_workspace/blob/2026.11.13.1/notebooks/imaging/start_here.ipynb)
