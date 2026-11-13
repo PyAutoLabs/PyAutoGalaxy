@@ -9,7 +9,7 @@
 ### Explore It Yourself
 
 - **[Start Here](https://pyautogalaxy.readthedocs.io/en/latest/overview/overview_1_start_here.html)** — discover PyAutoGalaxy and work through your first example.
-- **[Try it in your browser](https://colab.research.google.com/github/PyAutoLabs/autogalaxy_workspace/blob/2026.11.12.1/start_here.ipynb)** — run the introductory notebook without installing anything.
+- **[Try it in your browser](https://colab.research.google.com/github/PyAutoLabs/autogalaxy_workspace/blob/2026.11.13.1/start_here.ipynb)** — run the introductory notebook without installing anything.
 - **[Install PyAutoGalaxy](https://pyautogalaxy.readthedocs.io/en/latest/installation/overview.html)** — get set up on your computer.
 
 Visit the [workspace](https://github.com/PyAutoLabs/autogalaxy_workspace#find-your-examples) to find examples for your data and science goals.
