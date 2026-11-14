@@ -28,13 +28,30 @@ Choose the group that matches the object or result you want to inspect. The link
 Basic plots
 ~~~~~~~~~~~
 
-Display an array or a grid of coordinates.
+Display an array or a grid of coordinates, or write an array to a ``.fits`` file.
 
 .. autosummary::
    :toctree: _autosummary
 
     plot_array
     plot_grid
+    fits_array
+
+Dataset Subplots
+~~~~~~~~~~~~~~~~
+
+Inspect an imaging or interferometer dataset before fitting it, or write its components to ``.fits`` files.
+
+.. autosummary::
+   :toctree: _autosummary
+
+    subplot_imaging_dataset
+    subplot_imaging_dataset_intro
+    subplot_imaging_dataset_list
+    fits_imaging
+    subplot_interferometer_dataset
+    subplot_interferometer_dirty_images
+    fits_interferometer
 
 Galaxy and Light and Mass Profile subplots
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -51,6 +68,20 @@ Inspect profile components, combined galaxy images, basis profiles and adapt ima
     subplot_galaxy_images
     subplot_adapt_images
 
+Magnification maps
+~~~~~~~~~~~~~~~~~~
+
+Map the lensing magnification in the image plane and source plane, and its uncertainty over a set of posterior draws.
+
+.. autosummary::
+   :toctree: _autosummary
+
+    plot_magnification_2d
+    plot_magnification_source_plane
+    plot_magnification_source_plane_grid
+    plot_magnification_uncertainty_2d
+    magnification_fractional_error_2d_from
+
 Imaging Fit subplots
 ~~~~~~~~~~~~~~~~~~~~
 
@@ -61,6 +92,7 @@ Compare the image data and fitted model, and inspect residuals and other fit dia
 
     subplot_fit_imaging
     subplot_fit_imaging_of_galaxy
+    subplot_fit_imaging_list
 
 Interferometer Fit subplots
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -101,6 +133,7 @@ These functions visualize samples and search progress. They are implemented by *
    corner_anesthetic
    subplot_parameters
    log_likelihood_vs_iteration
+   output_figure
 
 .. _plot-customization-aplt:
 
