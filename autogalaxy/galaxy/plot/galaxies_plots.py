@@ -271,12 +271,12 @@ def plot_magnification_2d(
 ):
     """Plot the image-plane magnification map of a mass object, with constant-magnification contours.
 
-    Every pixel shows log10 |mu| at its centre, where mu = 1 / det(A) is the signed magnification computed from the
+    Every pixel shows log10 ``|mu|`` at its centre, where mu = 1 / det(A) is the signed magnification computed from the
     Hessian of the lensing potential. The magnification diverges on the critical curves, so a linear colour scale is
     dominated by the few pixels next to them; the log scale and a colour range set by the 1st and 99th percentiles
-    of log10 |mu| keep the rest of the map readable.
+    of log10 ``|mu|`` keep the rest of the map readable.
 
-    Contour lines are drawn at constant |mu| (by default 2, 5, 10, 20, 50 and 100), labelled with their |mu| value,
+    Contour lines are drawn at constant ``|mu|`` (by default 2, 5, 10, 20, 50 and 100), labelled with their ``|mu|`` value,
     as in the magnification maps of cluster lens models (e.g. LEGGOS II, Abedi et al. 2026, figure 4). Levels outside
     the range of the map are skipped. The critical curves can be overlaid, computed with the method configured in
     ``visualize/general.yaml``.
@@ -292,13 +292,13 @@ def plot_magnification_2d(
         The image-plane grid on which the magnification is evaluated, for example ``dataset.grid`` or a
         ``Grid2D.uniform``.
     contour_levels
-        The |mu| values at which contour lines are drawn. ``None`` or an empty sequence draws no contours.
+        The ``|mu|`` values at which contour lines are drawn. ``None`` or an empty sequence draws no contours.
     include_critical_curves
         If ``True``, overlay the tangential and radial critical curves.
     tangential_critical_curves, radial_critical_curves
         Pre-computed critical curves; ``None`` computes them when ``include_critical_curves`` is ``True``.
     vmin, vmax
-        Explicit colour-bar limits in log10 |mu|. ``None`` uses the 1st and 99th percentiles of the map.
+        Explicit colour-bar limits in log10 ``|mu|``. ``None`` uses the 1st and 99th percentiles of the map.
     title
         Title displayed above the panel.
     colormap
@@ -361,7 +361,7 @@ def plot_magnification_2d(
 
 
 def _magnification_contours(ax, log_abs_mu_array, grid, contour_levels):
-    """Draw labelled contour lines of constant |mu| over a log10 |mu| map on ``ax``.
+    """Draw labelled contour lines of constant ``|mu|`` over a log10 ``|mu|`` map on ``ax``.
 
     The contours are drawn in arcsecond coordinates from the grid's native (y, x) values, so they line up with the
     image however ``plot_array`` zoomed it. The axes limits are restored afterwards so the contours never widen the
@@ -372,11 +372,11 @@ def _magnification_contours(ax, log_abs_mu_array, grid, contour_levels):
     ax
         The ``Axes`` the map was drawn on.
     log_abs_mu_array
-        The ``Array2D`` of log10 |mu| that was plotted.
+        The ``Array2D`` of log10 ``|mu|`` that was plotted.
     grid
         The grid the magnification was evaluated on.
     contour_levels
-        The |mu| values at which to draw contours; values outside the range of the map are skipped.
+        The ``|mu|`` values at which to draw contours; values outside the range of the map are skipped.
     """
     if not contour_levels:
         return
@@ -597,8 +597,8 @@ def plot_magnification_source_plane_grid(
 def magnification_fractional_error_2d_from(magnification_list, magnification_best) -> aa.Array2D:
     """Return the fractional error of the magnification at every pixel, over a set of posterior draws.
 
-    For each pixel the error is half the range between the 16th and 84th percentiles of |mu| over the draws (the
-    1 sigma error for a Gaussian), divided by |mu| of the best-fit model. This is the quantity mapped in the
+    For each pixel the error is half the range between the 16th and 84th percentiles of ``|mu|`` over the draws (the
+    1 sigma error for a Gaussian), divided by ``|mu|`` of the best-fit model. This is the quantity mapped in the
     magnification uncertainty maps of cluster lens models (e.g. LEGGOS II, Abedi et al. 2026, figure 4).
 
     Next to a critical curve the magnification diverges and its sign differs between draws, so the fractional error
@@ -646,8 +646,8 @@ def plot_magnification_uncertainty_2d(
 ):
     """Plot the fractional error of the magnification at every image-plane pixel, over a set of posterior draws.
 
-    The error map is ``magnification_fractional_error_2d_from``: half the 16th-84th percentile range of |mu| over the
-    draws, divided by the best-fit |mu|. Contours of constant |mu| from the best-fit map (labelled as in
+    The error map is ``magnification_fractional_error_2d_from``: half the 16th-84th percentile range of ``|mu|`` over the
+    draws, divided by the best-fit ``|mu|``. Contours of constant ``|mu|`` from the best-fit map (labelled as in
     ``plot_magnification_2d``) and, optionally, the best-fit critical curves are drawn on top, as in the magnification
     uncertainty maps of cluster lens models (e.g. LEGGOS II, Abedi et al. 2026, figure 4).
 
@@ -665,7 +665,7 @@ def plot_magnification_uncertainty_2d(
     mass_obj
         The best-fit mass object (``Galaxies`` or a ``Tracer``), used for the critical curves. ``None`` draws none.
     contour_levels
-        The |mu| values of the best-fit contours. ``None`` or an empty sequence draws no contours.
+        The ``|mu|`` values of the best-fit contours. ``None`` or an empty sequence draws no contours.
     include_critical_curves
         If ``True`` and ``mass_obj`` is given (or critical curves are passed in), overlay them.
     tangential_critical_curves, radial_critical_curves
