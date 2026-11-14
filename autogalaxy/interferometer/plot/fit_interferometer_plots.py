@@ -135,6 +135,9 @@ def subplot_fit_dirty_images(
     dirty signal-to-noise map, dirty model image, dirty residual map, dirty
     normalised residual map, and dirty chi-squared map.
 
+    On an array-free dataset (``fit.dataset.is_array_free``) the unweighted dirty images cannot be formed,
+    so the natural-weighted dirty image, dirty model image and dirty residual map are plotted instead.
+
     Parameters
     ----------
     fit : FitInterferometer
@@ -149,9 +152,6 @@ def subplot_fit_dirty_images(
         Apply a log₁₀ stretch to the plotted values.
     residuals_symmetric_cmap : bool
         Reserved for future symmetric-colormap support (currently unused).
-
-    On an array-free dataset (``fit.dataset.is_array_free``) the unweighted dirty images cannot be formed,
-    so the natural-weighted dirty image, dirty model image and dirty residual map are plotted instead.
     """
     if fit.dataset.is_array_free:
         return _subplot_natural(
