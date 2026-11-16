@@ -189,7 +189,7 @@ class EllProfile(SphProfile):
     # How the sampled elliptical components are read: as an axis ratio and a
     # position angle (PyAutoFit's latent-parameter protocol; inherited by
     # every light and mass profile, and extended by the multipole classes).
-    latent_parameters = {("ell_comps_0", "ell_comps_1"): convert.latent_ellipse_from}
+    latent_parameters = {("ell_comps_0", "ell_comps_1"): convert.axis_ratio_angle_dict_from}
 
     def __init__(
         self,

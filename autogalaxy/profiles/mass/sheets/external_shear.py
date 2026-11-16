@@ -49,7 +49,7 @@ class ExternalShear(MassProfile):
     """
 
     # Read as a magnitude and an angle rather than gamma_1 / gamma_2.
-    latent_parameters = {("gamma_1", "gamma_2"): convert.latent_shear_from}
+    latent_parameters = {("gamma_1", "gamma_2"): convert.shear_magnitude_angle_dict_from}
 
     def __init__(self, gamma_1: float = 0.0, gamma_2: float = 0.0):
         r"""

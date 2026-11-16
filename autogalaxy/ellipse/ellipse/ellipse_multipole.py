@@ -9,7 +9,7 @@ from autogalaxy.ellipse.ellipse.ellipse import Ellipse
 
 class EllipseMultipole:
     latent_parameters = {
-        ("multipole_comps_0", "multipole_comps_1"): convert.latent_multipole_from
+        ("multipole_comps_0", "multipole_comps_1"): convert.multipole_k_m_phi_m_dict_from
     }
 
     def __init__(
@@ -128,7 +128,7 @@ class EllipseMultipoleScaled(EllipseMultipole):
         (
             "scaled_multipole_comps_0",
             "scaled_multipole_comps_1",
-        ): convert.latent_scaled_multipole_from
+        ): convert.scaled_multipole_k_m_phi_m_dict_from
     }
 
     def __init__(
