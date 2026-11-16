@@ -285,20 +285,20 @@ def test__latent_parameter_conversions__invert_the_sampled_components():
     # protocol, vectorised over samples.
     gamma_1 = np.array([0.1, 0.0])
     gamma_2 = np.array([0.0, 0.1])
-    latent = ag.convert.latent_shear_from(gamma_1=gamma_1, gamma_2=gamma_2)
+    latent = ag.convert.shear_magnitude_angle_dict_from(gamma_1=gamma_1, gamma_2=gamma_2)
     assert latent["magnitude"] == pytest.approx([0.1, 0.1])
     assert latent["angle"].values == pytest.approx([0.0, 45.0])
     assert latent["angle"].period == 180.0
 
     ell = ag.convert.ell_comps_from(axis_ratio=0.5, angle=30.0)
-    latent = ag.convert.latent_ellipse_from(
+    latent = ag.convert.axis_ratio_angle_dict_from(
         ell_comps_0=np.array([ell[0]]), ell_comps_1=np.array([ell[1]])
     )
     assert latent["axis_ratio"] == pytest.approx([0.5])
     assert latent["angle"].values == pytest.approx([30.0])
 
     comps = ag.convert.multipole_comps_from(k_m=0.05, phi_m=10.0, m=4)
-    latent = ag.convert.latent_multipole_from(
+    latent = ag.convert.multipole_k_m_phi_m_dict_from(
         multipole_comps_0=np.array([comps[0]]),
         multipole_comps_1=np.array([comps[1]]),
         m=4.0,
@@ -389,7 +389,7 @@ def test__latent_parameters__scaled_and_light_multipole_values_and_periods():
     c4 = ag.convert.multipole_comps_from(
         k_m=np.array([0.04, 0.08]), phi_m=np.array([15.0, -25.0]), m=4
     )
-    scaled = ag.convert.latent_scaled_multipole_from(*c3, m=3)
+    scaled = ag.convert.scaled_multipole_k_m_phi_m_dict_from(*c3, m=3)
     assert scaled["k_m"] == pytest.approx([0.03, 0.06])
     assert scaled["phi_m"].values == pytest.approx([10.0, -20.0])
     assert scaled["phi_m"].period == 120.0
@@ -402,7 +402,7 @@ def test__latent_parameters__scaled_and_light_multipole_values_and_periods():
         np.array([0.04, 0.08]) * np.cos(np.deg2rad(4 * np.array([15.0, -25.0]))),
         np.array([0.04, 0.08]) * np.sin(np.deg2rad(4 * np.array([15.0, -25.0]))),
     )
-    light = ag.convert.latent_light_multipoles_from(*light3, *light4)
+    light = ag.convert.light_multipoles_k_phi_dict_from(*light3, *light4)
     assert light["k_3"] == pytest.approx([0.03, 0.06])
     assert light["k_4"] == pytest.approx([0.04, 0.08])
     assert light["phi_3"].values == pytest.approx([10.0, -20.0])
@@ -418,7 +418,7 @@ def test__latent_declarations__preserve_profile_class_documentation():
 
 def test__light_multipole_latents__reconstruct_the_radius_perturbation():
     c3, s3, c4, s4 = 0.03, -0.02, 0.04, 0.01
-    latent = ag.convert.latent_light_multipoles_from(c3, s3, c4, s4)
+    latent = ag.convert.light_multipoles_k_phi_dict_from(c3, s3, c4, s4)
     theta = np.linspace(-np.pi, np.pi, 101)
     original = (
         c3 * np.cos(3 * theta)
@@ -431,7 +431,7 @@ def test__light_multipole_latents__reconstruct_the_radius_perturbation():
         for m in (3, 4)
     )
     assert reconstructed == pytest.approx(original)
-    cosine = ag.convert.latent_light_multipoles_from(0.03, 0.0, 0.04, 0.0)
+    cosine = ag.convert.light_multipoles_k_phi_dict_from(0.03, 0.0, 0.04, 0.0)
     assert cosine["phi_3"].values == pytest.approx(0.0)
     assert cosine["phi_4"].values == pytest.approx(0.0)
 
@@ -455,3 +455,39 @@ def test__light_multipole_latents__convert_independent_free_modes(free_mode):
     assert columns[f"k_{free_mode}"] == pytest.approx(0.03)
     assert columns[f"phi_{free_mode}"] == pytest.approx(0.0)
     assert not any(f"multipole_{free_mode}_comps" in name for name in latent.names)
+
+
+@pytest.mark.parametrize(
+    "old, new, args",
+    [
+        ("latent_shear_from", "shear_magnitude_angle_dict_from", (0.03, 0.04)),
+        ("latent_ellipse_from", "axis_ratio_angle_dict_from", (0.1, 0.2)),
+        ("latent_multipole_from", "multipole_k_m_phi_m_dict_from", (0.05, 0.02, 4)),
+        (
+            "latent_scaled_multipole_from",
+            "scaled_multipole_k_m_phi_m_dict_from",
+            (0.05, 0.02, 3),
+        ),
+        ("latent_light_multipole_3_from", "light_multipole_3_k_phi_dict_from", (0.03, 0.01)),
+        ("latent_light_multipole_4_from", "light_multipole_4_k_phi_dict_from", (0.04, 0.02)),
+        (
+            "latent_light_multipoles_from",
+            "light_multipoles_k_phi_dict_from",
+            (0.03, 0.01, 0.04, 0.02),
+        ),
+    ],
+)
+def test__deprecated_latent_names__warn_and_match_their_new_names(old, new, args):
+    with pytest.warns(DeprecationWarning, match=new):
+        result = getattr(ag.convert, old)(*args)
+
+    expected = getattr(ag.convert, new)(*args)
+
+    assert result.keys() == expected.keys()
+    for key, value in expected.items():
+        assert type(result[key]) is type(value)
+        if isinstance(value, af.Periodic):
+            assert result[key].period == value.period
+            assert result[key].values == pytest.approx(value.values)
+        else:
+            assert result[key] == pytest.approx(value)

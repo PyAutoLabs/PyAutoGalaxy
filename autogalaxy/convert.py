@@ -1,3 +1,5 @@
+import warnings
+
 import numpy as np
 from typing import Tuple, Optional
 
@@ -505,32 +507,38 @@ def multipole_comps_from(
     return multipole_comp_0, multipole_comp_1
 
 
-# Latent-parameter conversions.
+# Dict-returning conversions with periodic angles.
 #
-# PyAutoFit lets a model component declare, as a ``latent_parameters`` class
-# attribute, how the parameters it is *sampled* in convert to the ones it is
-# *read* in (``autofit.mapper.prior_model.latent_parameters``). The entries below are
-# those declarations' functions: each receives every parameter of the component
-# by name (the free ones as arrays over the posterior samples, the fixed ones as
-# floats) and returns the latent parameters by name. They are what the
-# ``corner_anesthetic_latent`` plots show. An angle is returned as ``Periodic``
-# with its period, so PyAutoFit recentres the samples on their circular mean and
-# a posterior peaked at the conversion's branch cut is not drawn as two peaks.
+# Each function below converts the parameters a profile is *sampled* in into the
+# ones it is *read* in, returning them in a dict keyed by name. They are the
+# functions the profiles' ``latent_parameters`` declarations use: PyAutoFit lets
+# a model component declare, as a ``latent_parameters`` class attribute, how to
+# derive extra quantities from its parameters
+# (``autofit.mapper.prior_model.latent_parameters``). Each receives every
+# parameter of the component by name (the free ones as arrays over the posterior
+# samples, the fixed ones as floats) and returns the converted parameters by
+# name, which the ``corner_anesthetic_latent`` plots show. An angle is returned
+# as ``Periodic`` with its period, so PyAutoFit recentres the samples on their
+# circular mean and a posterior peaked at the conversion's branch cut is not
+# drawn as two peaks.
+#
+# The ``_dict`` suffix separates them from the tuple-returning functions above
+# (e.g. ``shear_magnitude_and_angle_from``), which they wrap.
 
 
-def latent_shear_from(gamma_1, gamma_2, **kwargs) -> dict:
+def shear_magnitude_angle_dict_from(gamma_1, gamma_2, **kwargs) -> dict:
     """A shear's magnitude and angle (degrees) from its ``gamma_1`` / ``gamma_2``."""
     magnitude, angle = shear_magnitude_and_angle_from(gamma_1=gamma_1, gamma_2=gamma_2)
     return {"magnitude": magnitude, "angle": Periodic(angle, period=180.0)}
 
 
-def latent_ellipse_from(ell_comps_0, ell_comps_1, **kwargs) -> dict:
+def axis_ratio_angle_dict_from(ell_comps_0, ell_comps_1, **kwargs) -> dict:
     """An ellipse's axis ratio and position angle (degrees) from its elliptical components."""
     axis_ratio, angle = axis_ratio_and_angle_from(ell_comps=(ell_comps_0, ell_comps_1))
     return {"axis_ratio": axis_ratio, "angle": Periodic(angle, period=180.0)}
 
 
-def latent_multipole_from(multipole_comps_0, multipole_comps_1, m, **kwargs) -> dict:
+def multipole_k_m_phi_m_dict_from(multipole_comps_0, multipole_comps_1, m, **kwargs) -> dict:
     """A multipole's strength ``k_m`` and sky angle ``phi_m`` (degrees) from its components."""
     k_m, phi_m = multipole_k_m_and_phi_m_from(
         multipole_comps=(multipole_comps_0, multipole_comps_1), m=int(m)
@@ -538,7 +546,7 @@ def latent_multipole_from(multipole_comps_0, multipole_comps_1, m, **kwargs) -> 
     return {"k_m": k_m, "phi_m": Periodic(phi_m, period=360.0 / int(m))}
 
 
-def latent_scaled_multipole_from(
+def scaled_multipole_k_m_phi_m_dict_from(
     scaled_multipole_comps_0, scaled_multipole_comps_1, m, **kwargs
 ) -> dict:
     """A scaled multipole's strength ``k_m`` (per unit major axis) and sky angle ``phi_m``."""
@@ -548,7 +556,7 @@ def latent_scaled_multipole_from(
     return {"k_m": k_m, "phi_m": Periodic(phi_m, period=360.0 / int(m))}
 
 
-def latent_light_multipole_3_from(multipole_3_comps_0, multipole_3_comps_1, **kwargs) -> dict:
+def light_multipole_3_k_phi_dict_from(multipole_3_comps_0, multipole_3_comps_1, **kwargs) -> dict:
     """The m=3 light-mode strength and phase in its elliptical reference frame."""
     # Light profiles store (cosine, sine); the mass helper accepts (sine, cosine).
     k_3, phi_3 = multipole_k_m_and_phi_m_from(
@@ -557,7 +565,7 @@ def latent_light_multipole_3_from(multipole_3_comps_0, multipole_3_comps_1, **kw
     return {"k_3": k_3, "phi_3": Periodic(phi_3, period=120.0)}
 
 
-def latent_light_multipole_4_from(multipole_4_comps_0, multipole_4_comps_1, **kwargs) -> dict:
+def light_multipole_4_k_phi_dict_from(multipole_4_comps_0, multipole_4_comps_1, **kwargs) -> dict:
     """The m=4 light-mode strength and phase in its elliptical reference frame."""
     k_4, phi_4 = multipole_k_m_and_phi_m_from(
         multipole_comps=(multipole_4_comps_1, multipole_4_comps_0), m=4
@@ -565,7 +573,7 @@ def latent_light_multipole_4_from(multipole_4_comps_0, multipole_4_comps_1, **kw
     return {"k_4": k_4, "phi_4": Periodic(phi_4, period=90.0)}
 
 
-def latent_light_multipoles_from(
+def light_multipoles_k_phi_dict_from(
     multipole_3_comps_0,
     multipole_3_comps_1,
     multipole_4_comps_0,
@@ -574,6 +582,63 @@ def latent_light_multipoles_from(
 ) -> dict:
     """The m=3 and m=4 light-mode strengths and phases (degrees)."""
     return {
-        **latent_light_multipole_3_from(multipole_3_comps_0, multipole_3_comps_1),
-        **latent_light_multipole_4_from(multipole_4_comps_0, multipole_4_comps_1),
+        **light_multipole_3_k_phi_dict_from(multipole_3_comps_0, multipole_3_comps_1),
+        **light_multipole_4_k_phi_dict_from(multipole_4_comps_0, multipole_4_comps_1),
     }
+
+
+# Deprecated names.
+#
+# Release 2026.11.12.1 shipped the conversions above as ``latent_*_from``. Each
+# old name stays for one release as an alias that warns and calls its new name.
+
+
+def _warn_renamed(old: str, new: str):
+    warnings.warn(
+        f"autogalaxy.convert.{old} is deprecated; use autogalaxy.convert.{new} "
+        "instead. The old name will be removed after the next release.",
+        DeprecationWarning,
+        stacklevel=3,
+    )
+
+
+def latent_shear_from(*args, **kwargs) -> dict:
+    """Deprecated alias of ``shear_magnitude_angle_dict_from``; will be removed after the next release."""
+    _warn_renamed("latent_shear_from", "shear_magnitude_angle_dict_from")
+    return shear_magnitude_angle_dict_from(*args, **kwargs)
+
+
+def latent_ellipse_from(*args, **kwargs) -> dict:
+    """Deprecated alias of ``axis_ratio_angle_dict_from``; will be removed after the next release."""
+    _warn_renamed("latent_ellipse_from", "axis_ratio_angle_dict_from")
+    return axis_ratio_angle_dict_from(*args, **kwargs)
+
+
+def latent_multipole_from(*args, **kwargs) -> dict:
+    """Deprecated alias of ``multipole_k_m_phi_m_dict_from``; will be removed after the next release."""
+    _warn_renamed("latent_multipole_from", "multipole_k_m_phi_m_dict_from")
+    return multipole_k_m_phi_m_dict_from(*args, **kwargs)
+
+
+def latent_scaled_multipole_from(*args, **kwargs) -> dict:
+    """Deprecated alias of ``scaled_multipole_k_m_phi_m_dict_from``; will be removed after the next release."""
+    _warn_renamed("latent_scaled_multipole_from", "scaled_multipole_k_m_phi_m_dict_from")
+    return scaled_multipole_k_m_phi_m_dict_from(*args, **kwargs)
+
+
+def latent_light_multipole_3_from(*args, **kwargs) -> dict:
+    """Deprecated alias of ``light_multipole_3_k_phi_dict_from``; will be removed after the next release."""
+    _warn_renamed("latent_light_multipole_3_from", "light_multipole_3_k_phi_dict_from")
+    return light_multipole_3_k_phi_dict_from(*args, **kwargs)
+
+
+def latent_light_multipole_4_from(*args, **kwargs) -> dict:
+    """Deprecated alias of ``light_multipole_4_k_phi_dict_from``; will be removed after the next release."""
+    _warn_renamed("latent_light_multipole_4_from", "light_multipole_4_k_phi_dict_from")
+    return light_multipole_4_k_phi_dict_from(*args, **kwargs)
+
+
+def latent_light_multipoles_from(*args, **kwargs) -> dict:
+    """Deprecated alias of ``light_multipoles_k_phi_dict_from``; will be removed after the next release."""
+    _warn_renamed("latent_light_multipoles_from", "light_multipoles_k_phi_dict_from")
+    return light_multipoles_k_phi_dict_from(*args, **kwargs)

@@ -33,11 +33,11 @@ class _LightProfileMultipoleMixin:
         (
             "multipole_3_comps_0",
             "multipole_3_comps_1",
-        ): convert.latent_light_multipole_3_from,
+        ): convert.light_multipole_3_k_phi_dict_from,
         (
             "multipole_4_comps_0",
             "multipole_4_comps_1",
-        ): convert.latent_light_multipole_4_from,
+        ): convert.light_multipole_4_k_phi_dict_from,
     }
 
     def perturbed_radii_from(
