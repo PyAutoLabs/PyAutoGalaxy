@@ -76,14 +76,13 @@ class GaussianGradient(lp_linear.Gaussian, mp.GaussianGradient, LightMassProfile
         effective_radius
             The radius containing half the light of this light profile.
         mass_to_light_ratio_base
-            The base mass-to-light ratio of the profile, which is the mass-to-light ratio of the Gaussian before it
-            is scaled by values that adjust its mass-to-light ratio based on the reference radius and gradient.
+            The mass-to-light ratio of a Gaussian whose `sigma` equals `mass_to_light_radius`.
         mass_to_light_gradient
-            The mass-to-light radial gradient of the profile, whereby positive values means there is more mass
-            per unit light within the reference radius.
+            The power-law slope of the mass-to-light ratio with `sigma`, M/L proportional to
+            `(sigma / mass_to_light_radius) ** -mass_to_light_gradient`: positive values mean the mass-to-light
+            ratio falls outward (more mass per unit light within the reference radius).
         mass_to_light_radius
-            The radius where the mass-to-light ratio is equal to the base mass-to-light ratio, such that there will be
-            more of less mass per unit light within this radius depending on the mass-to-light gradient.
+            The reference radius at which the mass-to-light ratio equals `mass_to_light_ratio_base`.
         """
         lp_linear.Gaussian.__init__(
             self,
@@ -359,7 +358,9 @@ class SersicGradient(lp_linear.Sersic, mp.SersicGradient, LightMassProfile):
         mass_to_light_ratio
             The mass-to-light ratio of the light profiles.
         mass_to_light_gradient
-            The mass-to-light radial gradient.
+            The power-law slope of the mass-to-light ratio with radius, M/L proportional to
+            `(R / effective_radius) ** -mass_to_light_gradient`: positive values mean the mass-to-light ratio
+            falls outward, and it equals `mass_to_light_ratio` on the ellipse of the effective radius.
         """
         lp_linear.Sersic.__init__(
             self,
@@ -408,7 +409,9 @@ class SersicGradientSph(SersicGradient, LightMassProfile):
         mass_to_light_ratio
             The mass-to-light ratio of the light profiles
         mass_to_light_gradient
-            The mass-to-light radial gradient.
+            The power-law slope of the mass-to-light ratio with radius, M/L proportional to
+            `(R / effective_radius) ** -mass_to_light_gradient`: positive values mean the mass-to-light ratio
+            falls outward, and it equals `mass_to_light_ratio` on the ellipse of the effective radius.
         """
 
         SersicGradient.__init__(
@@ -451,7 +454,9 @@ class ExponentialGradient(SersicGradient, LightMassProfile):
         mass_to_light_ratio
             The mass-to-light ratio of the light profiles
         mass_to_light_gradient
-            The mass-to-light radial gradient.
+            The power-law slope of the mass-to-light ratio with radius, M/L proportional to
+            `(R / effective_radius) ** -mass_to_light_gradient`: positive values mean the mass-to-light ratio
+            falls outward, and it equals `mass_to_light_ratio` on the ellipse of the effective radius.
         """
 
         SersicGradient.__init__(
@@ -493,7 +498,9 @@ class ExponentialGradientSph(SersicGradientSph, LightMassProfile):
         mass_to_light_ratio
             The mass-to-light ratio of the light profiles
         mass_to_light_gradient
-            The mass-to-light radial gradient.
+            The power-law slope of the mass-to-light ratio with radius, M/L proportional to
+            `(R / effective_radius) ** -mass_to_light_gradient`: positive values mean the mass-to-light ratio
+            falls outward, and it equals `mass_to_light_ratio` on the ellipse of the effective radius.
         """
 
         SersicGradientSph.__init__(
