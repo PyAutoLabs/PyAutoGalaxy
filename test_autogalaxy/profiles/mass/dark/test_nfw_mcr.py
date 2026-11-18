@@ -1,3 +1,4 @@
+import numpy as np
 import pytest
 
 import autogalaxy as ag
@@ -332,3 +333,99 @@ def test__same_as_above_but_cored_nfw__elliptical():
     deflections = cnfw_kappa_s.deflections_yx_2d_from(grid=grid)
 
     assert (deflections_ludlow == deflections).all()
+
+
+def _gnfw_mcr_mass_3d_within_r200(mp, redshift_object, redshift_source):
+    from scipy.integrate import quad
+
+    from autogalaxy.cosmology.model import Planck15
+    from autogalaxy.profiles.mass.dark import mcr_util
+
+    cosmology = Planck15()
+
+    _, _, radius_at_200 = mcr_util.kappa_s_and_scale_radius_for_ludlow(
+        mass_at_200=mp.mass_at_200,
+        scatter_sigma=0.0,
+        redshift_object=redshift_object,
+        redshift_source=redshift_source,
+    )
+
+    critical_surface_density = (
+        cosmology.critical_surface_density_between_redshifts_solar_mass_per_kpc2_from(
+            redshift_0=redshift_object, redshift_1=redshift_source, xp=np
+        )
+    )
+    kpc_per_arcsec = cosmology.kpc_per_arcsec_from(redshift=redshift_object, xp=np)
+
+    scale_radius_kpc = float(mp.scale_radius) * kpc_per_arcsec
+    rho_s = float(mp.kappa_s) * critical_surface_density / scale_radius_kpc
+    gamma = float(mp.inner_slope)
+
+    integral = quad(
+        lambda x: x ** (2.0 - gamma) * (1.0 + x) ** (gamma - 3.0),
+        0.0,
+        radius_at_200 / scale_radius_kpc,
+    )[0]
+
+    return 4.0 * np.pi * rho_s * scale_radius_kpc**3 * integral
+
+
+@pytest.mark.parametrize("inner_slope", [0.5, 1.0, 1.5])
+def test__gnfw_mcr_ludlow__mass_within_r200_is_mass_at_200(inner_slope):
+
+    mp = ag.mp.gNFWMCRLudlow(
+        mass_at_200=1.0e12,
+        inner_slope=inner_slope,
+        redshift_object=0.5,
+        redshift_source=1.0,
+    )
+
+    mass_3d = _gnfw_mcr_mass_3d_within_r200(
+        mp, redshift_object=0.5, redshift_source=1.0
+    )
+
+    assert mass_3d == pytest.approx(1.0e12, rel=1.0e-3)
+
+
+def test__gnfw_mcr_ludlow__inner_slope_1_is_nfw_mcr_ludlow():
+
+    gnfw = ag.mp.gNFWMCRLudlow(
+        mass_at_200=1.0e12, inner_slope=1.0, redshift_object=0.5, redshift_source=1.0
+    )
+    nfw = ag.mp.NFWMCRLudlow(
+        mass_at_200=1.0e12, redshift_object=0.5, redshift_source=1.0
+    )
+
+    assert gnfw.kappa_s == pytest.approx(nfw.kappa_s, rel=1.0e-8)
+    assert gnfw.scale_radius == pytest.approx(nfw.scale_radius, rel=1.0e-8)
+
+
+@pytest.mark.parametrize("inner_slope", [0.5, 1.5])
+def test__gnfw_mcr_ludlow__jax_jit_matches_numpy(inner_slope):
+    jax = pytest.importorskip("jax")
+    import jax.numpy as jnp
+
+    from autogalaxy.profiles.mass.dark import mcr_util
+
+    kappa_s_np, scale_radius_np, _ = mcr_util.kappa_s_and_scale_radius_for_ludlow_gnfw(
+        mass_at_200=1.0e12,
+        scatter_sigma=0.0,
+        redshift_object=0.5,
+        redshift_source=1.0,
+        inner_slope=inner_slope,
+    )
+
+    @jax.jit
+    def f(mass_at_200, inner_slope):
+        return mcr_util.kappa_s_and_scale_radius_for_ludlow_gnfw(
+            mass_at_200=mass_at_200,
+            scatter_sigma=0.0,
+            redshift_object=0.5,
+            redshift_source=1.0,
+            inner_slope=inner_slope,
+        )
+
+    kappa_s_jax, scale_radius_jax, _ = f(jnp.array(1.0e12), jnp.array(inner_slope))
+
+    assert float(kappa_s_jax) == pytest.approx(kappa_s_np, rel=1.0e-4)
+    assert float(scale_radius_jax) == pytest.approx(scale_radius_np, rel=1.0e-4)
