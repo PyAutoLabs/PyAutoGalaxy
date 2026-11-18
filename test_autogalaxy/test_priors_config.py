@@ -255,8 +255,8 @@ def test__nfw_truncated_mcr_scatter_ludlow_sph_model_resolves():
 
 
 def test__ellipse_multipole_scaled_model_resolves():
-    # `m` and `major_axis` have no configured prior, exactly as for the parent
-    # `EllipseMultipole`, so they are passed as fixed values here.
+    # `major_axis` has no configured prior, so it is passed as a fixed value
+    # here; `m` defaults to its configured constant (4) but is passed explicitly.
     model = af.Model(ag.EllipseMultipoleScaled, m=4, major_axis=1.0)
 
     assert model.prior_count == 2

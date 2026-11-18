@@ -382,6 +382,18 @@ def test__latent_parameters__shared_mass_ellipticity_retains_owner_latents():
     assert not any("ell_comps" in name for name in latent.names)
 
 
+@pytest.mark.parametrize("cls", [ag.EllipseMultipole, ag.EllipseMultipoleScaled])
+def test__latent_parameters__ellipse_multipole_without_m_uses_default_m(cls):
+    model = af.Model(cls)
+    latent = model.latent_parameters_from(np.full((1, model.prior_count), 0.05))
+
+    k_m, phi_m = ag.convert.multipole_k_m_and_phi_m_from(
+        multipole_comps=(0.05, 0.05), m=4
+    )
+    assert latent.names == ["k_m", "phi_m"]
+    assert latent.parameter_array[0] == pytest.approx([float(k_m), float(phi_m)])
+
+
 def test__latent_parameters__scaled_and_light_multipole_values_and_periods():
     c3 = ag.convert.multipole_comps_from(
         k_m=np.array([0.03, 0.06]), phi_m=np.array([10.0, -20.0]), m=3
