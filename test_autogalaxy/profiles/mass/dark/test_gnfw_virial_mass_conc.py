@@ -40,7 +40,7 @@ def test__kappa_s__numpy_matches_closed_form_hyp2f1(inner_slope, c_2):
 
 
 @pytest.mark.parametrize("inner_slope", [0.0, 0.5, 1.0, 1.5, 1.9, 1.99])
-@pytest.mark.parametrize("c_2", [2.0, 5.0, 10.0, 20.0])
+@pytest.mark.parametrize("c_2", [2.0, 5.0, 10.0, 20.0, 2000.0])
 def test__kappa_s__jax_jit_matches_numpy(inner_slope, c_2):
     jax = pytest.importorskip("jax")
     import jax.numpy as jnp
