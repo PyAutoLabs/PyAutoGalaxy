@@ -47,7 +47,10 @@ def kappa_s_and_scale_radius(
         d_e = (Δ / 3) (3 − γ) c^γ /
               ₂F₁(3 − γ, 3 − γ; 4 − γ; −c)
 
-    where γ is the inner slope and c is the gNFW concentration.
+    where γ is the inner slope and c is the gNFW concentration. On the JAX path the
+    ₂F₁ term is evaluated as (1 + c)^-(3 − γ) ₂F₁(1, 3 − γ; 4 − γ; c / (1 + c))
+    (Pfaff's transformation), keeping the argument in (0, 1) where
+    `jax.scipy.special.hyp2f1` is accurate.
 
     Parameters
     ----------
@@ -148,9 +151,18 @@ def kappa_s_and_scale_radius(
     # c = rvir/rs is exactly "concentration" by definition
     c = concentration
 
-    # Analytic normalization
+    # Analytic normalization. `jax.scipy.special.hyp2f1` is wrong for z < -1 (inf or
+    # ~1e167 at jax 0.12), which made kappa_s ~0 under `jax.jit`, so the JAX path
+    # evaluates 2F1(a, a; a + 1; -c) through the Pfaff transformation
+    # 2F1(a, b; c; z) = (1 - z)^-b 2F1(c - a, b; c; z / (z - 1)), which maps
+    # z = -c into (0, 1). SciPy is accurate at z = -c directly, and less accurate
+    # than that near z -> 1 (c above a few hundred), so NumPy keeps the direct form.
     a = 3.0 - gamma
-    de_c = (overdens / 3.0) * a * (c**gamma) / hyp2f1(a, a, a + 1.0, -c)
+    if xp is np:
+        hyp = hyp2f1(a, a, a + 1.0, -c)
+    else:
+        hyp = (1.0 + c) ** (-a) * hyp2f1(1.0, a, a + 1.0, c / (1.0 + c))
+    de_c = (overdens / 3.0) * a * (c**gamma) / hyp
 
     rho_s = critical_density * de_c  # Msun / kpc^3
     kappa_s = rho_s * scale_radius_kpc / critical_surface_density  # dimensionless
