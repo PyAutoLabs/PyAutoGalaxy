@@ -162,6 +162,85 @@ def kappa_s_and_scale_radius_for_ludlow(
     return kappa_s, scale_radius, radius_at_200
 
 
+def kappa_s_and_scale_radius_for_ludlow_gnfw(
+    mass_at_200,
+    scatter_sigma,
+    redshift_object,
+    redshift_source,
+    inner_slope,
+):
+    """
+    Computes the AutoGalaxy gNFW parameters (kappa_s, scale_radius) for a gNFW halo of the given
+    mass and inner slope, enforcing the Ludlow et al. 2016 mass-concentration relation.
+
+    Interprets mass as *`M_{200c}`*, not `M_{200m}`.
+
+    The Ludlow concentration is used as c = r200 / r_s, so the scale radius is the same as for the
+    NFW halo of the same mass whatever the inner slope (an inner slope of 1 gives exactly the NFW
+    halo of `kappa_s_and_scale_radius_for_ludlow`). Ludlow et al. define c through r_-2, the radius
+    where the logarithmic density slope is -2, which for a gNFW is (2 - inner_slope) r_s; that
+    choice is not used because r_s diverges as the inner slope tends to 2.
+
+    `kappa_s` is normalised with the gNFW mass integral, so the 3D mass inside r200 equals
+    `mass_at_200` for any inner slope gamma < 3:
+
+        rho_s = rho_crit (200 / 3) (3 - gamma) c^gamma / 2F1(3 - gamma, 3 - gamma; 4 - gamma; -c)
+
+    On the JAX path the 2F1 term is evaluated as (1 + c)^-(3 - gamma) 2F1(1, 3 - gamma; 4 - gamma; c / (1 + c))
+    (Pfaff's transformation), as in `gnfw_virial_mass_conc.kappa_s_and_scale_radius`, because
+    `jax.scipy.special.hyp2f1` is inaccurate for arguments below -1.
+    """
+
+    numpy_types = (float, int, np.ndarray, np.floating)
+
+    if isinstance(mass_at_200, numpy_types) and isinstance(inner_slope, numpy_types):
+        xp = np
+        from scipy.special import hyp2f1
+    else:
+        import jax.numpy as jnp
+        from jax.scipy.special import hyp2f1
+
+        xp = jnp
+
+    (
+        concentration,
+        cosmic_average_density,
+        critical_surface_density,
+        kpc_per_arcsec,
+    ) = ludlow16_cosmology(
+        mass_at_200,
+        redshift_object,
+        redshift_source,
+        xp=xp,
+    )
+
+    # Apply scatter (JAX-safe)
+    concentration = 10.0 ** (xp.log10(concentration) + scatter_sigma * 0.15)
+
+    radius_at_200 = (
+        mass_at_200 / (200.0 * cosmic_average_density * (4.0 * xp.pi / 3.0))
+    ) ** (1.0 / 3.0)
+
+    gamma = inner_slope
+    a = 3.0 - gamma
+
+    if xp is np:
+        hyp = hyp2f1(a, a, a + 1.0, -concentration)
+    else:
+        hyp = (1.0 + concentration) ** (-a) * hyp2f1(
+            1.0, a, a + 1.0, concentration / (1.0 + concentration)
+        )
+
+    de_c = (200.0 / 3.0) * a * concentration**gamma / hyp
+
+    scale_radius_kpc = radius_at_200 / concentration
+    rho_s = cosmic_average_density * de_c
+    kappa_s = rho_s * scale_radius_kpc / critical_surface_density
+    scale_radius = scale_radius_kpc / kpc_per_arcsec
+
+    return kappa_s, scale_radius, radius_at_200
+
+
 def kappa_s_scale_radius_and_core_radius_for_ludlow(
     mass_at_200, scatter_sigma, f_c, redshift_object, redshift_source
 ):
