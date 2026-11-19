@@ -120,7 +120,18 @@ REFERENCE_EDGE = np.array(
 # float32 radii near r_s (the float64 radii above round to 1 in float32), and the
 # 50-digit deflection at each float32 value.
 ETA_FLOAT32 = np.array(
-    [1.0, 1.0004, 0.9999, 1.0001, 0.99995, 1.00005, 0.99999, 1.00001, 0.999999, 1.000001],
+    [
+        1.0,
+        1.0004,
+        0.9999,
+        1.0001,
+        0.99995,
+        1.00005,
+        0.99999,
+        1.00001,
+        0.999999,
+        1.000001,
+    ],
     dtype=np.float32,
 )
 
@@ -160,7 +171,9 @@ def test__convergence_2d_from__near_scale_radius__matches_reference():
     convergence = np.asarray(_profile().convergence_2d_from(grid=_grid(ETA_NEAR)))
 
     assert np.all(np.isfinite(convergence))
-    np.testing.assert_allclose(convergence, REFERENCE_NEAR[:, 0], rtol=1.0e-10, atol=0.0)
+    np.testing.assert_allclose(
+        convergence, REFERENCE_NEAR[:, 0], rtol=1.0e-10, atol=0.0
+    )
 
 
 def test__convergence_2d_from__near_scale_radius__continuous_through_scale_radius():
@@ -205,7 +218,9 @@ def test__series_window_edges_and_ordinary_radii__match_reference():
     convergence = np.asarray(profile.convergence_2d_from(grid=_grid(ETA_EDGE)))
     deflections = np.asarray(profile.deflections_yx_2d_from(grid=_grid(ETA_EDGE)))
 
-    np.testing.assert_allclose(convergence, REFERENCE_EDGE[:, 0], rtol=1.0e-10, atol=0.0)
+    np.testing.assert_allclose(
+        convergence, REFERENCE_EDGE[:, 0], rtol=1.0e-10, atol=0.0
+    )
     np.testing.assert_allclose(
         deflections[:, 1], REFERENCE_EDGE[:, 1], rtol=1.0e-10, atol=0.0
     )
