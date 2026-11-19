@@ -12,6 +12,7 @@ Every other lensing observable (shear, magnification, critical curves, Einstein 
 be derived from these three quantities. See the `autogalaxy.operate.lens_calc` module for the `LensCalc` class
 that derives these secondary quantities.
 """
+
 import numpy as np
 from typing import Tuple
 
@@ -58,17 +59,19 @@ class MassProfile(EllProfile):
 
         def single(params):
             centred = grid - params[:2]
-            r = xp.sqrt(centred[:, 0] ** 2 + centred[:, 1] ** 2)
+            r_squared = centred[:, 0] ** 2 + centred[:, 1] ** 2
+            # A grid point exactly on a halo centre (r = 0): `sqrt` and `arctan2`
+            # both have NaN gradients there. Evaluate them on a safe value and
+            # take the direction from `centred / r`, which is zero at the centre,
+            # so the deflection and its gradient stay finite.
+            is_centre = r_squared == 0.0
+            r_safe = xp.sqrt(xp.where(is_centre, 1.0, r_squared))
+            r = xp.where(is_centre, 0.0, r_safe)
             defl_r = cls.radial_deflection_from(r, params[2:], xp)
-            angle = xp.arctan2(centred[:, 0], centred[:, 1])
-            return defl_r[:, None] * xp.stack(
-                [xp.sin(angle), xp.cos(angle)], axis=-1
-            )
+            return defl_r[:, None] * (centred / r_safe[:, None])
 
         all_defl = jax.vmap(single)(params_batch)
-        return xp.sum(
-            xp.where(mask[:, None, None], all_defl, 0.0), axis=0
-        )
+        return xp.sum(xp.where(mask[:, None, None], all_defl, 0.0), axis=0)
 
     def deflections_yx_2d_from(self, grid):
         """

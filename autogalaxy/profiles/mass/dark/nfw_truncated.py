@@ -31,6 +31,76 @@ def coord_func_m_from(grid_radius, tau, xp=np):
     )
 
 
+def radial_deflection_func_sph_from(grid_radius, tau, xp=np):
+    r"""
+    Return the real-valued tNFW radial deflection term :math:`m(x) / x`.
+
+    The radial deflection of ``NFWTruncatedSph`` is
+    :math:`\alpha(x) = 4 \kappa_s r_s \, m(x) / x`, with :math:`x = r / r_s` and
+    :math:`m(x)` the dimensionless projected mass of Baltz, Marshall & Oguri (2009),
+    as in ``coord_func_m_from``.
+
+    Evaluated directly, :math:`m(x)` subtracts large, nearly equal terms at small
+    :math:`x` (the logarithms in :math:`F(x)` and :math:`L(x)` cancel to
+    :math:`O(x^2 \ln x)`), so it loses precision in float64 below about
+    :math:`x = 10^{-5}` and in float32 below about :math:`x = 10^{-1}`, and is NaN
+    at :math:`x = 0`.  Below :math:`x = 0.5` this function uses an exact
+    rearrangement in which every term is :math:`O(x^2)` and nothing cancels.
+    With :math:`s = \sqrt{1 - x^2}` and :math:`R = \sqrt{x^2 + \tau^2}`:
+
+    .. math::
+
+        \frac{m(x)}{T} = (\tau^2 - 1)\left[
+            \frac{x^2 \ln\left((1 + s)/x\right)}{(1 + s) s}
+            + \ln\left(1 - \frac{x^2 (\tau^2 + 1)}{(s\tau + R)(R + \tau)}\right)
+            + \frac{x^2 L(x)}{\tau (R + \tau)}
+        \right] + 2 x^2 F(x) - \frac{\pi x^2}{R + \tau}
+
+    where :math:`T = \tau^2 / (\tau^2 + 1)^2`.  At and above :math:`x = 0.5` it uses
+    the closed form unchanged.  It returns exactly zero at :math:`x = 0` (the
+    deflection at the centre of a spherical profile).  Every branch of each
+    ``xp.where`` is evaluated on an input inside its own domain, so the result
+    and its JAX gradients stay finite.
+    """
+    grid_radius = xp.real(grid_radius)
+    tau_squared = tau**2.0
+    prefactor = tau_squared / (tau_squared + 1.0) ** 2.0
+
+    is_small = grid_radius < 0.5
+    is_positive = grid_radius > 0.0
+
+    # Small-radius form, on 0 < x < 0.5.
+    x = xp.where(is_small & is_positive, grid_radius, 0.25)
+    x = xp.maximum(x, 1.0e-30)
+    u = xp.square(x)
+    s = xp.sqrt(1.0 - u)
+    root = xp.sqrt(u + tau_squared)
+    log_a = xp.log((1.0 + s) / x)
+    l_r = xp.log(x / (root + tau))
+    bracket = (
+        (tau_squared - 1.0)
+        * (
+            log_a * u / ((1.0 + s) * s)
+            + xp.log1p(-u * (tau_squared + 1.0) / ((s * tau + root) * (root + tau)))
+            + u * l_r / (tau * (root + tau))
+        )
+        + 2.0 * u * log_a / s
+        - xp.pi * u / (root + tau)
+    )
+    m_over_x_small = prefactor * bracket / x
+
+    # Closed form, on x >= 0.5.
+    x_large = xp.where(is_small, 1.0, grid_radius)
+    m_large = coord_func_m_from(grid_radius=x_large, tau=tau, xp=xp)
+    m_over_x_large = m_large / x_large
+
+    return xp.where(
+        is_small,
+        xp.where(is_positive, m_over_x_small, 0.0),
+        m_over_x_large,
+    )
+
+
 def potential_func_sph_from(grid_radius, tau, xp=np):
     r"""Return the dimensionless analytic tNFW lensing potential.
 
@@ -214,9 +284,11 @@ class NFWTruncatedSph(AbstractgNFW):
             self.radial_grid_from(grid=grid, xp=xp, **kwargs).array,
         )
 
-        deflection_grid = xp.multiply(
-            (4.0 * self.kappa_s * self.scale_radius / eta),
-            self.deflection_func_sph(grid_radius=eta),
+        deflection_grid = (
+            4.0
+            * self.kappa_s
+            * self.scale_radius
+            * radial_deflection_func_sph_from(grid_radius=eta, tau=self.tau, xp=xp)
         )
 
         return self._cartesian_grid_via_radial_from(
@@ -224,8 +296,10 @@ class NFWTruncatedSph(AbstractgNFW):
         )
 
     def deflection_func_sph(self, grid_radius, xp=np):
-        grid_radius = grid_radius + 0j
-        return xp.real(self.coord_func_m(grid_radius=grid_radius, xp=xp))
+        grid_radius = xp.real(grid_radius)
+        return grid_radius * radial_deflection_func_sph_from(
+            grid_radius=grid_radius, tau=self.tau, xp=xp
+        )
 
     def convergence_func(self, grid_radius: float, xp=np) -> float:
         grid_radius = ((1.0 / self.scale_radius) * grid_radius) + 0j
@@ -281,10 +355,14 @@ class NFWTruncatedSph(AbstractgNFW):
     @staticmethod
     def radial_deflection_from(r, params, xp):
         kappa_s, scale_radius, truncation_radius = params[0], params[1], params[2]
-        eta = (r / scale_radius) + 0j
+        eta = r / scale_radius
         tau = truncation_radius / scale_radius
-        m = xp.real(coord_func_m_from(eta, tau, xp=xp))
-        return (4.0 * kappa_s * scale_radius / xp.real(eta)) * m
+        return (
+            4.0
+            * kappa_s
+            * scale_radius
+            * radial_deflection_func_sph_from(grid_radius=eta, tau=tau, xp=xp)
+        )
 
     @staticmethod
     def _delta_c_from_concentration(concentration: float) -> float:
