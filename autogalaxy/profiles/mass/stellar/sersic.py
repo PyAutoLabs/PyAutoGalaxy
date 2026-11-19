@@ -23,89 +23,71 @@ def cse_settings_from(
     decomposition resolution (``total_cses`` / ``sample_points``) used to decompose
     a Sersic convergence profile into cored steep ellipsoids.
 
-    The standard (``mass_to_light_gradient <= 0.5``) path is written branch-free
-    using ``xp`` (``jnp.where`` / ``jnp.log10`` under JAX) so it traces cleanly
-    inside ``jax.jit`` when ``sersic_index`` / ``effective_radius`` are tracers:
-    Python ``if`` statements cannot branch on a tracer value, and ``jax.jit``
-    requires static array shapes, so ``total_cses`` / ``sample_points`` are frozen
-    to the conservative maximum previously used (50 / 80) rather than tuned per
-    Sersic index. The per-index ``upper_dex`` / ``lower_dex`` *ranges* are preserved
-    exactly via ``xp.where`` so accuracy is unchanged (only the CSE count can rise).
-
-    The ``mass_to_light_gradient > 0.5`` path (radial-gradient Sersic profiles) is
-    left as the original NumPy branching — it is only reached with a concrete
-    gradient value and is not part of the standard JAX-traced Sersic path.
+    Both the standard (``mass_to_light_gradient <= 0.5``) ranges and the steep-gradient
+    (``mass_to_light_gradient > 0.5``, radial-gradient Sersic profiles) ranges are written
+    branch-free using ``xp`` (``jnp.where`` / ``jnp.log10`` under JAX), and the two are
+    selected with ``xp.where`` on the gradient. This lets the profile trace inside
+    ``jax.jit`` when ``sersic_index``, ``effective_radius`` or ``mass_to_light_gradient``
+    are tracers: Python ``if`` statements cannot branch on a tracer value. ``jax.jit``
+    also requires static array shapes, so ``total_cses`` / ``sample_points`` are frozen
+    to the conservative maximum previously used on either path (50 / 80) rather than
+    tuned per Sersic index. The per-index ``upper_dex`` / ``lower_dex`` *ranges* are
+    preserved exactly, so accuracy is unchanged (only the CSE count can rise).
     """
-    if mass_to_light_gradient > 0.5:
-        if effective_radius > 0.2:
-            lower_dex = 6.0
-            upper_dex = np.min(
-                [np.log10((18.0 / sersic_constant) ** sersic_index), 1.1]
-            )
+    # Static shapes for jax.jit: frozen to the former per-index maximum.
+    total_cses = 50
+    sample_points = 80
 
-            if sersic_index <= 1.2:
-                total_cses = 50
-                sample_points = 80
-            elif sersic_index > 3.8:
-                total_cses = 40
-                sample_points = 50
-                lower_dex = 6.5
-            else:
-                total_cses = 30
-                sample_points = 50
+    # Standard ranges (mass_to_light_gradient <= 0.5).
+    log_effective_radius = xp.log10(effective_radius)
+    base_upper_dex = xp.minimum(
+        xp.log10((23.0 / sersic_constant) ** sersic_index),
+        0.85 - log_effective_radius,
+    )
 
-        else:
-            if sersic_index <= 1.2:
-                upper_dex = 1.0
-                total_cses = 50
-                sample_points = 80
-                lower_dex = 4.5
-
-            elif sersic_index > 3.8:
-                total_cses = 40
-                sample_points = 50
-                lower_dex = 6.0
-                upper_dex = 1.5
-            else:
-                upper_dex = 1.1
-                lower_dex = 6.0
-                total_cses = 30
-                sample_points = 50
-    else:
-        # Static shapes for jax.jit: frozen to the former per-index maximum.
-        total_cses = 50
-        sample_points = 80
-
-        log_effective_radius = xp.log10(effective_radius)
-        base_upper_dex = xp.minimum(
-            xp.log10((23.0 / sersic_constant) ** sersic_index),
-            0.85 - log_effective_radius,
-        )
-
-        # upper_dex / lower_dex select the same per-index ranges as the original
-        # if/elif ladder, expressed branch-free so a tracer sersic_index traces.
-        upper_dex = xp.where(
-            sersic_index <= 0.8,
-            xp.log10((16.0 / sersic_constant) ** sersic_index),
+    # upper_dex / lower_dex select the same per-index ranges as the original
+    # if/elif ladder, expressed branch-free so a tracer sersic_index traces.
+    standard_upper_dex = xp.where(
+        sersic_index <= 0.8,
+        xp.log10((16.0 / sersic_constant) ** sersic_index),
+        xp.where(
+            sersic_index <= 0.9,
+            xp.log10((18.0 / sersic_constant) ** sersic_index),
+            base_upper_dex,
+        ),
+    )
+    standard_lower_dex = xp.where(
+        sersic_index <= 0.8,
+        4.0 + log_effective_radius,
+        xp.where(
+            sersic_index <= 0.9,
+            4.3 + log_effective_radius,
             xp.where(
-                sersic_index <= 0.9,
-                xp.log10((18.0 / sersic_constant) ** sersic_index),
-                base_upper_dex,
+                sersic_index > 3.8,
+                4.5 + log_effective_radius,
+                3.5 + log_effective_radius,
             ),
-        )
-        lower_dex = xp.where(
-            sersic_index <= 0.8,
-            4.0 + log_effective_radius,
-            xp.where(
-                sersic_index <= 0.9,
-                4.3 + log_effective_radius,
-                xp.where(
-                    sersic_index > 3.8,
-                    4.5 + log_effective_radius,
-                    3.5 + log_effective_radius,
-                ),
-            ),
-        )
+        ),
+    )
+
+    # Steep-gradient ranges (mass_to_light_gradient > 0.5), the same values as the
+    # former nested if/else on effective_radius > 0.2 and the Sersic index.
+    large_upper_dex = xp.minimum(
+        xp.log10((18.0 / sersic_constant) ** sersic_index), 1.1
+    )
+    large_lower_dex = xp.where(sersic_index > 3.8, 6.5, 6.0)
+    small_upper_dex = xp.where(
+        sersic_index <= 1.2, 1.0, xp.where(sersic_index > 3.8, 1.5, 1.1)
+    )
+    small_lower_dex = xp.where(sersic_index <= 1.2, 4.5, 6.0)
+
+    is_large = effective_radius > 0.2
+    gradient_upper_dex = xp.where(is_large, large_upper_dex, small_upper_dex)
+    gradient_lower_dex = xp.where(is_large, large_lower_dex, small_lower_dex)
+
+    is_steep_gradient = mass_to_light_gradient > 0.5
+    upper_dex = xp.where(is_steep_gradient, gradient_upper_dex, standard_upper_dex)
+    lower_dex = xp.where(is_steep_gradient, gradient_lower_dex, standard_lower_dex)
 
     return upper_dex, lower_dex, total_cses, sample_points
 

@@ -15,18 +15,24 @@ class GaussianGradient(Gaussian):
         mass_to_light_radius: float = 1.0,
     ):
         r"""
-        The elliptical Gaussian light profile with a gradient in its mass to light conversion.
+        The elliptical Gaussian mass profile with a gradient in its mass-to-light conversion.
 
-        $\Psi (r) = \Psi_{o} \frac{(\sigma + 0.01)}{R_{ref}}^{\Tau}$
+        Each Gaussian takes a single mass-to-light ratio set by its `sigma`, following a power law in radius:
+
+        $\Upsilon(\sigma) = \Upsilon_{0} \left( \frac{\sigma}{R_{\rm ref}} \right)^{-\Gamma}$
 
         Where:
 
-        $\Psi (r)$ is the 1D convergence profile of the Gaussian [dimensionless].
-        $\Psi_{o}$ is the base mass-to-light ratio of the profile [dimensionless].
+        $\Upsilon(\sigma)$ is the mass-to-light ratio of the Gaussian [dimensionless].
+        $\Upsilon_{0}$ is `mass_to_light_ratio_base`, the mass-to-light ratio at the reference radius [dimensionless].
         $\sigma$ is the sigma value of the Gaussian [arc-seconds].
-        $r$ is the radius from the centre of the profile [arc-seconds].
-        $R_{ref}$ is the reference radius where the mass-to-light ratio is equal to $\Psi_{o} [arc-seconds].
-        $\Tau$ is the mass-to-light gradient of the profile [dimensionless].
+        $R_{\rm ref}$ is `mass_to_light_radius`, the reference radius [arc-seconds].
+        $\Gamma$ is `mass_to_light_gradient` [dimensionless].
+
+        A positive `mass_to_light_gradient` means the mass-to-light ratio falls outward: Gaussians with
+        `sigma` below the reference radius carry more mass per unit light than those above it. This is the
+        same convention as `SersicGradient`, so the same positive gradient makes both profiles' mass-to-light
+        ratio fall with radius.
 
         Parameters
         ----------
@@ -40,14 +46,13 @@ class GaussianGradient(Gaussian):
         sigma
             The sigma value of the Gaussian.
         mass_to_light_ratio_base
-            The base mass-to-light ratio of the profile, which is the mass-to-light ratio of the Gaussian before it
-            is scaled by values that adjust its mass-to-light ratio based on the reference radius and gradient.
+            The mass-to-light ratio of a Gaussian whose `sigma` equals `mass_to_light_radius`.
         mass_to_light_gradient
-            The mass-to-light radial gradient of the profile, whereby positive values means there is more mass
-            per unit light within the reference radius.
+            The power-law slope of the mass-to-light ratio with `sigma`, M/L proportional to
+            `(sigma / mass_to_light_radius) ** -mass_to_light_gradient`: positive values mean the mass-to-light
+            ratio falls outward.
         mass_to_light_radius
-            The radius where the mass-to-light ratio is equal to the base mass-to-light ratio, such that there will be
-            more of less mass per unit light within this radius depending on the mass-to-light gradient.
+            The reference radius at which the mass-to-light ratio equals `mass_to_light_ratio_base`.
         """
 
         self.mass_to_light_ratio_base = mass_to_light_ratio_base
@@ -55,8 +60,7 @@ class GaussianGradient(Gaussian):
         self.mass_to_light_radius = mass_to_light_radius
         mass_to_light_ratio = (
             self.mass_to_light_ratio_base
-            * ((sigma + 0.01) / self.mass_to_light_radius)
-            ** self.mass_to_light_gradient
+            * (sigma / self.mass_to_light_radius) ** -self.mass_to_light_gradient
         )
 
         super().__init__(

@@ -19,8 +19,20 @@ class SersicGradient(AbstractSersic):
         mass_to_light_ratio: float = 1.0,
         mass_to_light_gradient: float = 0.0,
     ):
-        """
-        Setup a Sersic mass and light profiles.
+        r"""
+        A Sersic stellar mass profile whose mass-to-light ratio varies as a power law of radius.
+
+        The convergence is the Sersic light profile multiplied by a radially varying mass-to-light ratio:
+
+        $\kappa(R) = \Upsilon \left( \frac{R}{R_{\rm e}} \right)^{-\Gamma} I(R)$
+
+        where $R$ is the same (circularised) radius the light profile $I(R)$ is evaluated at, $R_{\rm e}$ is
+        the effective radius, $\Upsilon$ is `mass_to_light_ratio` and $\Gamma$ is `mass_to_light_gradient`.
+
+        The mass-to-light ratio therefore equals `mass_to_light_ratio` exactly on the ellipse of the effective
+        radius, for any axis ratio. A positive `mass_to_light_gradient` means the mass-to-light ratio falls
+        outward (more mass per unit light inside the effective radius); a negative value means it rises
+        outward. This is the same convention as `GaussianGradient`.
 
         Parameters
         ----------
@@ -35,9 +47,10 @@ class SersicGradient(AbstractSersic):
         sersic_index
             Controls the concentration of the profile (lower -> less concentrated, higher -> more concentrated).
         mass_to_light_ratio
-            The mass-to-light ratio of the light profile.
+            The mass-to-light ratio on the ellipse of the effective radius.
         mass_to_light_gradient
-            The mass-to-light radial gradient.
+            The power-law slope $\Gamma$ of the mass-to-light ratio with radius, M/L proportional to
+            $(R / R_{\rm e})^{-\Gamma}$: positive values mean the mass-to-light ratio falls outward.
         """
         super().__init__(
             centre=centre,
@@ -62,17 +75,14 @@ class SersicGradient(AbstractSersic):
 
         """
         return self.convergence_func(
-            self.eccentric_radii_grid_from(grid=grid, xp=xp, **kwargs)
+            self.eccentric_radii_grid_from(grid=grid, xp=xp, **kwargs), xp=xp
         )
 
     def convergence_func(self, grid_radius: float, xp=np) -> float:
         return (
             self.mass_to_light_ratio
-            * (
-                ((self.axis_ratio() * grid_radius) / self.effective_radius)
-                ** -self.mass_to_light_gradient
-            )
-            * self.image_2d_via_radii_from(grid_radius)
+            * ((grid_radius / self.effective_radius) ** -self.mass_to_light_gradient)
+            * self.image_2d_via_radii_from(grid_radius, xp=xp)
         )
 
     def decompose_convergence_via_mge(self, **kwargs):
@@ -83,10 +93,7 @@ class SersicGradient(AbstractSersic):
             return (
                 self.mass_to_light_ratio
                 * self.intensity
-                * (
-                    ((self.axis_ratio() * r) / self.effective_radius)
-                    ** -self.mass_to_light_gradient
-                )
+                * ((r / self.effective_radius) ** -self.mass_to_light_gradient)
                 * np.exp(
                     -self.sersic_constant
                     * (((r / self.effective_radius) ** (1.0 / self.sersic_index)) - 1.0)
@@ -143,10 +150,7 @@ class SersicGradient(AbstractSersic):
             return (
                 self.mass_to_light_ratio
                 * self.intensity
-                * (
-                    ((self.axis_ratio(xp) * r) / scaled_effective_radius)
-                    ** -self.mass_to_light_gradient
-                )
+                * ((r / scaled_effective_radius) ** -self.mass_to_light_gradient)
                 * xp.exp(
                     -self.sersic_constant
                     * (
@@ -192,7 +196,9 @@ class SersicGradientSph(SersicGradient):
         mass_to_light_ratio
             The mass-to-light ratio of the light profile.
         mass_to_light_gradient
-            The mass-to-light radial gradient.
+            The power-law slope of the mass-to-light ratio with radius, M/L proportional to
+            `(R / effective_radius) ** -mass_to_light_gradient`: positive values mean the mass-to-light ratio
+            falls outward.
         """
         super().__init__(
             centre=centre,
