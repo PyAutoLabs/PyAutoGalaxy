@@ -147,9 +147,18 @@ class MassProfileCSE(ABC):
 
             amplitude_list = lstsq(coefficient_matrix, y_samples.T)[0]
         else:
-            amplitude_list = xp.linalg.lstsq(
-                coefficient_matrix, y_samples.T, rcond=None
-            )[0]
+            # Solve the least-squares problem by QR factorisation, not
+            # ``jnp.linalg.lstsq``. ``lstsq`` is SVD-based, and the SVD's
+            # reverse-mode derivative is NaN on this ill-conditioned matrix,
+            # so ``jax.grad`` of the deflections with respect to every
+            # parameter entering ``func`` (mass-to-light ratio, intensity,
+            # effective radius, Sersic index, ellipticity) was NaN. The matrix
+            # has full column rank, so the QR solve gives the same
+            # least-squares amplitudes and its derivative is finite.
+            from jax.scipy.linalg import solve_triangular
+
+            q_matrix, r_matrix = xp.linalg.qr(coefficient_matrix)
+            amplitude_list = solve_triangular(r_matrix, q_matrix.T @ y_samples)
 
         return amplitude_list, core_radius_list
 
