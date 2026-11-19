@@ -224,7 +224,7 @@ def test__potential_2d_from__laplacian_matches_analytic_convergence(
     assert potential_laplacian == pytest.approx(2.0 * convergence, rel=1.0e-5)
 
 
-def test__mass_at_truncation_radius():
+def test__total_mass_solar_masses():
     mp = ag.mp.NFWTruncatedSph(
         centre=(0.0, 0.0), kappa_s=1.0, scale_radius=1.0, truncation_radius=1.0
     )
@@ -236,11 +236,74 @@ def test__mass_at_truncation_radius():
         cosmic_average_density=1.0,
     )
 
-    mass_at_truncation_radius = mp.mass_at_truncation_radius_solar_mass(
+    total_mass = mp.total_mass_solar_masses(
         redshift_profile=0.5, redshift_source=1.0, cosmology=cosmology
     )
 
-    assert mass_at_truncation_radius == pytest.approx(0.00009792581, 1.0e-5)
+    assert total_mass == pytest.approx(3.586413031624348, 1.0e-5)
+
+
+@pytest.mark.parametrize(
+    "m200_solar_mass, concentration",
+    [(1.0e8, 5.0), (1.0e9, 10.0), (1.0e10, 15.0)],
+)
+def test__total_mass_solar_masses__matches_integrated_convergence(
+    m200_solar_mass, concentration
+):
+    """
+    The total mass equals the projected mass from integrating the convergence over
+    the whole plane, and equals M200 times the analytic tNFW / NFW mass ratio.
+    """
+
+    cosmology = Planck15()
+    redshift_halo = 0.5
+    redshift_source = 1.0
+
+    mp = ag.mp.NFWTruncatedSph.from_m200_concentration(
+        m200_solar_mass=m200_solar_mass,
+        concentration=concentration,
+        redshift_halo=redshift_halo,
+        redshift_source=redshift_source,
+        cosmology=cosmology,
+    )
+
+    total_mass = mp.total_mass_solar_masses(
+        redshift_profile=redshift_halo,
+        redshift_source=redshift_source,
+        cosmology=cosmology,
+    )
+
+    # Integrate 2 pi r kappa(r) dr = 2 pi kappa r^2 d(ln r) from 1e-6 r_s to 1e4 r_s by the
+    # midpoint rule. r = r_s is a cell edge, so no sample lands within 6e-4 of it, where the
+    # convergence loses precision.
+    ln_x_edges = np.linspace(np.log(1.0e-6), np.log(1.0e4), 20001)
+    ln_x = 0.5 * (ln_x_edges[1:] + ln_x_edges[:-1])
+    radii = mp.scale_radius * np.exp(ln_x)
+    grid = ag.Grid2DIrregular(np.stack([np.zeros_like(radii), radii], axis=1))
+    convergence = np.asarray(mp.convergence_2d_from(grid=grid).array)
+
+    mass_arcsec2 = np.sum(2.0 * np.pi * convergence * radii**2) * (
+        ln_x_edges[1] - ln_x_edges[0]
+    )
+
+    critical_surface_density = (
+        cosmology.critical_surface_density_between_redshifts_solar_mass_per_kpc2_from(
+            redshift_0=redshift_halo, redshift_1=redshift_source
+        )
+    )
+    kpc_per_arcsec = cosmology.kpc_per_arcsec_from(redshift=redshift_halo)
+
+    mass_integrated = mass_arcsec2 * critical_surface_density * kpc_per_arcsec**2
+
+    assert total_mass == pytest.approx(mass_integrated, rel=1.0e-4)
+
+    mass_ratio = (
+        ag.mp.NFWTruncatedSph.mass_ratio_from_concentration_and_truncation_factor(
+            concentration=concentration
+        )
+    )
+
+    assert total_mass == pytest.approx(m200_solar_mass * mass_ratio, rel=1.0e-4)
 
 
 def test__compare_nfw_and_truncated_nfw_with_large_truncation_radius():

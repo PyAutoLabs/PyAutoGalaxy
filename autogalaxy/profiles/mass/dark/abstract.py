@@ -283,16 +283,19 @@ class AbstractgNFW(MassProfile, DarkProfile):
         cosmology: LensingCosmology = None,
         xp=np,
     ):
+        """
+        Computes the NFW halo concentration, `c_{200c}`.
 
+        The 200 overdensity is relative to the critical density of the Universe
+        (``cosmic_average_density_solar_mass_per_kpc3_from`` returns
+        the critical density at redshift z), not the mean matter density.
+        """
         from autogalaxy.cosmology.model import Planck15
 
         cosmology = cosmology or Planck15()
 
         from scipy.optimize import fsolve
 
-        """
-        Computes the NFW halo concentration, `c_{200m}`
-        """
         delta_concentration = self.delta_concentration(
             redshift_object=redshift_profile,
             redshift_source=redshift_source,
@@ -329,7 +332,8 @@ class AbstractgNFW(MassProfile, DarkProfile):
         xp=np,
     ):
         """
-        Returns `r_{200m}` for this halo in **arcseconds**
+        Returns `r_{200c}` for this halo in **arcseconds**: the radius within which
+        the mean density is 200 times the critical density.
         """
         from autogalaxy.cosmology.model import Planck15
 
@@ -353,13 +357,15 @@ class AbstractgNFW(MassProfile, DarkProfile):
         cosmology: LensingCosmology = None,
         xp=np,
     ):
+        """
+        Returns `M_{200c}` of this NFW halo, in solar masses, at the given cosmology:
+        the mass within the radius where the mean density is 200 times the critical
+        density of the Universe (not the mean matter density).
+        """
         from autogalaxy.cosmology.model import Planck15
 
         cosmology = cosmology or Planck15()
 
-        """
-        Returns `M_{200m}` of this NFW halo, in solar masses, at the given cosmology.
-        """
         if redshift_of_cosmic_average_density == "profile":
             redshift_calc = redshift_object
         elif redshift_of_cosmic_average_density == "local":
