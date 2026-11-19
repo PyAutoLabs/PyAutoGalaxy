@@ -44,21 +44,167 @@ class gNFW(AbstractgNFW):
         return self.deflections_2d_via_mge_from(grid=grid, xp=xp, **kwargs)
 
     def deflections_2d_via_mge_from(self, grid: aa.type.Grid2DLike, xp=np, **kwargs):
-        radii_min = self.scale_radius / 20000.0
-        radii_max = self.scale_radius * 200.0
-        log_sigmas = xp.linspace(xp.log(radii_min), xp.log(radii_max), 30)
-        sigmas = xp.exp(log_sigmas)
-
+        """
+        Returns the deflection angles via the MGE decomposition of the 3D density, plus
+        the central point-like term for the mass inside the smallest Gaussian (see
+        :meth:`_inner_mass_deficit_from`).
+        """
         mge_decomp = MGEDecomposer(mass_profile=self)
 
         deflections_via_mge = mge_decomp.deflections_2d_via_mge_from(
             grid=grid,
             xp=xp,
-            sigma_log_list=sigmas,
+            sigma_log_list=self._mge_sigmas_from(xp=xp),
             ellipticity_convention="major",
             three_D=True,
         )
-        return deflections_via_mge
+
+        return deflections_via_mge + self._deflections_2d_inner_mass_from(
+            grid=grid, xp=xp
+        )
+
+    def _mge_sigmas_from(self, xp=np):
+        """
+        The widths of the 30 log-spaced Gaussians of the MGE decomposition of the 3D
+        density, from ``scale_radius / 20000`` to ``200 * scale_radius``.
+        """
+        radii_min = self.scale_radius / 20000.0
+        radii_max = self.scale_radius * 200.0
+        return xp.exp(xp.linspace(xp.log(radii_min), xp.log(radii_max), 30))
+
+    def _enclosed_mass_3d_from(self, radius, xp=np):
+        r"""
+        Returns the exact 3D mass inside a sphere of ``radius``, in the convergence units
+        of the projected mass (:math:`\int \kappa \, dA`):
+
+        .. math::
+
+            M(<r) = 4 \pi \kappa_s r_s^2 F(x), \qquad
+            F(x) = \int_0^x t^{2-\gamma} (1+t)^{\gamma-3} \, dt, \qquad x = r / r_s.
+
+        The substitution :math:`t = x s^{1/(3-\gamma)}` gives
+
+        .. math::
+
+            F(x) = \frac{x^{3-\gamma}}{3-\gamma}
+                   \int_0^1 \left(1 + x s^{1/(3-\gamma)}\right)^{\gamma-3} \, ds,
+
+        whose integrand is smooth (the cusp is absorbed), so a fixed 32-node
+        Gauss-Legendre rule is accurate to double precision for any
+        :math:`\gamma < 3`, on both array backends.
+        """
+        nodes, weights = np.polynomial.legendre.leggauss(32)
+        nodes = xp.asarray(0.5 * (nodes + 1.0))
+        weights = xp.asarray(0.5 * weights)
+
+        exponent = 3.0 - self.inner_slope
+        x = radius / self.scale_radius
+
+        f_x = (
+            x**exponent
+            / exponent
+            * xp.sum(weights * (1.0 + x * nodes ** (1.0 / exponent)) ** (-exponent))
+        )
+
+        return 4.0 * np.pi * self.kappa_s * self.scale_radius**2.0 * f_x
+
+    def _inner_mass_deficit_from(self, xp=np):
+        r"""
+        Returns the mass the MGE decomposition of the 3D density misses at its inner
+        cut-off, in the convergence units of the projected mass.
+
+        The Gaussians represent the density only down to the smallest width
+        :math:`\sigma_{\rm min}`; inside it the expansion flattens, while the gNFW cusp
+        keeps a mass :math:`\propto \sigma_{\rm min}^{3-\gamma}`. For a steep cusp
+        (:math:`\gamma \gtrsim 1.5`) that mass is no longer negligible: without this term
+        the deflections are biased low by 0.8% at :math:`\gamma = 2`, 6% at 2.4 and 40% at
+        2.8 (PyAutoGalaxy#729).
+
+        The deficit is the exact 3D mass inside a reference radius
+        :math:`r_* = 10 \sigma_{\rm min}` minus the 3D mass the Gaussians hold inside it,
+        each Gaussian of projected amplitude :math:`A_j` and width :math:`\sigma_j`
+        contributing
+
+        .. math::
+
+            2 \pi A_j \sigma_j^2 \left[ {\rm erf}(u_j / \sqrt{2})
+            - \sqrt{2 / \pi} \, u_j e^{-u_j^2 / 2} \right],
+            \qquad u_j = r_* / \sigma_j.
+
+        Above a few :math:`\sigma_{\rm min}` the expansion follows the density, so the
+        difference does not depend on :math:`r_*` (it is flat from 5 to 30
+        :math:`\sigma_{\rm min}`). Both masses scale with the axis ratio for an
+        elliptical profile (major-axis convention).
+        """
+        sigmas = self._mge_sigmas_from(xp=xp)
+
+        amps, _ = MGEDecomposer(mass_profile=self).decompose_convergence_via_mge(
+            sigma_log_list=sigmas, three_D=True, xp=xp
+        )
+
+        radius_ref = 10.0 * sigmas[0]
+        u = radius_ref / sigmas
+
+        if xp is np:
+            from scipy.special import erf
+        else:
+            from jax.scipy.special import erf
+
+        mass_mge = xp.sum(
+            2.0
+            * np.pi
+            * amps
+            * sigmas**2.0
+            * (erf(u / np.sqrt(2.0)) - np.sqrt(2.0 / np.pi) * u * xp.exp(-0.5 * u**2.0))
+        )
+
+        mass_true = self._enclosed_mass_3d_from(radius=radius_ref, xp=xp)
+
+        return self.axis_ratio(xp=xp) * (mass_true - mass_mge)
+
+    @aa.decorators.to_vector_yx
+    @aa.decorators.transform
+    def _deflections_2d_inner_mass_from(
+        self, grid: aa.type.Grid2DLike, xp=np, **kwargs
+    ):
+        """
+        Returns the deflection angles of the mass inside the MGE inner cut-off
+        (:meth:`_inner_mass_deficit_from`), placed as a uniform disc of radius
+        ``sigma_min`` at the centre: exactly a point mass, ``M / (pi R)``, for every
+        ``R >= sigma_min`` (``scale_radius / 20000``), and finite with a finite gradient
+        at ``R = 0``.
+        """
+        mass = self._inner_mass_deficit_from(xp=xp)
+        core_radius_squared = self._mge_sigmas_from(xp=xp)[0] ** 2.0
+
+        y = xp.asarray(grid.array[:, 0], dtype=xp.float64)
+        x = xp.asarray(grid.array[:, 1], dtype=xp.float64)
+
+        factor = mass / (np.pi * xp.maximum(y * y + x * x, core_radius_squared))
+
+        return self.rotated_grid_from_reference_frame_from(
+            xp.vstack((factor * y, factor * x)).T, xp=xp
+        )
+
+    def _potential_2d_inner_mass_from(self, grid: aa.type.Grid2DLike, xp=np):
+        """
+        Returns the lensing potential of the uniform-disc inner-mass term of
+        :meth:`_deflections_2d_inner_mass_from`, zero at the centre like the MGE
+        potential, on a grid already in the profile's reference frame.
+        """
+        mass = self._inner_mass_deficit_from(xp=xp)
+        core_radius_squared = self._mge_sigmas_from(xp=xp)[0] ** 2.0
+
+        y = xp.asarray(grid.array[:, 0], dtype=xp.float64)
+        x = xp.asarray(grid.array[:, 1], dtype=xp.float64)
+        radii_squared = y * y + x * x
+
+        return (mass / (2.0 * np.pi)) * (
+            xp.minimum(radii_squared, core_radius_squared) / core_radius_squared
+            + xp.log(
+                xp.maximum(radii_squared, core_radius_squared) / core_radius_squared
+            )
+        )
 
     @aa.over_sample
     @aa.decorators.to_array
@@ -66,26 +212,28 @@ class gNFW(AbstractgNFW):
     def potential_2d_from(self, grid: aa.type.Grid2DLike, xp=np, **kwargs):
         """
         Returns the 2D lensing potential via the same MGE decomposition used for the
-        deflection angles, so that ``grad(psi)`` is self-consistent with ``deflections_yx_2d_from``.
+        deflection angles, plus the same inner-mass term, so that ``grad(psi)`` matches
+        ``deflections_yx_2d_from``. The inner-mass term is exactly consistent; the MGE
+        part integrates the deflections along radial lines with a fixed quadrature,
+        which for ``inner_slope`` above ~2 leaves ``grad(psi)`` and the deflections
+        apart at the 0.1-1% level.
 
         This implementation is inherited by every elliptical and spherical gNFW/NFW variant
         (``NFW``, ``gNFWSph``, and the MCR / Virial-mass subclasses), none of which have a
         closed-form elliptical potential. The MGE decomposer expands the 3D density into a
         Gaussian sum and integrates each Gaussian's analytic potential.
         """
-        radii_min = self.scale_radius / 20000.0
-        radii_max = self.scale_radius * 200.0
-        sigmas = xp.exp(xp.linspace(xp.log(radii_min), xp.log(radii_max), 30))
-
         mge_decomp = MGEDecomposer(mass_profile=self)
 
-        return mge_decomp.potential_2d_via_mge_from(
+        potential_mge = mge_decomp.potential_2d_via_mge_from(
             grid=grid,
             xp=xp,
-            sigma_log_list=sigmas,
+            sigma_log_list=self._mge_sigmas_from(xp=xp),
             ellipticity_convention="major",
             three_D=True,
         )
+
+        return potential_mge + self._potential_2d_inner_mass_from(grid=grid, xp=xp)
 
     def convergence_func(self, grid_radius: float, xp=np) -> float:
         """
@@ -141,9 +289,7 @@ class gNFW(AbstractgNFW):
                 )
                 n_nodes = max(
                     int(
-                        np.ceil(
-                            total_decades * self.convergence_table_nodes_per_decade
-                        )
+                        np.ceil(total_decades * self.convergence_table_nodes_per_decade)
                     )
                     + 1,
                     self.convergence_table_min_nodes,
@@ -165,9 +311,7 @@ class gNFW(AbstractgNFW):
 
                     spline = CubicSpline(log_eta_nodes, np.log(integral_nodes))
 
-                    grid_radius[usable] = convergence_from(
-                        eta, np.exp(spline(log_eta))
-                    )
+                    grid_radius[usable] = convergence_from(eta, np.exp(spline(log_eta)))
 
                     loop_indexes = np.flatnonzero(~usable)
 
@@ -187,9 +331,7 @@ class gNFW(AbstractgNFW):
                     epsrel=gNFW.epsrel,
                 )[0]
 
-            grid_radius[index] = convergence_from(
-                grid_radius[index], integral_y_value
-            )
+            grid_radius[index] = convergence_from(grid_radius[index], integral_y_value)
 
         return grid_radius
 
