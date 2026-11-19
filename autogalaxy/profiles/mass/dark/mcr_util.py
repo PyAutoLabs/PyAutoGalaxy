@@ -1,12 +1,35 @@
 import numpy as np
 
 
+def radius_at_200_arcsec_from(radius_at_200, redshift_object):
+    """
+    Converts ``radius_at_200`` as returned by the ``kappa_s_and_scale_radius_for_*`` helpers (kpc)
+    into arcseconds, the unit of the ``scale_radius`` they return beside it, using the same
+    ``Planck15`` cosmology.
+    """
+    from autogalaxy.cosmology.model import Planck15
+
+    if isinstance(radius_at_200, (float, int, np.ndarray, np.floating)):
+        xp = np
+    else:
+        import jax.numpy as jnp
+
+        xp = jnp
+
+    kpc_per_arcsec = Planck15().kpc_per_arcsec_from(redshift=redshift_object, xp=xp)
+
+    return radius_at_200 / kpc_per_arcsec
+
+
 def kappa_s_and_scale_radius_for_duffy(mass_at_200, redshift_object, redshift_source):
     """
     Computes the AutoGalaxy NFW parameters (kappa_s, scale_radius) for an NFW halo of the given
     mass, enforcing the Duffy '08 mass-concentration relation.
 
     Interprets mass as *`M_{200c}`*, not `M_{200m}`.
+
+    Returns ``(kappa_s, scale_radius, radius_at_200)`` with ``scale_radius`` in arcseconds and
+    ``radius_at_200`` in kpc.
     """
     from autogalaxy.cosmology.model import Planck15
 
@@ -159,6 +182,7 @@ def kappa_s_and_scale_radius_for_ludlow(
     kappa_s = rho_s * scale_radius_kpc / critical_surface_density
     scale_radius = scale_radius_kpc / kpc_per_arcsec
 
+    # scale_radius is in arcsec; radius_at_200 is in kpc.
     return kappa_s, scale_radius, radius_at_200
 
 

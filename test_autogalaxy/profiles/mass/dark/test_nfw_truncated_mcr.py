@@ -98,4 +98,41 @@ def test__ludlow__mass_and_concentration_consistent_with_normal_truncated_nfw__s
     assert mp.inner_slope == 1.0
 
     assert mp.scale_radius == pytest.approx(0.21157, 1.0e-3)
-    assert mp.truncation_radius == pytest.approx(33.7134116, 1.0e-3)
+    assert mp.truncation_radius == pytest.approx(4.897742, 1.0e-3)
+
+
+def test__duffy__truncation_radius_is_twice_r200__tau_is_twice_concentration():
+    mass_at_200 = 1.0e9
+    redshift_object = 0.5
+
+    mp = ag.mp.NFWTruncatedMCRDuffySph(
+        mass_at_200=mass_at_200,
+        redshift_object=redshift_object,
+        redshift_source=1.0,
+    )
+
+    # Duffy+2008 mass-concentration relation, as in mcr_util.kappa_s_and_scale_radius_for_duffy.
+    concentration = (
+        5.71
+        * (1.0 + redshift_object) ** (-0.47)
+        * (mass_at_200 / 2.952465309e12) ** (-0.084)
+    )
+
+    assert mp.tau == pytest.approx(2.0 * concentration, 1.0e-6)
+
+
+def test__ludlow__truncation_radius_is_twice_r200__tau_is_twice_concentration():
+    from autogalaxy.profiles.mass.dark.mcr_util import ludlow16_cosmology
+
+    mp = ag.mp.NFWTruncatedMCRLudlowSph(
+        mass_at_200=1.0e9,
+        redshift_object=0.5,
+        redshift_source=1.0,
+    )
+
+    concentration = ludlow16_cosmology(
+        mass_at_200=1.0e9, redshift_object=0.5, redshift_source=1.0
+    )[0]
+
+    assert mp.tau == pytest.approx(2.0 * concentration, 1.0e-6)
+    assert mp.tau == pytest.approx(24.0888, 1.0e-4)

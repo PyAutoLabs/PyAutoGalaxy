@@ -34,5 +34,8 @@ class NFWTruncatedMCRScatterLudlowSph(NFWTruncatedSph):
             centre=centre,
             kappa_s=kappa_s,
             scale_radius=scale_radius,
-            truncation_radius=2.0 * radius_at_200,
+            truncation_radius=2.0
+            * mcr_util.radius_at_200_arcsec_from(
+                radius_at_200=radius_at_200, redshift_object=redshift_object
+            ),
         )
