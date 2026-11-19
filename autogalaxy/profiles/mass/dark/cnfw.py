@@ -10,68 +10,78 @@ from autogalaxy.profiles import validate
 
 
 def F_func_from(theta, radius, xp=np):
+    """
+    The cNFW projected-mass function ``F(theta; radius)`` of Shajib (2019) used by the cNFW
+    deflections, for ``theta > 0``.
+
+    The inner (``theta < radius``) and outer (``theta > radius``) closed forms are each
+    evaluated on a ``theta`` inside their own domain (the other branch's points are swapped for
+    a safe value first), and ``theta == radius`` uses their common limit. Evaluating a branch
+    outside its domain gives NaN there, and although ``where`` discards that value, its NaN
+    gradient still reaches JAX's ``grad``.
+    """
+    is_inner = (theta > 0) & (theta < radius)
+    is_edge = theta == radius
+    is_outer = theta > radius
+
+    theta_inner = xp.where(is_inner, theta, 0.5 * radius)
+    theta_outer = xp.where(is_outer, theta, 2.0 * radius)
+    theta_edge = xp.where(is_edge, theta, radius)
+
+    F_inner = radius / 2 * xp.log(2 * radius / theta_inner) - xp.sqrt(
+        radius**2 - theta_inner**2
+    ) * xp.arctanh(xp.sqrt((radius - theta_inner) / (radius + theta_inner)))
+
+    F_outer = radius / 2 * xp.log(2 * radius / theta_outer) + xp.sqrt(
+        theta_outer**2 - radius**2
+    ) * xp.arctan(xp.sqrt((theta_outer - radius) / (theta_outer + radius)))
+
+    # Both closed forms meet at radius / 2 * ln(2) with slope 1 / 2 in theta; the added
+    # (theta - radius) is zero in value and gives the edge branch that slope.
+    F_edge = radius / 2 * xp.log(2 * radius / theta_edge) + (theta_edge - radius)
+
     F = theta * 0.0
-
-    mask1 = (theta > 0) & (theta <= radius)
-    mask2 = theta > radius
-
-    F = xp.where(
-        mask1,
-        (
-            radius / 2 * xp.log(2 * radius / theta)
-            - xp.sqrt(radius**2 - theta**2)
-            * xp.arctanh(xp.sqrt((radius - theta) / (radius + theta)))
-        ),
-        F,
-    )
-
-    F = xp.where(
-        mask2,
-        (
-            radius / 2 * xp.log(2 * radius / theta)
-            + xp.sqrt(theta**2 - radius**2)
-            * xp.arctan(xp.sqrt((theta - radius) / (theta + radius)))
-        ),
-        F,
-    )
+    F = xp.where(is_inner, F_inner, F)
+    F = xp.where(is_edge, F_edge, F)
+    F = xp.where(is_outer, F_outer, F)
 
     return 2 * radius * F
 
 
 def dev_F_func_from(theta, radius, xp=np):
+    """
+    The derivative of ``F_func_from`` with respect to ``radius``, for ``theta > 0``.
+
+    Each closed form is evaluated on a ``theta`` inside its own domain, as in ``F_func_from``,
+    so that its JAX gradient is finite everywhere.
+    """
+    is_inner = (theta > 0) & (theta < radius)
+    is_edge = theta == radius
+    is_outer = theta > radius
+
+    theta_inner = xp.where(is_inner, theta, 0.5 * radius)
+    theta_outer = xp.where(is_outer, theta, 2.0 * radius)
+
+    dev_F_inner = radius * xp.log(2 * radius / theta_inner) - (
+        2 * radius**2 - theta_inner**2
+    ) / xp.sqrt(radius**2 - theta_inner**2) * xp.arctanh(
+        xp.sqrt((radius - theta_inner) / (radius + theta_inner))
+    )
+
+    dev_F_outer = radius * xp.log(2 * radius / theta_outer) + (
+        theta_outer**2 - 2 * radius**2
+    ) / xp.sqrt(theta_outer**2 - radius**2) * xp.arctan(
+        xp.sqrt((theta_outer - radius) / (theta_outer + radius))
+    )
+
     dev_F = theta * 0.0
-
-    mask1 = (theta > 0) & (theta < radius)
-    mask2 = theta == radius
-    mask3 = theta > radius
-
-    dev_F = xp.where(
-        mask1,
-        (
-            radius * xp.log(2 * radius / theta)
-            - (2 * radius**2 - theta**2)
-            / xp.sqrt(radius**2 - theta**2)
-            * xp.arctanh(xp.sqrt((radius - theta) / (radius + theta)))
-        ),
-        dev_F,
-    )
-
-    dev_F = xp.where(
-        mask2,
-        radius * (xp.log(2) - 1 / 2),
-        dev_F,
-    )
-
-    dev_F = xp.where(
-        mask3,
-        (
-            radius * xp.log(2 * radius / theta)
-            + (theta**2 - 2 * radius**2)
-            / xp.sqrt(theta**2 - radius**2)
-            * xp.arctan(xp.sqrt((theta - radius) / (theta + radius)))
-        ),
-        dev_F,
-    )
+    dev_F = xp.where(is_inner, dev_F_inner, dev_F)
+    # Both closed forms meet at radius * (ln(2) - 1 / 2) with slope 1 / 3 in theta; the
+    # added (theta - radius) / 3 is zero in value and gives the edge branch that slope.
+    theta_edge = xp.where(is_edge, theta, radius)
+    dev_F_edge = radius * (xp.log(2) - 1 / 2) + (theta_edge - radius) / 3.0
+    dev_F = xp.where(is_edge, dev_F_edge, dev_F)
+    dev_F = xp.where(is_outer, dev_F_outer, dev_F)
 
     return 2 * dev_F
 
@@ -329,6 +339,10 @@ class cNFWSph(cNFW):
 
     def dev_F_func(self, theta, radius, xp=np):
         return dev_F_func_from(theta, radius, xp=xp)
+
+    # (kappa_s, scale_radius, core_radius) of a masked-out `vmapped_deflections_from` slot;
+    # the default of ones would put scale_radius == core_radius and divide by zero.
+    vmapped_padding_params = (0.0, 1.0, 0.1)
 
     @staticmethod
     def radial_deflection_from(r, params, xp):
