@@ -344,7 +344,7 @@ def test__values_of_quantities_for_real_cosmology__local_density():
         cosmology=cosmology,
     )
 
-    mass_at_truncation_radius = mp.mass_at_truncation_radius_solar_mass(
+    total_mass = mp.total_mass_solar_masses(
         redshift_profile=0.6,
         redshift_source=2.5,
         redshift_of_cosmic_average_density="local",
@@ -356,7 +356,7 @@ def test__values_of_quantities_for_real_cosmology__local_density():
     assert concentration == pytest.approx(18.694005966122, 1.0e-4)
     assert radius_at_200 == pytest.approx(93.4700298306, 1.0e-4)
     assert mass_at_200 == pytest.approx(27664107754813.824, 1.0e-4)
-    assert mass_at_truncation_radius == pytest.approx(14883851437772.34, 1.0e-4)
+    assert total_mass == pytest.approx(7328007465285.967, 1.0e-4)
 
 
 def test__values_of_quantities_for_real_cosmology__profile_density():
@@ -399,7 +399,7 @@ def test__values_of_quantities_for_real_cosmology__profile_density():
         cosmology=cosmology,
     )
 
-    mass_at_truncation_radius = mp.mass_at_truncation_radius_solar_mass(
+    total_mass = mp.total_mass_solar_masses(
         redshift_profile=0.6,
         redshift_source=2.5,
         redshift_of_cosmic_average_density="profile",
@@ -411,4 +411,4 @@ def test__values_of_quantities_for_real_cosmology__profile_density():
     assert concentration == pytest.approx(14.3904385787937, 1.0e-4)
     assert radius_at_200 == pytest.approx(71.9521928939688, 1.0e-4)
     assert mass_at_200 == pytest.approx(24499163428482.89, 1.0e-4)
-    assert mass_at_truncation_radius == pytest.approx(13181047155073.828, 1.0e-4)
+    assert total_mass == pytest.approx(7328007465286.096, 1.0e-4)

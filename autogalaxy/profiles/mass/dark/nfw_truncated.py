@@ -530,7 +530,7 @@ class NFWTruncatedSph(AbstractgNFW):
 
         return tau_scale / c_scale
 
-    def mass_at_truncation_radius_solar_mass(
+    def total_mass_solar_masses(
         self,
         redshift_profile,
         redshift_source,
@@ -538,6 +538,42 @@ class NFWTruncatedSph(AbstractgNFW):
         cosmology: LensingCosmology = None,
         xp=np,
     ):
+        r"""
+        Total mass of the truncated NFW halo, in solar masses, integrated to infinity.
+
+        Baltz, Marshall & Oguri (2009) give the total mass of the :math:`n=1` tNFW
+        profile as
+
+        .. math::
+
+            M_{\rm tNFW} = M_0 \frac{\tau^2}{(\tau^2 + 1)^2}
+                \left[(\tau^2 - 1)\ln\tau + \tau\pi - (\tau^2 + 1)\right]
+
+        where :math:`M_0 = 4 \pi \rho_s r_s^3` is the NFW scale mass. It relates to
+        :math:`M_{200}` through the concentration :math:`c`:
+
+        .. math::
+
+            M_0 = \frac{M_{200}}{\ln(1 + c) - c / (1 + c)}
+
+        :math:`M_{200}` and :math:`c` are this profile's own values, from
+        ``mass_at_200_solar_masses`` and ``concentration``. The result equals
+        :math:`M_{200}` times ``mass_ratio_from_concentration_and_truncation_factor``
+        for a profile built by ``from_m200_concentration``.
+
+        Parameters
+        ----------
+        redshift_profile
+            Redshift of the halo.
+        redshift_source
+            Redshift of the background source.
+        redshift_of_cosmic_average_density
+            ``"profile"`` or ``"local"``: the redshift at which the critical density
+            that defines :math:`M_{200}` is evaluated.
+        cosmology
+            Cosmology used for distance and density calculations.  Defaults to
+            Planck15 if not supplied.
+        """
         from autogalaxy.cosmology.model import Planck15
 
         cosmology = cosmology or Planck15()
@@ -550,12 +586,22 @@ class NFWTruncatedSph(AbstractgNFW):
             xp=xp,
         )
 
-        return (
-            mass_at_200
-            * (self.tau**2.0 / (self.tau**2.0 + 1.0) ** 2.0)
-            * (
-                ((self.tau**2.0 - 1) * np.log(self.tau))
-                + (self.tau * np.pi)
-                - (self.tau**2.0 + 1)
-            )
+        concentration = self.concentration(
+            redshift_profile=redshift_profile,
+            redshift_source=redshift_source,
+            redshift_of_cosmic_average_density=redshift_of_cosmic_average_density,
+            cosmology=cosmology,
+            xp=xp,
         )
+
+        nfw_mass_factor = xp.log(1.0 + concentration) - concentration / (
+            1.0 + concentration
+        )
+
+        tau_scale = (self.tau**2.0 / (self.tau**2.0 + 1.0) ** 2.0) * (
+            ((self.tau**2.0 - 1.0) * xp.log(self.tau))
+            + (self.tau * xp.pi)
+            - (self.tau**2.0 + 1.0)
+        )
+
+        return mass_at_200 * tau_scale / nfw_mass_factor
