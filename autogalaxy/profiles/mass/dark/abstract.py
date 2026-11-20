@@ -15,10 +15,53 @@ class DarkProfile:
     pass
 
 
+# Inside |1 - x^2| < this window the NFW auxiliaries f(x) and g(x) use their power series
+# in u = 1 - x^2 instead of the closed forms, which cancel near the scale radius x = 1.
+SCALE_RADIUS_SERIES_WINDOW = 0.1
+_SCALE_RADIUS_SERIES_TERMS = 16
+
+
+def coord_func_u_from(grid_radius):
+    """
+    Return u = 1 - x^2, formed as (1 - x)(1 + x) so it keeps full relative precision
+    near x = 1, where 1 - x^2 computed directly would cancel.
+    """
+    return (1.0 - grid_radius) * (1.0 + grid_radius)
+
+
+def coord_func_g_series_from(u):
+    r"""
+    The NFW auxiliary function :math:`g(x) = (1 - f(x)) / (x^2 - 1)` as a power series
+    in :math:`u = 1 - x^2`:
+
+    .. math::
+
+        g = \sum_{k \ge 0} \frac{u^k}{2k + 3} = \frac{1}{3} + \frac{u}{5} + \frac{u^2}{7} + \dots
+
+    With :math:`s = \sqrt{u}`, :math:`f = \operatorname{arctanh}(s)/s` inside the scale
+    radius and :math:`f = \arctan(\sqrt{-u})/\sqrt{-u}` outside it; both expand to
+    :math:`f = 1 + u\,g`, so one series covers both sides of :math:`x = 1`.  It is
+    analytic in :math:`u`, so it also gives the complex continuation the gNFW family
+    uses.  Sixteen terms bound the truncation error by :math:`10^{-17}` for
+    :math:`|u| \le` ``SCALE_RADIUS_SERIES_WINDOW``.
+    """
+    n = _SCALE_RADIUS_SERIES_TERMS
+    out = 1.0 / (2.0 * n + 1.0)
+    for k in range(n - 2, -1, -1):
+        out = out * u + 1.0 / (2.0 * k + 3.0)
+    return out
+
+
 def coord_func_f_from(grid_radius, xp=np):
     """
     The NFW auxiliary function f(x): arccos(1/x) / sqrt(x^2 - 1) outside the scale radius,
     arccosh(1/x) / sqrt(1 - x^2) inside it, and 1 on it.
+
+    Near the scale radius each closed form divides two vanishing quantities and loses
+    precision (relative error ~ machine epsilon / |1 - x^2|), and the constant at x = 1
+    has the wrong derivative.  Within |1 - x^2| < ``SCALE_RADIUS_SERIES_WINDOW`` the
+    series f = 1 + u g(u), with u = 1 - x^2 (``coord_func_g_series_from``), is used
+    instead: it is exact to round-off and smooth through x = 1.
 
     The result has the dtype of the input: a real radius gives a real f (each branch is
     evaluated on inputs masked into its own domain, so no branch sees a radius it is not
@@ -29,16 +72,26 @@ def coord_func_f_from(grid_radius, xp=np):
 
     r = grid_radius
 
+    u = coord_func_u_from(r)
+    near = xp.abs(u) < SCALE_RADIUS_SERIES_WINDOW
+
     greater = r > 1.0
     less = r < 1.0
 
-    r_gt = xp.where(greater, r, 2.0)
-    r_lt = xp.where(less, r, 0.5)
+    r_gt = xp.where(greater & ~near, r, 2.0)
+    r_lt = xp.where(less & ~near, r, 0.5)
 
     out_gt = xp.arccos(1.0 / r_gt) / xp.sqrt(r_gt**2 - 1.0)
     out_lt = xp.arccosh(1.0 / r_lt) / xp.sqrt(1.0 - r_lt**2)
 
-    return xp.where(greater, out_gt, xp.where(less, out_lt, xp.ones_like(r)))
+    u_near = xp.where(near, u, 0.0)
+    out_near = 1.0 + u_near * coord_func_g_series_from(u_near)
+
+    return xp.where(
+        near,
+        out_near,
+        xp.where(greater, out_gt, xp.where(less, out_lt, xp.ones_like(r))),
+    )
 
 
 class AbstractgNFW(MassProfile, DarkProfile):
@@ -168,6 +221,9 @@ class AbstractgNFW(MassProfile, DarkProfile):
           - if r < 1: g = (f_r - 1) / (1 - r^2)
           - else:     g = 1/3
 
+        Within |1 - r^2| < ``SCALE_RADIUS_SERIES_WINDOW`` the power series in
+        u = 1 - r^2 replaces all three, since the closed forms cancel near r = 1.
+
         Parameters
         ----------
         grid_radius : np.ndarray
@@ -192,22 +248,32 @@ class AbstractgNFW(MassProfile, DarkProfile):
         r = xp.real(grid_radius)
         r2 = r**2
 
-        # Each branch divides by (r^2 - 1), which is zero on the scale radius: mask the
-        # denominators into each branch's own domain so the excluded points are never
-        # divided by zero, then select.
-        greater = r > 1.0
-        less = r < 1.0
+        # Each closed form divides by (r^2 - 1), which vanishes on the scale radius, and
+        # cancels near it: within the series window use g's power series in u = 1 - r^2
+        # (``coord_func_g_series_from``) instead.  Mask each closed form's denominator into
+        # its own domain, away from the window, so no excluded point is divided by zero.
+        u = coord_func_u_from(grid_radius)
+        near = xp.abs(u) < SCALE_RADIUS_SERIES_WINDOW
+
+        greater = (r > 1.0) & ~near
+        less = (r < 1.0) & ~near
 
         r2_gt = xp.where(greater, r2, 2.0)
         r2_lt = xp.where(less, r2, 0.5)
 
+        u_near = xp.where(near, u, 0.0)
+
         return xp.where(
-            greater,
-            (1.0 - f_r) / (r2_gt - 1.0),
+            near,
+            coord_func_g_series_from(u_near),
             xp.where(
-                less,
-                (f_r - 1.0) / (1.0 - r2_lt),
-                1.0 / 3.0,
+                greater,
+                (1.0 - f_r) / (r2_gt - 1.0),
+                xp.where(
+                    less,
+                    (f_r - 1.0) / (1.0 - r2_lt),
+                    1.0 / 3.0,
+                ),
             ),
         )
 
