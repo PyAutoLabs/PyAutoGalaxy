@@ -49,13 +49,50 @@ class MassProfile(EllProfile):
             "(jnightingale2211@gmail.com) or open a GitHub issue."
         )
 
+    # The radial parameters (everything after the centre) put into a masked-out slot of
+    # `vmapped_deflections_from` before it is evaluated. They must lie inside the domain of
+    # `radial_deflection_from`, so that a masked slot's deflection and its gradient are both
+    # finite (and then exactly zero). `None` uses ones; a profile for which ones are not a
+    # valid parameter set overrides this.
+    vmapped_padding_params = None
+
     @classmethod
     def vmapped_deflections_from(cls, grid, params_batch, mask, xp=None):
+        """
+        Returns the summed deflections of a batch of spherical profiles of this class, for the
+        JAX ray-tracing scan of the line-of-sight and subhalo substructure code.
+
+        Parameters
+        ----------
+        grid
+            The (y,x) coordinates, shape ``(n_grid, 2)``.
+        params_batch
+            The parameters of each slot, shape ``(n_slots, 2 + n_radial)``: the centre followed
+            by the parameters ``radial_deflection_from`` takes.
+        mask
+            Which slots hold a real profile, shape ``(n_slots,)``. A masked-out slot contributes
+            exactly zero to the deflections and to their gradients, whatever its parameters
+            (callers pad such slots with zeros). Its parameters are swapped for
+            ``vmapped_padding_params`` before evaluation, because a zero scale radius would give a
+            NaN gradient that ``where`` alone does not stop: the masked branch's cotangent is zero,
+            but zero times an infinite partial derivative is NaN.
+        """
         import jax
         import jax.numpy as jnp
 
         if xp is None:
             xp = jnp
+
+        n_radial = params_batch.shape[-1] - 2
+        padding_radial = (
+            xp.ones(n_radial)
+            if cls.vmapped_padding_params is None
+            else xp.asarray(cls.vmapped_padding_params, dtype=params_batch.dtype)
+        )
+        padding = xp.concatenate(
+            [xp.zeros(2, dtype=params_batch.dtype), padding_radial.astype(params_batch.dtype)]
+        )
+        params_batch = xp.where(mask[:, None], params_batch, padding[None, :])
 
         def single(params):
             centred = grid - params[:2]
