@@ -136,6 +136,17 @@ class AbstractFitInversion:
 
         return linear_light_profile_intensity_dict
 
+    def _galaxy_image_dict_with_linear_reconstruction(
+        self, galaxy_image_dict: Dict[Galaxy, aa.Array2D], use_operated: bool
+    ) -> Dict[Galaxy, aa.Array2D]:
+        """Add each galaxy's reconstructed linear light to its ordinary image."""
+        linear_images = self.galaxy_linear_obj_data_dict_from(use_operated=use_operated)
+        for galaxy, linear_image in linear_images.items():
+            if galaxy in galaxy_image_dict:
+                linear_image = galaxy_image_dict[galaxy] + linear_image
+            galaxy_image_dict[galaxy] = linear_image
+        return galaxy_image_dict
+
     def galaxy_linear_obj_data_dict_from(
         self,
         use_operated: bool = True,

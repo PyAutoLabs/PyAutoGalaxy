@@ -1380,10 +1380,8 @@ def test__natural_dirty_images__galaxy_with_ordinary_and_linear_light__matches_m
     interferometer_7, linear_component
 ):
     """
-    A galaxy with both an ordinary light profile and a linear component (a linear light profile, or a
-    pixelization) has only its linear reconstruction in `galaxy_image_dict`; `model_image_natural` must
-    still include the ordinary light, so `dirty_model_image_natural` is the natural dirty image of the
-    fit's model visibilities `model_data`.
+    The naturally weighted dirty image includes ordinary and reconstructed light and matches the
+    natural dirty image of the fit's model visibilities `model_data`.
     """
     dataset = interferometer_7.apply_sparse_operator(use_jax=False)
 
@@ -1613,3 +1611,71 @@ def test__fit__matrix_free_route__unsupported_configurations__raise():
 
     with pytest.raises(aa.exc.InversionException, match="use_edge_zeroed_pixels"):
         fit.figure_of_merit
+
+
+
+@pytest.mark.parametrize("array_free", [False, True])
+def test__galaxy_image_dict__adds_ordinary_and_linear_light(
+    interferometer_7, array_free, tmp_path
+):
+    from types import SimpleNamespace
+
+    from astropy.io import fits
+    from autonerves import conf
+    from autonerves.fitsable import hdu_list_for_output_from
+    import autofit as af
+    from autogalaxy.interferometer.plot.fit_interferometer_plots import fits_galaxy_images
+    from autogalaxy.interferometer.model.result import ResultInterferometer
+
+    dataset = (
+        _array_free_dataset_from(interferometer_7) if array_free else interferometer_7
+    )
+    galaxy = ag.Galaxy(
+        redshift=0.5,
+        bulge=ag.lp.Sersic(intensity=0.1),
+        disk=ag.lp_linear.Gaussian(sigma=1.0),
+    )
+    fit = ag.FitInterferometer(dataset=dataset, galaxies=[galaxy])
+    ordinary = galaxy.bulge.image_2d_from(grid=fit.grids.lp)
+    linear = fit.inversion.mapped_reconstructed_data
+    assert np.any(ordinary.array)
+    assert np.any(linear.array)
+
+    expected = ordinary + linear
+    np.testing.assert_allclose(
+        fit.galaxy_image_dict[galaxy].array, expected.array, rtol=1.0e-8
+    )
+    np.testing.assert_allclose(
+        fit.model_image_natural.array, expected.array, rtol=1.0e-8
+    )
+
+    fits_galaxy_images(fit=fit, output_path=tmp_path)
+    with fits.open(tmp_path / "galaxy_images.fits") as hdus:
+        np.testing.assert_allclose(hdus["GALAXY_0"].data, expected.native_for_fits)
+
+    instance = af.Collection(galaxies=af.Collection(galaxy=galaxy))
+    paths = af.DirectoryPaths(
+        name="mixed_light", path_prefix=str(tmp_path), is_identifier_in_paths=False
+    )
+    result = ResultInterferometer(
+        paths=paths,
+        samples_summary=SimpleNamespace(instance=instance),
+        analysis=ag.AnalysisInterferometer(dataset=dataset, use_jax=False),
+    )
+    ((path, _),) = result.path_galaxy_tuples
+    cache_path = paths._files_path / "galaxy_images_model.fits"
+    hdu_list_for_output_from(
+        values_list=[expected.mask.astype("float"), linear.native_for_fits],
+        ext_name_list=["mask", path],
+        header_dict=expected.mask.header_dict,
+    ).writeto(cache_path)
+
+    adapt_image = result.adapt_images_from().galaxy_name_image_dict[path]
+    floor = conf.instance["general"]["adapt"]["adapt_minimum_percent"]
+    np.testing.assert_allclose(
+        adapt_image.array, np.maximum(expected.array, floor * np.max(expected.array))
+    )
+
+    with fits.open(cache_path) as hdus:
+        assert hdus[0].header["CACHEVER"] == 1
+        np.testing.assert_allclose(hdus[1].data, expected.native_for_fits)

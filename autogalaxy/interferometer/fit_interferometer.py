@@ -597,11 +597,9 @@ class FitInterferometer(aa.FitInterferometer, AbstractFitInversion):
             grid=self.grids.lp, xp=self._xp
         )
 
-        galaxy_linear_obj_image_dict = self.galaxy_linear_obj_data_dict_from(
-            use_operated=False
+        return self._galaxy_image_dict_with_linear_reconstruction(
+            galaxy_image_dict=galaxy_image_dict, use_operated=False
         )
-
-        return {**galaxy_image_dict, **galaxy_linear_obj_image_dict}
 
     @property
     def model_image_natural(self) -> aa.Array2D:
@@ -610,9 +608,6 @@ class FitInterferometer(aa.FitInterferometer, AbstractFitInversion):
         ordinary (non-linear) light profile (`profile_image`) plus, when the fit has an inversion, the solved
         linear objects' reconstruction (`inversion.mapped_reconstructed_data`, linear light profiles and
         pixelizations) -- the real-space image whose visibilities are `model_data`.
-
-        It is built from these two terms rather than from `galaxy_image_dict`, whose entry for a galaxy with
-        both ordinary and linear light holds only the linear reconstruction.
 
         It needs neither visibilities nor a transformer, so it is available on an array-free dataset (built by
         `Interferometer.from_stream` / `from_sparse_terms`), where it is the image the natural-weighted dirty
