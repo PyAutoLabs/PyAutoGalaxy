@@ -2,6 +2,8 @@ import logging
 import numpy as np
 from typing import Optional, Union
 
+from astropy.io.fits import HDUList
+
 from autonerves.dictable import to_dict, output_to_json
 
 import autofit as af
@@ -115,6 +117,22 @@ class AnalysisDataset(Analysis):
 
         return self
 
+    @staticmethod
+    def _save_dataset_fits(paths: af.AbstractPaths, hdu_list: HDUList) -> None:
+        """Save the dataset for directory and database aggregators."""
+        dataset_path = paths.image_path / "dataset.fits"
+        if not dataset_path.exists():
+            hdu_list.writeto(dataset_path, overwrite=True)
+
+        if isinstance(paths, af.DatabasePaths) and not any(
+            fits.name == "dataset" for fits in paths.fit.fits
+        ):
+            # PyAutoFit reloads database HDU data as big-endian float64.
+            for hdu in hdu_list:
+                if hdu.data is not None:
+                    hdu.data = hdu.data.astype(">f8", copy=False)
+            paths.save_fits(name="dataset", fits=hdu_list)
+
     def save_attributes(self, paths: af.DirectoryPaths):
         """
         Before the model-fit via the non-linear search begins, this routine saves attributes of the `Analysis` object
@@ -129,6 +147,7 @@ class AnalysisDataset(Analysis):
 
         The dataset itself is output as `dataset.fits` to the `image` folder by the `save_attributes` method of
         each dataset-specific subclass (e.g. `AnalysisImaging`), with the mask in its `PrimaryHDU`.
+        Database paths also register the dataset FITS with the search's database fit.
 
         The following .fits files are also output via the plotter interface:
 
