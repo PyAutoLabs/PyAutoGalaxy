@@ -820,3 +820,24 @@ def test__galaxies_linear_light_profiles_to_light_profiles__basis_with_mixed_pro
         90.36651920, 1.0e-4
     )
     assert galaxies[2].bulge.intensity == pytest.approx(-64.44560420348, 1.0e-4)
+
+
+
+def test__galaxy_image_dicts__add_ordinary_and_linear_light(masked_imaging_7x7):
+    galaxy = ag.Galaxy(
+        redshift=0.5,
+        bulge=ag.lp.Sersic(intensity=0.1),
+        disk=ag.lp_linear.Gaussian(sigma=1.0),
+    )
+    fit = ag.FitImaging(dataset=masked_imaging_7x7, galaxies=[galaxy])
+    ordinary = galaxy.bulge.image_2d_from(grid=fit.grids.lp)
+    linear = fit.inversion.mapped_reconstructed_data
+    assert np.any(ordinary.array)
+    assert np.any(linear.array)
+
+    np.testing.assert_allclose(
+        fit.galaxy_image_dict[galaxy].array, ordinary.array + linear.array
+    )
+    np.testing.assert_allclose(
+        fit.galaxy_model_image_dict[galaxy].array, fit.model_data.array
+    )

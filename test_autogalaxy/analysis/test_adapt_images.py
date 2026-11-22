@@ -171,7 +171,12 @@ def test__galaxy_image_dict_cache__round_trip(tmp_path):
         assert (loaded[name].mask == image_dict[name].mask).all()
 
 
-def test__galaxy_name_image_dict_via_result_from__loads_cache_on_second_call(tmp_path):
+@pytest.mark.parametrize("legacy", [False, True])
+def test__galaxy_name_image_dict_via_result_from__loads_cache_on_second_call(
+    tmp_path, legacy
+):
+    from astropy.io import fits
+
     from autogalaxy.analysis.adapt_images.adapt_images import (
         galaxy_name_image_dict_via_result_from,
     )
@@ -181,7 +186,11 @@ def test__galaxy_name_image_dict_via_result_from__loads_cache_on_second_call(tmp
     result = _StubCacheResult(tmp_path, image_dict)
     first = galaxy_name_image_dict_via_result_from(result=result)
 
-    assert (tmp_path / "galaxy_images_snr.fits").exists()
+    cache_path = tmp_path / "galaxy_images_snr.fits"
+    assert cache_path.exists()
+    if legacy:
+        with fits.open(cache_path, mode="update") as hdus:
+            del hdus[0].header["CACHEVER"]
 
     # A poisoned result raises if the compute path is taken — the second call
     # must come entirely from the cache written by the first.

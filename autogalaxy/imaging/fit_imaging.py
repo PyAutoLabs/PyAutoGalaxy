@@ -207,11 +207,9 @@ class FitImaging(aa.FitImaging, AbstractFitInversion):
             grid=self.grids.lp, xp=self._xp
         )
 
-        galaxy_linear_obj_image_dict = self.galaxy_linear_obj_data_dict_from(
-            use_operated=False,
+        return self._galaxy_image_dict_with_linear_reconstruction(
+            galaxy_image_dict=galaxy_image_2d_dict, use_operated=False
         )
-
-        return {**galaxy_image_2d_dict, **galaxy_linear_obj_image_dict}
 
     @functools.cached_property
     def galaxy_model_image_dict(self) -> Dict[Galaxy, np.ndarray]:
@@ -235,11 +233,9 @@ class FitImaging(aa.FitImaging, AbstractFitInversion):
             xp=self._xp,
         )
 
-        galaxy_linear_obj_image_dict = self.galaxy_linear_obj_data_dict_from(
-            use_operated=True,
+        return self._galaxy_image_dict_with_linear_reconstruction(
+            galaxy_image_dict=galaxy_blurred_image_2d_dict, use_operated=True
         )
-
-        return {**galaxy_blurred_image_2d_dict, **galaxy_linear_obj_image_dict}
 
     @functools.cached_property
     def subtracted_images_of_galaxies_dict(self) -> Dict[Galaxy, aa.Array2D]:

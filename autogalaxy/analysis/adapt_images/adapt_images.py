@@ -11,6 +11,10 @@ if TYPE_CHECKING:
     from autogalaxy.galaxy.galaxy import Galaxy
 
 
+_GALAXY_IMAGES_CACHE_VERSION_KEY = "CACHEVER"
+_GALAXY_IMAGES_CACHE_VERSION = 1
+
+
 def _galaxy_images_cache_path(result, use_model_images: bool):
     """
     The on-disk cache file for the raw per-galaxy images of a result, inside the
@@ -44,7 +48,20 @@ def _masks_are_equal(mask_0, mask_1) -> bool:
     return bool(np.array_equal(np.asarray(mask_0), np.asarray(mask_1)))
 
 
-def _galaxy_image_dict_from_cache(cache_path, mask=None) -> Optional[Dict]:
+def _result_has_mixed_light(result) -> bool:
+    """Check whether earlier image dictionaries could omit a galaxy's ordinary light."""
+    from autogalaxy.galaxy.galaxies import Galaxies
+    from autogalaxy.interferometer.fit_interferometer import _has_light_profile_non_linear
+
+    return any(
+        galaxy is not None
+        and Galaxies(galaxies=[galaxy]).perform_inversion
+        and _has_light_profile_non_linear([galaxy])
+        for _, galaxy in result.path_galaxy_tuples
+    )
+
+
+def _galaxy_image_dict_from_cache(cache_path, mask=None, result=None) -> Optional[Dict]:
     """
     Load the raw (pre minimum-percent clip) per-galaxy image dictionary from a
     result's cache file, or ``None`` when the file does not exist (the first
@@ -71,7 +88,10 @@ def _galaxy_image_dict_from_cache(cache_path, mask=None) -> Optional[Dict]:
         The cache file to load, or ``None`` when the result cannot cache.
     mask
         The mask the caller expects the cached images to be defined on. When
-        ``None`` no validation is performed.
+        ``None`` no mask validation is performed.
+    result
+        The result used to invalidate older caches when a galaxy has both
+        ordinary light and a linear reconstruction.
     """
     from astropy.io import fits as astropy_fits
 
@@ -83,6 +103,13 @@ def _galaxy_image_dict_from_cache(cache_path, mask=None) -> Optional[Dict]:
 
     with astropy_fits.open(cache_path) as hdu_list:
         header = hdu_list[0].header
+        if (
+            header.get(_GALAXY_IMAGES_CACHE_VERSION_KEY, 0) < _GALAXY_IMAGES_CACHE_VERSION
+            and result is not None
+            and _result_has_mixed_light(result)
+        ):
+            return None
+
         pixel_scales = (
             header[Mask2DKeys.PIXSCAY.value],
             header[Mask2DKeys.PIXSCAX.value],
@@ -131,6 +158,7 @@ def _galaxy_image_dict_to_cache(cache_path, galaxy_name_image_dict: Dict, paths)
         ext_name_list=["mask"] + list(galaxy_name_image_dict.keys()),
         header_dict=next(iter(galaxy_name_image_dict.values())).mask.header_dict,
     )
+    hdu_list[0].header[_GALAXY_IMAGES_CACHE_VERSION_KEY] = _GALAXY_IMAGES_CACHE_VERSION
     hdu_list.writeto(cache_path, overwrite=True)
     paths.preserve_in_zip(cache_path)
 
@@ -196,7 +224,7 @@ def galaxy_name_image_dict_via_result_from(
 
     cache_path = _galaxy_images_cache_path(result, use_model_images=use_model_images)
     raw_image_dict = _galaxy_image_dict_from_cache(
-        cache_path, mask=getattr(result, "mask", None)
+        cache_path, mask=getattr(result, "mask", None), result=result
     )
 
     if raw_image_dict is None:
