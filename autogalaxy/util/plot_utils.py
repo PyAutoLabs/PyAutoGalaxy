@@ -451,11 +451,15 @@ def _caustics_from(mass_obj, grid):
     The algorithm used is controlled by ``general.critical_curves_method`` in
     ``visualize/general.yaml``:
 
-    - ``"zero_contour"`` *(default)* — uses ``jax_zero_contour`` to trace the
-      zero contour of each eigen value directly.  No dense evaluation grid is
-      needed; a coarse 25 × 25 scan finds the seed points automatically.
-    - ``"marching_squares"`` — evaluates eigen values on the full *grid* and
+    - ``"marching_squares"`` *(default)* — evaluates eigen values on the full *grid* and
       uses marching squares to find the contours.
+    - ``"zero_contour"`` traces eigenvalue zero contours directly with
+      ``jax_zero_contour``. JAX currently recompiles on every call. The
+      automatic 25 × 25 seed grid spans only ±3 arcsec on each axis, so it
+      can miss critical curves in group and cluster lenses.
+
+    See the `critical-curve profiling campaign
+    <https://github.com/PyAutoLabs/autolens_profiling/blob/main/wiki/campaigns/lens/critical_curves/critical_curves.md>`_.
 
     Parameters
     ----------
@@ -497,11 +501,17 @@ def _critical_curves_from(mass_obj, grid, tc=None, rc=None):
 
     The algorithm used when *tc* is ``None`` is controlled by
     ``general.critical_curves_method`` in ``visualize/general.yaml``:
-    - ``"zero_contour"`` *(default)* — uses ``jax_zero_contour``; no dense
-      grid needed, seed points found automatically via a coarse grid scan.
-    - ``"marching_squares"`` — evaluates eigen values on the full *grid* and
+
+    - ``"marching_squares"`` *(default)* — evaluates eigen values on the full *grid* and
       uses marching squares.  Radial critical curves are only computed when at
       least one radial critical-curve area exceeds the grid pixel scale.
+    - ``"zero_contour"`` traces eigenvalue zero contours directly with
+      ``jax_zero_contour``. JAX currently recompiles on every call. The
+      automatic 25 × 25 seed grid spans only ±3 arcsec on each axis, so it
+      can miss critical curves in group and cluster lenses.
+
+    See the `critical-curve profiling campaign
+    <https://github.com/PyAutoLabs/autolens_profiling/blob/main/wiki/campaigns/lens/critical_curves/critical_curves.md>`_.
 
     Parameters
     ----------
