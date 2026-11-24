@@ -60,6 +60,7 @@ def sparse_profile_terms_from(
     galaxies: List[Galaxy],
     image: aa.Array2D,
     xp=np,
+    sparse_operator=None,
 ):
     """
     Returns the sparse dirty image and chi-squared data term of the profile-subtracted visibilities
@@ -88,8 +89,15 @@ def sparse_profile_terms_from(
         is Fourier transformed to the fit's `profile_visibilities`.
     xp
         The array module (`numpy` or `jax.numpy`).
+    sparse_operator
+        The sparse operator the fit's inversion uses (`fit.sparse_operator`, which may be one the dataset
+        built lazily), so the correction and the inversion use the same operator. `None` falls back to
+        `dataset.sparse_operator`.
     """
-    if dataset.sparse_operator is None:
+    if sparse_operator is None:
+        sparse_operator = dataset.sparse_operator
+
+    if sparse_operator is None:
         return None, None
 
     if not _has_light_profile_non_linear(galaxies=galaxies):
@@ -97,7 +105,7 @@ def sparse_profile_terms_from(
 
     _, sparse_dirty_image, data_term = (
         aa.util.inversion_interferometer.sparse_profile_terms_from(
-            sparse_operator=dataset.sparse_operator,
+            sparse_operator=sparse_operator,
             image=image,
             extent_index_for_masked_pixel=dataset.real_space_mask.extent_index_for_masked_pixel,
             xp=xp,
@@ -112,6 +120,7 @@ def sparse_dirty_image_from(
     galaxies: List[Galaxy],
     image: aa.Array2D,
     xp=np,
+    sparse_operator=None,
 ) -> Optional[np.ndarray]:
     """
     Returns the dirty image the sparse (w-tilde) inversion of an interferometer fit must use to form its data
@@ -145,9 +154,15 @@ def sparse_dirty_image_from(
         is Fourier transformed to the fit's `profile_visibilities`.
     xp
         The array module (`numpy` or `jax.numpy`).
+    sparse_operator
+        The sparse operator the fit's inversion uses; `None` falls back to `dataset.sparse_operator`.
     """
     return sparse_profile_terms_from(
-        dataset=dataset, galaxies=galaxies, image=image, xp=xp
+        dataset=dataset,
+        galaxies=galaxies,
+        image=image,
+        xp=xp,
+        sparse_operator=sparse_operator,
     )[0]
 
 
@@ -156,6 +171,7 @@ def uses_precomputed_data_term_from(
     galaxies: List[Galaxy],
     data: aa.Visibilities,
     noise_map: aa.VisibilitiesNoiseMap,
+    sparse_operator=None,
 ) -> bool:
     """
     Returns whether the inversion of an interferometer fit can read the data term `d^T N^-1 d` of its
@@ -194,8 +210,13 @@ def uses_precomputed_data_term_from(
         The visibilities the fit is fitting (`fit.data`).
     noise_map
         The noise-map the fit uses (`fit.noise_map`).
+    sparse_operator
+        The sparse operator the fit's inversion uses (`fit.sparse_operator`). An operator the dataset built
+        lazily (`sparse_operator_for`) is built from the dataset's own data and noise-map, so its cached
+        `data_term` is valid under the same identity checks. `None` falls back to `dataset.sparse_operator`.
     """
-    sparse_operator = getattr(dataset, "sparse_operator", None)
+    if sparse_operator is None:
+        sparse_operator = getattr(dataset, "sparse_operator", None)
 
     if getattr(sparse_operator, "data_term", None) is None:
         return False
@@ -253,7 +274,7 @@ def _require_no_array_free_overrides(fit):
         )
 
 
-def sparse_chi_squared_from(fit, galaxies: List[Galaxy]):
+def sparse_chi_squared_from(fit, galaxies: List[Galaxy], sparse_operator=None):
     """
     Returns the chi-squared `sum(|d - F m|^2 / sigma^2)` of an interferometer fit computed from its dataset's
     `sparse_operator` without any visibility-sized array, by applying the data-term identity to the fit's total
@@ -281,8 +302,15 @@ def sparse_chi_squared_from(fit, galaxies: List[Galaxy]):
         `perform_inversion`, `inversion` and `_xp`.
     galaxies
         The fit's galaxies, checked for ordinary light profiles.
+    sparse_operator
+        The sparse operator to use. `None` uses the fit's resolved `fit.sparse_operator` (the one its
+        inversion uses) when the fit has one, else `fit.dataset.sparse_operator`.
     """
-    sparse_operator = fit.dataset.sparse_operator
+    if sparse_operator is None:
+        sparse_operator = getattr(fit, "sparse_operator", None)
+
+    if sparse_operator is None:
+        sparse_operator = fit.dataset.sparse_operator
 
     if sparse_operator is None:
         return None
@@ -438,7 +466,9 @@ class FitInterferometer(aa.FitInterferometer, AbstractFitInversion):
         `DatasetException` if the fit overrides an array-free dataset's data or noise-map. Every branch is
         structural, so it is safe under `jax.jit`, where the value is traced with the model's parameters.
         """
-        return sparse_chi_squared_from(fit=self, galaxies=self.galaxies)
+        return sparse_chi_squared_from(
+            fit=self, galaxies=self.galaxies, sparse_operator=self.sparse_operator
+        )
 
     @property
     def _uses_precomputed_data_term(self) -> bool:
@@ -453,6 +483,7 @@ class FitInterferometer(aa.FitInterferometer, AbstractFitInversion):
             galaxies=self.galaxies,
             data=self.data,
             noise_map=self.noise_map,
+            sparse_operator=self.sparse_operator,
         )
 
     @property
@@ -485,6 +516,7 @@ class FitInterferometer(aa.FitInterferometer, AbstractFitInversion):
             galaxies=self.galaxies,
             image=self.profile_image,
             xp=self._xp,
+            sparse_operator=self.sparse_operator,
         )
 
         if self._uses_precomputed_data_term:
@@ -498,7 +530,7 @@ class FitInterferometer(aa.FitInterferometer, AbstractFitInversion):
             noise_map=self.noise_map,
             grids=self.grids,
             transformer=self.dataset.transformer,
-            sparse_operator=self.dataset.sparse_operator,
+            sparse_operator=self.sparse_operator,
             sparse_dirty_image=sparse_dirty_image,
             data_term=data_term,
         )

@@ -12,6 +12,7 @@ import autoarray as aa
 from autogalaxy.analysis.adapt_images.adapt_images import AdaptImages
 from autogalaxy.cosmology.model import LensingCosmology
 from autogalaxy.analysis.analysis.analysis import Analysis
+from autogalaxy.analysis.analysis.setup import AnalysisSetupMixin
 from autogalaxy.analysis.result import ResultDataset
 from autogalaxy.analysis import setup_util
 
@@ -20,7 +21,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(level="INFO")
 
 
-class AnalysisDataset(Analysis):
+class AnalysisDataset(AnalysisSetupMixin, Analysis):
     # Lensing latents (e.g. effective Einstein radius via
     # `LensCalc.einstein_radius_jit_from`) call into `jax_zero_contour.ZeroSolver`,
     # which upstream documents as incompatible with `jax.vmap` (uses
@@ -86,9 +87,7 @@ class AnalysisDataset(Analysis):
             **kwargs,
         )
 
-        self.setup_input = setup_util.setup_input_from(setup)
-        self.setup = None
-        self.setup_chosen_by = None
+        self._init_setup(setup)
 
         self.dataset = dataset
         self.adapt_images = adapt_images
@@ -147,97 +146,28 @@ class AnalysisDataset(Analysis):
     @staticmethod
     def _setup_environment():
         """
-        The detected hardware (`autonerves.environment.Environment`), or `None` if detection fails.
+        The detected hardware (`autonerves.environment.Environment`), or `None` if detection fails
+        (kept for backwards compatibility; see `setup_util.setup_environment`).
         """
-        try:
-            from autonerves.environment import Environment
+        return setup_util.setup_environment()
 
-            return Environment.detect()
-        except Exception as e:
-            logger.debug(f"Setup: hardware detection failed: {e}")
-            return None
-
-    def resolve_setup(self, model: af.Collection):
+    def setup_key_and_note_from(self, model: af.Collection):
         """
-        Resolve the `setup` input of the analysis against the model and apply it.
-
-        With no `setup` input nothing changes: one log line reports what `setup="auto"` would choose (any
-        error working that out is ignored).
-
-        With `setup="auto"` the setup is chosen by `aa.Setup.auto` from the rule key of the dataset and
-        model (see `setup_util.setup_key_from`); `PYAUTO_SETUP=<setup_id>` overrides it. An explicit
-        `aa.Setup` or setup_id is used as given. The resolved setup then:
-
-        - sets the analysis backend (`_use_jax = setup.backend == "jax"`, falling back to numpy when JAX is
-          disabled or not installed, as `af.Analysis` does);
-        - is applied to the dataset (`dataset.apply_setup`), which attaches the operator it names;
-        - is checked against the dataset operator and backend with the inversion factory's check, so a
-          mismatch raises an `InversionException` here rather than rejecting every sample;
-        - pins the thread pools (`setup.apply_threads()`);
-        - is logged as the setup banner line and stored as `self.setup`.
-
-        Parameters
-        ----------
-        model
-            The model fitted by the search, which decides the rule variant (pixelization mesh or MGE).
+        The `(dataset_type, variant)` rule key of `aa.Setup.auto` for this analysis's dataset and the
+        model (see `setup_util.setup_key_and_note_from`), plus a note when the nearest rule was used.
         """
-        setup_input = getattr(self, "setup_input", None)
+        return setup_util.setup_key_and_note_from(dataset=self.dataset, model=model)
 
-        if setup_input is None:
-            self._log_setup_auto_would_choose(model=model)
-            return
-
-        note = None
-
-        if setup_input == setup_util.SETUP_AUTO:
-            environment = self._setup_environment()
-            key, note = setup_util.setup_key_and_note_from(
-                dataset=self.dataset, model=model
-            )
-            setup = aa.Setup.auto(*key, environment=environment)
-            chosen_by = setup_util.chosen_by_from(setup=setup, auto=True)
-        else:
-            environment = self._setup_environment()
-            setup = setup_input
-            chosen_by = setup_util.chosen_by_from(setup=setup, auto=False)
-
-        self._use_jax = setup_util.use_jax_from(setup.backend == "jax")
-
+    def _apply_resolved_setup(self, setup: aa.Setup):
+        """
+        Apply the resolved setup to the dataset (`dataset.apply_setup`), which attaches the operator it
+        names, then check the operator against the setup and the resolved backend with the inversion
+        factory's check, so a mismatch raises an `InversionException` here rather than rejecting every
+        sample. Called by `resolve_setup` (`AnalysisSetupMixin`) after `_use_jax` is set.
+        """
         self.dataset = self.dataset.apply_setup(setup)
 
         setup_util.check_setup_consistency(dataset=self.dataset, use_jax=self._use_jax)
-
-        setup.apply_threads()
-
-        self.setup = setup
-        self.setup_chosen_by = chosen_by
-
-        logger.info(
-            setup_util.setup_banner_from(
-                setup=setup,
-                chosen_by=chosen_by,
-                environment=environment,
-                note=note,
-            )
-        )
-
-    def _log_setup_auto_would_choose(self, model: af.Collection):
-        """
-        Log one line reporting the setup `setup="auto"` would choose, applying nothing.
-        """
-        try:
-            key, _ = setup_util.setup_key_and_note_from(
-                dataset=self.dataset, model=model
-            )
-            setup = aa.Setup.auto(*key, environment=self._setup_environment())
-        except Exception as e:
-            logger.debug(f"Setup: could not work out what setup='auto' would choose: {e}")
-            return
-
-        logger.info(
-            f"Setup: auto would choose {setup.setup_id} (rule {setup.rule_id}); "
-            f'pass setup="auto" to use it'
-        )
 
     @staticmethod
     def _save_dataset_fits(paths: af.AbstractPaths, hdu_list: HDUList) -> None:
@@ -296,15 +226,7 @@ class AnalysisDataset(Analysis):
             object_dict=to_dict(self.cosmology),
         )
 
-        setup = getattr(self, "setup", None)
-
-        if setup is not None:
-            paths.save_json(
-                name="setup",
-                object_dict=setup_util.setup_dict_from(
-                    setup=setup, chosen_by=self.setup_chosen_by
-                ),
-            )
+        self.save_setup(paths=paths)
 
     def save_results(self, paths: af.DirectoryPaths, result: ResultDataset):
         """

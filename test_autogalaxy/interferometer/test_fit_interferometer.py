@@ -1679,3 +1679,262 @@ def test__galaxy_image_dict__adds_ordinary_and_linear_light(
     with fits.open(cache_path) as hdus:
         assert hdus[0].header["CACHEVER"] == 1
         np.testing.assert_allclose(hdus[1].data, expected.native_for_fits)
+
+
+# The lazy sparse operator (`dataset.sparse_operator_for`) reached through `fit.sparse_operator`.
+
+LAZY_ON = aa.Settings(lazy_sparse_operator="auto")
+
+
+@pytest.fixture(name="no_ambient_setup")
+def make_no_ambient_setup(monkeypatch):
+    # An ambient `PYAUTO_SETUP=auto` turns the lazy policy on; these tests set it explicitly.
+    monkeypatch.delenv("PYAUTO_SETUP", raising=False)
+
+
+def _pixelization_and_light_profile_galaxies():
+    pixelization = ag.Pixelization(
+        mesh=ag.mesh.RectangularUniform(shape=(3, 3)),
+        regularization=ag.reg.Constant(coefficient=1.0),
+    )
+
+    return [
+        ag.Galaxy(redshift=0.5, bulge=ag.lp.Sersic(intensity=0.1, centre=(0.05, 0.05))),
+        ag.Galaxy(redshift=0.5, pixelization=pixelization),
+    ]
+
+
+def test__sparse_operator__lazy_policy_off__dense_and_nothing_built(
+    interferometer_7, no_ambient_setup
+):
+    fit = ag.FitInterferometer(
+        dataset=interferometer_7, galaxies=_pixelization_only_galaxies()
+    )
+
+    assert fit.sparse_operator is None
+    assert isinstance(fit.inversion, aa.InversionInterferometerMapping)
+    assert interferometer_7._lazy_sparse_operator is None
+
+
+def test__sparse_operator__lazy_policy_on__pixelization_only__matches_dense_built_once(
+    interferometer_7, no_ambient_setup
+):
+    pytest.importorskip("finufft")
+
+    galaxies = _pixelization_only_galaxies()
+
+    fit_dense = ag.FitInterferometer(dataset=interferometer_7, galaxies=galaxies)
+
+    fit = ag.FitInterferometer(
+        dataset=interferometer_7, galaxies=galaxies, settings=LAZY_ON
+    )
+
+    operator = fit.sparse_operator
+
+    assert operator is not None
+    assert interferometer_7.sparse_operator is None
+    assert interferometer_7._lazy_sparse_operator is operator
+    assert isinstance(fit.inversion, aa.InversionInterferometerSparse)
+    assert fit.inversion.dataset.sparse_operator is operator
+
+    # The lazily built operator is built from the dataset's own visibilities and noise-map, so its cached
+    # data term is valid and the inversion reads it instead of the visibilities.
+    assert fit._uses_precomputed_data_term
+    assert fit.inversion.dataset.data is None
+
+    assert fit.log_likelihood == pytest.approx(fit_dense.log_likelihood, rel=1.0e-8)
+    assert fit.figure_of_merit == pytest.approx(fit_dense.figure_of_merit, rel=1.0e-8)
+
+    fit_again = ag.FitInterferometer(
+        dataset=interferometer_7, galaxies=galaxies, settings=LAZY_ON
+    )
+
+    assert fit_again.sparse_operator is operator
+
+
+def test__sparse_operator__lazy_policy_on__pixelization_and_light_profile__dirty_image_correction_matches_dense(
+    interferometer_7, no_ambient_setup
+):
+    pytest.importorskip("finufft")
+
+    galaxies = _pixelization_and_light_profile_galaxies()
+
+    fit_dense = ag.FitInterferometer(dataset=interferometer_7, galaxies=galaxies)
+
+    fit = ag.FitInterferometer(
+        dataset=interferometer_7, galaxies=galaxies, settings=LAZY_ON
+    )
+
+    operator = fit.sparse_operator
+
+    assert operator is not None
+    assert isinstance(fit.inversion, aa.InversionInterferometerSparse)
+    assert fit.inversion.dataset.sparse_operator is operator
+
+    # The ordinary light profile is subtracted, so the inversion's dirty image is corrected (`d~ - W~ i_p`)
+    # with the same, lazily built, operator, and the array path is kept.
+    assert fit.inversion.dataset.sparse_dirty_image is not None
+    assert not fit._uses_precomputed_data_term
+    assert fit.inversion.dataset.data is not None
+
+    expected_dirty_image = ag.interferometer.fit_interferometer.sparse_dirty_image_from(
+        dataset=interferometer_7,
+        galaxies=galaxies,
+        image=fit.profile_image,
+        sparse_operator=operator,
+    )
+
+    np.testing.assert_allclose(
+        fit.inversion.dataset.sparse_dirty_image, expected_dirty_image, rtol=1.0e-12
+    )
+
+    assert fit.log_likelihood == pytest.approx(fit_dense.log_likelihood, rel=1.0e-8)
+    assert fit.log_evidence == pytest.approx(fit_dense.log_evidence, rel=1.0e-8)
+
+    # The sparse chi-squared reads the same operator and is the dense residual chi-squared.
+    assert fit.sparse_chi_squared == pytest.approx(fit_dense.chi_squared, rel=1.0e-8)
+
+
+def test__sparse_operator__lazy_policy_on__mge_only_builds_nothing(
+    interferometer_7, no_ambient_setup, monkeypatch
+):
+    built = []
+    monkeypatch.setattr(
+        aa.Interferometer,
+        "apply_sparse_operator",
+        lambda self, **kwargs: built.append(1),
+    )
+
+    galaxies = [
+        ag.Galaxy(
+            redshift=0.5,
+            bulge=ag.lp_basis.Basis(
+                profile_list=[
+                    ag.lp_linear.Gaussian(sigma=0.5, centre=(0.05, 0.05)),
+                    ag.lp_linear.Gaussian(sigma=1.5, centre=(0.05, 0.05)),
+                ]
+            ),
+        )
+    ]
+
+    fit = ag.FitInterferometer(
+        dataset=interferometer_7, galaxies=galaxies, settings=LAZY_ON
+    )
+
+    assert fit.sparse_operator is None
+    fit.figure_of_merit
+
+    assert built == []
+    assert interferometer_7._lazy_sparse_operator is None
+
+
+def test__sparse_operator__lazy_policy_on__jax_xp_builds_nothing(
+    interferometer_7, no_ambient_setup, monkeypatch
+):
+    pytest.importorskip("jax")
+
+    import jax.numpy as jnp
+
+    built = []
+    monkeypatch.setattr(
+        aa.Interferometer,
+        "apply_sparse_operator",
+        lambda self, **kwargs: built.append(1),
+    )
+
+    fit = ag.FitInterferometer(
+        dataset=interferometer_7,
+        galaxies=_pixelization_only_galaxies(),
+        settings=LAZY_ON,
+        xp=jnp,
+    )
+
+    assert fit.sparse_operator is None
+    assert built == []
+
+
+def test__sparse_operator__linear_light_only__attached_operator_unchanged(
+    interferometer_7, no_ambient_setup
+):
+    dataset_sparse = interferometer_7.apply_sparse_operator(use_jax=False)
+
+    galaxies = [
+        ag.Galaxy(
+            redshift=0.5,
+            bulge=ag.lp_linear.Gaussian(sigma=0.5, centre=(0.05, 0.05)),
+            disk=ag.lp_linear.Gaussian(sigma=1.5, centre=(0.05, 0.05)),
+        )
+    ]
+
+    for settings in (None, LAZY_ON):
+        fit = ag.FitInterferometer(
+            dataset=dataset_sparse, galaxies=galaxies, settings=settings
+        )
+
+        assert fit.total_mappers == 0
+        assert fit.sparse_operator is dataset_sparse.sparse_operator
+        assert fit.inversion.dataset.sparse_operator is dataset_sparse.sparse_operator
+        assert fit._uses_precomputed_data_term
+
+        fit_dense = ag.FitInterferometer(
+            dataset=interferometer_7, galaxies=galaxies, settings=settings
+        )
+
+        assert fit.log_likelihood == pytest.approx(fit_dense.log_likelihood, rel=1.0e-8)
+
+
+def test__interferometer_helpers__sparse_operator_argument__defaults_to_dataset_operator(
+    interferometer_7,
+):
+    """
+    The profile-subtraction helpers take the fit's resolved operator; called without one (as PyAutoLens does
+    until it passes its own) they fall back to the dataset's attached operator, exactly as before.
+    """
+    from autogalaxy.interferometer import fit_interferometer as fi
+
+    dataset_sparse = interferometer_7.apply_sparse_operator(use_jax=False)
+
+    galaxies = _pixelization_and_light_profile_galaxies()
+
+    fit = ag.FitInterferometer(dataset=dataset_sparse, galaxies=galaxies)
+
+    default = fi.sparse_profile_terms_from(
+        dataset=dataset_sparse, galaxies=galaxies, image=fit.profile_image
+    )
+    explicit = fi.sparse_profile_terms_from(
+        dataset=dataset_sparse,
+        galaxies=galaxies,
+        image=fit.profile_image,
+        sparse_operator=dataset_sparse.sparse_operator,
+    )
+
+    np.testing.assert_array_equal(default[0], explicit[0])
+    assert default[1] == explicit[1]
+
+    # Without any operator nothing is corrected.
+    assert fi.sparse_profile_terms_from(
+        dataset=interferometer_7, galaxies=galaxies, image=fit.profile_image
+    ) == (None, None)
+
+    assert fi.uses_precomputed_data_term_from(
+        dataset=interferometer_7,
+        galaxies=_pixelization_only_galaxies(),
+        data=interferometer_7.data,
+        noise_map=interferometer_7.noise_map,
+    ) is False
+    assert fi.uses_precomputed_data_term_from(
+        dataset=interferometer_7,
+        galaxies=_pixelization_only_galaxies(),
+        data=interferometer_7.data,
+        noise_map=interferometer_7.noise_map,
+        sparse_operator=dataset_sparse.sparse_operator,
+    ) is True
+
+    assert fi.sparse_chi_squared_from(
+        fit=fit, galaxies=galaxies
+    ) == pytest.approx(
+        fi.sparse_chi_squared_from(
+            fit=fit, galaxies=galaxies, sparse_operator=dataset_sparse.sparse_operator
+        ),
+        rel=1.0e-14,
+    )
