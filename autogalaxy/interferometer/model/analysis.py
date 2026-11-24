@@ -272,6 +272,7 @@ class AnalysisInterferometer(AnalysisDataset):
         settings: aa.Settings = None,
         title_prefix: str = None,
         use_jax: bool = True,
+        setup=None,
         **kwargs,
     ):
         """
@@ -303,6 +304,12 @@ class AnalysisInterferometer(AnalysisDataset):
         title_prefix
             A string that is added before the title of all figures output by visualization, for example to
             put the name of the dataset and galaxy in the title.
+        use_jax
+            Whether the likelihood is evaluated with JAX; honoured as given when `setup` is `None`.
+        setup
+            The compute setup of the likelihood: `None` (default, nothing changes), `"auto"` (the designated
+            setup for the likelihood and hardware, chosen at fit start from the model), an `aa.Setup` or a
+            setup_id string. See `AnalysisDataset`.
         """
         super().__init__(
             dataset=dataset,
@@ -311,6 +318,7 @@ class AnalysisInterferometer(AnalysisDataset):
             settings=settings,
             title_prefix=title_prefix,
             use_jax=use_jax,
+            setup=setup,
             **kwargs,
         )
 

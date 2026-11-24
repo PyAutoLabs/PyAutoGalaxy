@@ -1039,3 +1039,103 @@ def test__save_attributes__registers_dataset_fits_in_database(
             database_dataset.uv_wavelengths, directory_dataset.uv_wavelengths
         )
         assert type(database_dataset.transformer) is type(directory_dataset.transformer)
+
+
+# --- setup="auto" (likelihood lifecycle 5C) ---------------------------------------------
+
+import pytest
+
+from autonerves.environment import Environment
+
+
+def _environment(gpu=False, gpu_name=None, cores=64):
+    return Environment(
+        gpu=gpu,
+        gpu_name=gpu_name,
+        gpu_memory_gb=None,
+        cores=cores,
+        ram_gb=None,
+        numba=True,
+        nufftax=True,
+        site="local",
+    )
+
+
+@pytest.fixture(autouse=True)
+def unset_setup_env(monkeypatch):
+    monkeypatch.delenv("PYAUTO_SETUP", raising=False)
+    monkeypatch.delenv("PYAUTO_DISABLE_JAX", raising=False)
+
+
+def _rectangular_model():
+    pixelization = af.Model(
+        ag.Pixelization,
+        mesh=ag.mesh.RectangularUniform(shape=(3, 3)),
+        regularization=ag.reg.Constant,
+    )
+    return af.Collection(
+        galaxies=af.Collection(
+            source=af.Model(ag.Galaxy, redshift=1.0, pixelization=pixelization)
+        )
+    )
+
+
+def test__setup_auto__cpu_many_core_rectangular__numba_wtilde_sparse_operator(
+    interferometer_7, monkeypatch
+):
+    pytest.importorskip("finufft")
+
+    monkeypatch.setattr(
+        Environment, "detect", classmethod(lambda cls: _environment(cores=64))
+    )
+
+    analysis = ag.AnalysisInterferometer(
+        dataset=interferometer_7, setup="auto", use_jax=True
+    )
+    analysis.modify_before_fit(paths=af.DirectoryPaths(), model=_rectangular_model())
+
+    assert analysis.setup.setup_id == "numba_cpu_sparse_fp64_wtilde"
+    assert analysis._use_jax is False
+    assert analysis.dataset.sparse_operator is not None
+    assert analysis.dataset.setup == analysis.setup
+
+
+def test__setup_auto__gpu_mge__jax_dense_nufft(interferometer_7, monkeypatch):
+    pytest.importorskip("jax")
+
+    monkeypatch.setattr(
+        Environment,
+        "detect",
+        classmethod(
+            lambda cls: _environment(gpu=True, gpu_name="NVIDIA A100-SXM4-80GB")
+        ),
+    )
+
+    model = af.Collection(
+        galaxies=af.Collection(
+            galaxy=af.Model(ag.Galaxy, redshift=0.5, light=ag.lp.Sersic)
+        )
+    )
+
+    analysis = ag.AnalysisInterferometer(
+        dataset=interferometer_7, setup="auto", use_jax=False
+    )
+    analysis.modify_before_fit(paths=af.DirectoryPaths(), model=model)
+
+    assert analysis.setup.setup_id == "jax_gpu_dense_fp64_nufft"
+    assert analysis._use_jax is True
+    assert analysis.dataset.sparse_operator is None
+    assert isinstance(analysis.dataset.transformer, ag.TransformerNUFFT)
+
+
+def test__no_setup__dataset_unchanged(interferometer_7, monkeypatch):
+    monkeypatch.setattr(
+        Environment, "detect", classmethod(lambda cls: _environment(cores=64))
+    )
+
+    analysis = ag.AnalysisInterferometer(dataset=interferometer_7, use_jax=False)
+    analysis.modify_before_fit(paths=af.DirectoryPaths(), model=_rectangular_model())
+
+    assert analysis.dataset is interferometer_7
+    assert analysis._use_jax is False
+    assert analysis.setup is None

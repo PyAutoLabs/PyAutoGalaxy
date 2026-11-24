@@ -13,6 +13,7 @@ from autogalaxy.analysis.adapt_images.adapt_images import AdaptImages
 from autogalaxy.cosmology.model import LensingCosmology
 from autogalaxy.analysis.analysis.analysis import Analysis
 from autogalaxy.analysis.result import ResultDataset
+from autogalaxy.analysis import setup_util
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +38,7 @@ class AnalysisDataset(Analysis):
         settings: aa.Settings = None,
         title_prefix: str = None,
         use_jax: bool = True,
+        setup=None,
         **kwargs,
     ):
         """
@@ -61,12 +63,32 @@ class AnalysisDataset(Analysis):
         title_prefix
             A string that is added before the title of all figures output by visualization, for example to
             put the name of the dataset and galaxy in the title.
+        use_jax
+            Whether the likelihood is evaluated with JAX. It is honoured as given when `setup` is `None`; a
+            resolved `setup` sets the backend instead.
+        setup
+            The compute setup of the likelihood (backend, device, operator, precision, transformer): `None`,
+            `"auto"`, an `aa.Setup` or a setup_id string such as `"numba_cpu_sparse_fp64"`. It is resolved in
+            `modify_before_fit`, because the rule key needs the model (pixelization mesh or MGE):
+
+            - `None` (the default): nothing changes; one log line reports what `"auto"` would choose.
+            - `"auto"`: `aa.Setup.auto` chooses the designated setup for the likelihood and hardware
+              (`PYAUTO_SETUP=<setup_id>` overrides it).
+            - An `aa.Setup` or setup_id string: that setup is used as given.
+
+            A resolved setup sets the analysis backend, is applied to the dataset (`dataset.apply_setup`),
+            checked for an operator / backend mismatch, pins the thread pools, is logged as a banner line and
+            is written to `files/setup.json`.
         """
         super().__init__(
             cosmology=cosmology,
             use_jax=use_jax,
             **kwargs,
         )
+
+        self.setup_input = setup_util.setup_input_from(setup)
+        self.setup = None
+        self.setup_chosen_by = None
 
         self.dataset = dataset
         self.adapt_images = adapt_images
@@ -94,6 +116,11 @@ class AnalysisDataset(Analysis):
             the imaging data.
         """
 
+        # The setup is resolved first: applying it may rebuild the dataset, so the grids below are
+        # preloaded on the dataset the likelihood will use.
+
+        self.resolve_setup(model=model)
+
         # Ensures preloaded in memory so repeated calls are fast
 
         self.dataset.grids.lp
@@ -116,6 +143,101 @@ class AnalysisDataset(Analysis):
         super().modify_before_fit(paths=paths, model=model)
 
         return self
+
+    @staticmethod
+    def _setup_environment():
+        """
+        The detected hardware (`autonerves.environment.Environment`), or `None` if detection fails.
+        """
+        try:
+            from autonerves.environment import Environment
+
+            return Environment.detect()
+        except Exception as e:
+            logger.debug(f"Setup: hardware detection failed: {e}")
+            return None
+
+    def resolve_setup(self, model: af.Collection):
+        """
+        Resolve the `setup` input of the analysis against the model and apply it.
+
+        With no `setup` input nothing changes: one log line reports what `setup="auto"` would choose (any
+        error working that out is ignored).
+
+        With `setup="auto"` the setup is chosen by `aa.Setup.auto` from the rule key of the dataset and
+        model (see `setup_util.setup_key_from`); `PYAUTO_SETUP=<setup_id>` overrides it. An explicit
+        `aa.Setup` or setup_id is used as given. The resolved setup then:
+
+        - sets the analysis backend (`_use_jax = setup.backend == "jax"`, falling back to numpy when JAX is
+          disabled or not installed, as `af.Analysis` does);
+        - is applied to the dataset (`dataset.apply_setup`), which attaches the operator it names;
+        - is checked against the dataset operator and backend with the inversion factory's check, so a
+          mismatch raises an `InversionException` here rather than rejecting every sample;
+        - pins the thread pools (`setup.apply_threads()`);
+        - is logged as the setup banner line and stored as `self.setup`.
+
+        Parameters
+        ----------
+        model
+            The model fitted by the search, which decides the rule variant (pixelization mesh or MGE).
+        """
+        setup_input = getattr(self, "setup_input", None)
+
+        if setup_input is None:
+            self._log_setup_auto_would_choose(model=model)
+            return
+
+        note = None
+
+        if setup_input == setup_util.SETUP_AUTO:
+            environment = self._setup_environment()
+            key, note = setup_util.setup_key_and_note_from(
+                dataset=self.dataset, model=model
+            )
+            setup = aa.Setup.auto(*key, environment=environment)
+            chosen_by = setup_util.chosen_by_from(setup=setup, auto=True)
+        else:
+            environment = self._setup_environment()
+            setup = setup_input
+            chosen_by = setup_util.chosen_by_from(setup=setup, auto=False)
+
+        self._use_jax = setup_util.use_jax_from(setup.backend == "jax")
+
+        self.dataset = self.dataset.apply_setup(setup)
+
+        setup_util.check_setup_consistency(dataset=self.dataset, use_jax=self._use_jax)
+
+        setup.apply_threads()
+
+        self.setup = setup
+        self.setup_chosen_by = chosen_by
+
+        logger.info(
+            setup_util.setup_banner_from(
+                setup=setup,
+                chosen_by=chosen_by,
+                environment=environment,
+                note=note,
+            )
+        )
+
+    def _log_setup_auto_would_choose(self, model: af.Collection):
+        """
+        Log one line reporting the setup `setup="auto"` would choose, applying nothing.
+        """
+        try:
+            key, _ = setup_util.setup_key_and_note_from(
+                dataset=self.dataset, model=model
+            )
+            setup = aa.Setup.auto(*key, environment=self._setup_environment())
+        except Exception as e:
+            logger.debug(f"Setup: could not work out what setup='auto' would choose: {e}")
+            return
+
+        logger.info(
+            f"Setup: auto would choose {setup.setup_id} (rule {setup.rule_id}); "
+            f'pass setup="auto" to use it'
+        )
 
     @staticmethod
     def _save_dataset_fits(paths: af.AbstractPaths, hdu_list: HDUList) -> None:
@@ -144,6 +266,7 @@ class AnalysisDataset(Analysis):
         - The settings associated with the inversion.
         - The settings associated with the pixelization.
         - The Cosmology.
+        - The resolved compute setup (`setup.json`), when a `setup` was given.
 
         The dataset itself is output as `dataset.fits` to the `image` folder by the `save_attributes` method of
         each dataset-specific subclass (e.g. `AnalysisImaging`), with the mask in its `PrimaryHDU`.
@@ -172,6 +295,16 @@ class AnalysisDataset(Analysis):
             name="cosmology",
             object_dict=to_dict(self.cosmology),
         )
+
+        setup = getattr(self, "setup", None)
+
+        if setup is not None:
+            paths.save_json(
+                name="setup",
+                object_dict=setup_util.setup_dict_from(
+                    setup=setup, chosen_by=self.setup_chosen_by
+                ),
+            )
 
     def save_results(self, paths: af.DirectoryPaths, result: ResultDataset):
         """
