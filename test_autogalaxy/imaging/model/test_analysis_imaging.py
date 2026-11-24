@@ -116,3 +116,221 @@ def test__save_attributes__registers_dataset_fits_in_database(masked_imaging_7x7
     np.testing.assert_array_equal(
         database_dataset.psf.kernel.array, directory_dataset.psf.kernel.array
     )
+
+
+# --- setup="auto" (likelihood lifecycle 5C) ---------------------------------------------
+
+import json
+import logging
+
+import pytest
+
+import autoarray as aa
+
+from autonerves.environment import Environment
+
+
+def _environment(gpu=False, gpu_name=None, cores=64):
+    return Environment(
+        gpu=gpu,
+        gpu_name=gpu_name,
+        gpu_memory_gb=None,
+        cores=cores,
+        ram_gb=None,
+        numba=True,
+        nufftax=True,
+        site="local",
+    )
+
+
+MANY_CORE = _environment(cores=64)
+A100 = _environment(gpu=True, gpu_name="NVIDIA A100-SXM4-80GB")
+
+
+@pytest.fixture(autouse=True)
+def unset_setup_env(monkeypatch):
+    monkeypatch.delenv("PYAUTO_SETUP", raising=False)
+    monkeypatch.delenv("PYAUTO_DISABLE_JAX", raising=False)
+
+
+def _detect(monkeypatch, environment):
+    monkeypatch.setattr(Environment, "detect", classmethod(lambda cls: environment))
+
+
+def _rectangular_model():
+    pixelization = af.Model(
+        ag.Pixelization,
+        mesh=ag.mesh.RectangularUniform(shape=(3, 3)),
+        regularization=ag.reg.Constant,
+    )
+    return af.Collection(
+        galaxies=af.Collection(
+            source=af.Model(ag.Galaxy, redshift=1.0, pixelization=pixelization)
+        )
+    )
+
+
+def _mge_model():
+    basis = af.Model(
+        ag.lp_basis.Basis,
+        profile_list=[af.Model(ag.lp_linear.Gaussian) for _ in range(3)],
+    )
+    return af.Collection(
+        galaxies=af.Collection(galaxy=af.Model(ag.Galaxy, redshift=0.5, bulge=basis))
+    )
+
+
+def test__setup_auto__cpu_many_core_rectangular__numba_sparse_operator(
+    masked_imaging_7x7, monkeypatch, caplog
+):
+    pytest.importorskip("numba")
+    from autoarray.inversion.inversion.imaging_numba.inversion_imaging_numba_util import (
+        SparseLinAlgImagingNumba,
+    )
+
+    _detect(monkeypatch, MANY_CORE)
+
+    analysis = ag.AnalysisImaging(
+        dataset=masked_imaging_7x7, setup="auto", use_jax=True
+    )
+
+    with caplog.at_level(logging.INFO):
+        result = analysis.modify_before_fit(
+            paths=af.DirectoryPaths(), model=_rectangular_model()
+        )
+
+    assert result is analysis
+    assert analysis.setup.setup_id == "numba_cpu_sparse_fp64"
+    assert analysis.setup_chosen_by == "auto"
+    assert analysis._use_jax is False
+    assert analysis.dataset.setup == analysis.setup
+    assert isinstance(analysis.dataset.sparse_operator, SparseLinAlgImagingNumba)
+
+    banners = [r.message for r in caplog.records if r.message.startswith("Setup: ")]
+
+    assert banners == [
+        "Setup: numba/cpu/sparse/fp64 (64 CPU cores) · rule "
+        "imaging-rectangular-standard-cpu-many-core · optimal (decision "
+        "imaging-rectangular-standard-cpu-many-core) · override: PYAUTO_SETUP"
+    ]
+
+
+def test__setup_auto__gpu_rectangular__jax_dense_no_operator(
+    masked_imaging_7x7, monkeypatch
+):
+    pytest.importorskip("jax")
+
+    _detect(monkeypatch, A100)
+
+    analysis = ag.AnalysisImaging(
+        dataset=masked_imaging_7x7, setup="auto", use_jax=False
+    )
+    analysis.modify_before_fit(paths=af.DirectoryPaths(), model=_rectangular_model())
+
+    assert analysis.setup.setup_id == "jax_gpu_dense_fp64"
+    assert analysis.setup.extrapolated is False
+    assert analysis._use_jax is True
+    assert analysis.dataset.sparse_operator is None
+
+
+def test__setup_auto__cpu_mge__jax_dense(masked_imaging_7x7, monkeypatch):
+    pytest.importorskip("jax")
+
+    _detect(monkeypatch, MANY_CORE)
+
+    analysis = ag.AnalysisImaging(
+        dataset=masked_imaging_7x7, setup="auto", use_jax=False
+    )
+    analysis.modify_before_fit(paths=af.DirectoryPaths(), model=_mge_model())
+
+    assert analysis.setup.setup_id == "jax_cpu_dense_fp64"
+    assert analysis._use_jax is True
+    assert analysis.dataset.sparse_operator is None
+
+
+def test__setup_auto__disable_jax_falls_back_to_numpy(masked_imaging_7x7, monkeypatch):
+    _detect(monkeypatch, A100)
+    monkeypatch.setenv("PYAUTO_DISABLE_JAX", "1")
+
+    analysis = ag.AnalysisImaging(dataset=masked_imaging_7x7, setup="auto")
+    analysis.modify_before_fit(paths=af.DirectoryPaths(), model=_rectangular_model())
+
+    assert analysis.setup.setup_id == "jax_gpu_dense_fp64"
+    assert analysis._use_jax is False
+
+
+def test__setup_auto__pyauto_setup_env_wins(masked_imaging_7x7, monkeypatch, tmp_path):
+    _detect(monkeypatch, A100)
+    monkeypatch.setenv("PYAUTO_SETUP", "numba_cpu_dense_fp64")
+
+    analysis = ag.AnalysisImaging(dataset=masked_imaging_7x7, setup="auto")
+    analysis.modify_before_fit(paths=af.DirectoryPaths(), model=_rectangular_model())
+
+    assert analysis.setup.setup_id == "numba_cpu_dense_fp64"
+    assert analysis.setup_chosen_by == "PYAUTO_SETUP"
+    assert analysis._use_jax is False
+
+    paths = af.DirectoryPaths(name="pyauto_setup", path_prefix=str(tmp_path))
+    analysis.save_attributes(paths=paths)
+
+    with open(paths._files_path / "setup.json") as f:
+        setup_dict = json.load(f)
+
+    assert setup_dict["chosen_by"] == "PYAUTO_SETUP"
+    assert setup_dict["rule_id"] == "explicit:PYAUTO_SETUP"
+    assert setup_dict["setup_id"] == "numba_cpu_dense_fp64"
+
+
+def test__explicit_setup__wins_over_pyauto_setup_env(masked_imaging_7x7, monkeypatch):
+    _detect(monkeypatch, MANY_CORE)
+    monkeypatch.setenv("PYAUTO_SETUP", "jax_cpu_dense_fp64")
+
+    setup = aa.Setup.from_setup_id("numba_cpu_dense_fp64")
+
+    analysis = ag.AnalysisImaging(
+        dataset=masked_imaging_7x7, setup=setup, use_jax=True
+    )
+    analysis.modify_before_fit(paths=af.DirectoryPaths(), model=_mge_model())
+
+    assert analysis.setup is setup
+    assert analysis.setup_chosen_by == "explicit"
+    assert analysis._use_jax is False
+
+
+def test__setup_auto__setup_json_written_by_search(masked_imaging_7x7, monkeypatch):
+    pytest.importorskip("jax")
+
+    _detect(monkeypatch, MANY_CORE)
+
+    model = af.Collection(galaxies=af.Collection(galaxy_0=ag.Galaxy(redshift=0.5)))
+
+    analysis = ag.AnalysisImaging(
+        dataset=masked_imaging_7x7, setup="auto", use_jax=False
+    )
+
+    search = ag.m.MockSearch(name="test_search_setup_auto")
+    search.fit(model=model, analysis=analysis)
+
+    with open(search.paths._files_path / "setup.json") as f:
+        setup_dict = json.load(f)
+
+    assert setup_dict["setup_id"] == "jax_cpu_dense_fp64"
+    assert setup_dict["rule_id"] == "imaging-mge-standard-cpu-many-core"
+    assert setup_dict["decision_id"] == "imaging-mge-standard-cpu-many-core"
+    assert setup_dict["hardware_class"] == "cpu_many_core"
+    assert setup_dict["extrapolated"] is False
+    assert setup_dict["chosen_by"] == "auto"
+
+
+def test__check_setup_consistency__numba_operator_under_jax_raises(masked_imaging_7x7):
+    pytest.importorskip("jax")
+    pytest.importorskip("numba")
+
+    from autogalaxy.analysis import setup_util
+
+    dataset = masked_imaging_7x7.apply_setup("numba_cpu_sparse_fp64")
+
+    setup_util.check_setup_consistency(dataset=dataset, use_jax=False)
+
+    with pytest.raises(aa.exc.InversionException, match="mismatch"):
+        setup_util.check_setup_consistency(dataset=dataset, use_jax=True)
