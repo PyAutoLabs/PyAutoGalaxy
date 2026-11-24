@@ -18,8 +18,12 @@ Key functions
 - `mesh_grids_of_planes_list_from` — Loads the pre-computed image-plane mesh grids that
   were saved during the fit, removing any stochastic variation when inspecting results
   offline.
+- `dataset_with_setup_from` — Reapplies the compute setup a search wrote to
+  ``files/setup.json`` to a reloaded dataset, so a reloaded fit takes the same operator
+  route as the search.
 """
 from __future__ import annotations
+import logging
 import numpy as np
 from typing import List, Optional
 
@@ -31,6 +35,8 @@ import autoarray as aa
 from autoarray.mask.mask_2d import Mask2DKeys
 
 from autogalaxy.analysis.adapt_images.adapt_images import AdaptImages
+
+logger = logging.getLogger(__name__)
 
 
 def instance_list_from(
@@ -230,3 +236,53 @@ def mesh_grids_of_planes_list_from(
             return fit.child_values(name="preload_mesh_grids_of_planes")
         except AttributeError:
             return [None] * total_fits
+
+
+def dataset_with_setup_from(fit: af.Fit, dataset):
+    """
+    Returns a dataset reloaded from a model-fit with the compute setup of that search reapplied, so a fit of
+    the reloaded dataset takes the same operator route (e.g. the sparse operator) as the search did.
+
+    The setup is read from ``files/setup.json`` (``fit.value(name="setup")``), the plain dict written by
+    `autogalaxy.analysis.setup_util.setup_dict_from` when the analysis was given a ``setup``, and applied
+    with ``dataset.apply_setup(setup_id)``. This is best-effort:
+
+    - a search with no ``setup.json`` (no ``setup`` was given) returns the dataset unchanged;
+    - an array-free dataset (``dataset.data is None``, rebuilt by ``Interferometer.from_sparse_terms``)
+      already carries its operator and is returned unchanged;
+    - if the setup cannot be applied here (e.g. a JAX sparse setup reloaded without JAX installed, or an
+      unreadable file), one warning is logged and the dataset is returned unapplied.
+
+    Parameters
+    ----------
+    fit
+        A `PyAutoFit` `Fit` object (a directory output or sqlite database entry) of one analysis.
+    dataset
+        The reloaded `Imaging` / `Interferometer` dataset, already masked and over-sampled.
+    """
+    if getattr(dataset, "data", None) is None:
+        return dataset
+
+    try:
+        setup_dict = fit.value(name="setup")
+    except Exception as e:
+        logger.warning(
+            f"Aggregator: could not read files/setup.json ({e}); the dataset is reloaded without "
+            f"its search's compute setup."
+        )
+        return dataset
+
+    if setup_dict is None:
+        return dataset
+
+    setup_id = setup_dict.get("setup_id") if isinstance(setup_dict, dict) else setup_dict
+
+    try:
+        return dataset.apply_setup(setup_id)
+    except Exception as e:
+        logger.warning(
+            f"Aggregator: the search's compute setup {setup_id!r} could not be reapplied to the "
+            f"reloaded dataset ({type(e).__name__}: {e}); the dataset is reloaded without it, so a fit "
+            f"of it may take a different operator route from the search."
+        )
+        return dataset

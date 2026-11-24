@@ -46,6 +46,11 @@ def _imaging_from(
     This method combines all of these attributes and returns a `Imaging` object, has the mask applied to the
     `Imaging` data structure and its settings updated to the values used by the model-fit.
 
+    If the search was given a compute `setup` it wrote `files/setup.json`, which is reapplied to the reloaded
+    dataset (`dataset.apply_setup`, see `agg_util.dataset_with_setup_from`), so a fit of it takes the same
+    operator route as the search. Without the file the dataset reloads exactly as before; if the setup cannot
+    be reapplied a warning is logged and the dataset reloads without it.
+
     If multiple `Imaging` objects were fitted simultaneously via analysis summing, the `fit.child_values()` method
     is instead used to load lists of the data, noise-map, PSF and mask and combine them into a list of
     `Imaging` objects.
@@ -109,6 +114,8 @@ def _imaging_from(
             over_sample_size_lp=over_sample_size_lp,
             over_sample_size_pixelization=over_sample_size_pixelization,
         )
+
+        dataset = agg_util.dataset_with_setup_from(fit=fit, dataset=dataset)
 
         dataset_list.append(dataset)
 

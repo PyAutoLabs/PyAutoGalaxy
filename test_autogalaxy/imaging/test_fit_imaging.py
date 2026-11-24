@@ -2,6 +2,7 @@ import copy
 import numpy as np
 import pytest
 
+import autoarray as aa
 import autogalaxy as ag
 
 
@@ -841,3 +842,171 @@ def test__galaxy_image_dicts__add_ordinary_and_linear_light(masked_imaging_7x7):
     np.testing.assert_allclose(
         fit.galaxy_model_image_dict[galaxy].array, fit.model_data.array
     )
+
+
+# The lazy sparse operator (`dataset.sparse_operator_for`) reached through `fit.sparse_operator`.
+
+LAZY_ON = aa.Settings(lazy_sparse_operator="auto")
+
+
+@pytest.fixture(name="no_ambient_setup")
+def make_no_ambient_setup(monkeypatch):
+    # An ambient `PYAUTO_SETUP=auto` turns the lazy policy on; these tests set it explicitly.
+    monkeypatch.delenv("PYAUTO_SETUP", raising=False)
+
+
+def _pixelization_galaxies():
+    pixelization = ag.Pixelization(
+        mesh=ag.mesh.RectangularUniform(shape=(3, 3)),
+        regularization=ag.reg.Constant(coefficient=1.0),
+    )
+
+    return [
+        ag.Galaxy(redshift=0.5, bulge=ag.lp.Sersic(intensity=0.1)),
+        ag.Galaxy(redshift=0.5, pixelization=pixelization),
+    ]
+
+
+def test__sparse_operator__lazy_policy_on__matches_dense_built_once_and_reused(
+    masked_imaging_7x7, no_ambient_setup
+):
+    pytest.importorskip("numba")
+
+    galaxies = _pixelization_galaxies()
+
+    fit_dense = ag.FitImaging(dataset=masked_imaging_7x7, galaxies=galaxies)
+
+    assert fit_dense.sparse_operator is None
+    assert isinstance(fit_dense.inversion, aa.InversionImagingMapping)
+    assert masked_imaging_7x7._lazy_sparse_operator is None
+
+    fit = ag.FitImaging(
+        dataset=masked_imaging_7x7, galaxies=galaxies, settings=LAZY_ON
+    )
+
+    operator = fit.sparse_operator
+
+    assert operator is not None
+    assert masked_imaging_7x7.sparse_operator is None
+    assert masked_imaging_7x7._lazy_sparse_operator is operator
+    assert fit.inversion.dataset.sparse_operator is operator
+    assert not isinstance(fit.inversion, aa.InversionImagingMapping)
+
+    assert fit.figure_of_merit == pytest.approx(fit_dense.figure_of_merit, rel=1.0e-6)
+
+    # A second fit reuses the operator cached on the dataset rather than building another.
+    fit_again = ag.FitImaging(
+        dataset=masked_imaging_7x7, galaxies=galaxies, settings=LAZY_ON
+    )
+
+    assert fit_again.sparse_operator is operator
+    assert fit_again.figure_of_merit == pytest.approx(fit.figure_of_merit, rel=1.0e-12)
+
+
+def test__sparse_operator__lazy_policy_on__cached_per_fit(
+    masked_imaging_7x7, no_ambient_setup, monkeypatch
+):
+    calls = []
+
+    original = aa.Imaging.sparse_operator_for
+
+    def counting(self, *args, **kwargs):
+        calls.append(kwargs)
+        return original(self, *args, **kwargs)
+
+    monkeypatch.setattr(aa.Imaging, "sparse_operator_for", counting)
+
+    fit = ag.FitImaging(
+        dataset=masked_imaging_7x7, galaxies=_pixelization_galaxies(), settings=LAZY_ON
+    )
+
+    fit.sparse_operator
+    fit.sparse_operator
+
+    assert len(calls) == 1
+    assert calls[0]["needs_operator"] is True
+    assert calls[0]["settings"] is LAZY_ON
+
+
+def test__sparse_operator__lazy_policy_on__mge_only_builds_nothing(
+    masked_imaging_7x7, no_ambient_setup, monkeypatch
+):
+    built = []
+    monkeypatch.setattr(
+        aa.Imaging, "apply_sparse_operator_cpu", lambda self: built.append(1)
+    )
+
+    galaxies = [
+        ag.Galaxy(
+            redshift=0.5,
+            bulge=ag.lp_basis.Basis(
+                profile_list=[
+                    ag.lp_linear.Gaussian(sigma=0.5),
+                    ag.lp_linear.Gaussian(sigma=1.5),
+                ]
+            ),
+        )
+    ]
+
+    fit = ag.FitImaging(dataset=masked_imaging_7x7, galaxies=galaxies, settings=LAZY_ON)
+
+    assert fit.sparse_operator is None
+    fit.figure_of_merit
+
+    assert built == []
+    assert masked_imaging_7x7._lazy_sparse_operator is None
+
+
+def test__sparse_operator__lazy_policy_on__jax_xp_builds_nothing(
+    masked_imaging_7x7, no_ambient_setup, monkeypatch
+):
+    pytest.importorskip("jax")
+
+    built = []
+    monkeypatch.setattr(
+        aa.Imaging, "apply_sparse_operator_cpu", lambda self: built.append(1)
+    )
+
+    import jax.numpy as jnp
+
+    fit = ag.FitImaging(
+        dataset=masked_imaging_7x7,
+        galaxies=_pixelization_galaxies(),
+        settings=LAZY_ON,
+        xp=jnp,
+    )
+
+    assert fit.sparse_operator is None
+    assert built == []
+
+
+def test__sparse_operator__linear_light_only__attached_operator_unchanged(
+    masked_imaging_7x7, no_ambient_setup
+):
+    pytest.importorskip("numba")
+
+    dataset = masked_imaging_7x7.apply_sparse_operator_cpu()
+
+    galaxies = [
+        ag.Galaxy(
+            redshift=0.5,
+            bulge=ag.lp_linear.Sersic(),
+            disk=ag.lp_linear.Exponential(),
+        )
+    ]
+
+    for settings in (None, LAZY_ON):
+        fit = ag.FitImaging(dataset=dataset, galaxies=galaxies, settings=settings)
+
+        # No mappers, yet the attached operator is still passed to the inversion, as before.
+        assert fit.total_mappers == 0
+        assert fit.sparse_operator is dataset.sparse_operator
+        assert fit.inversion.dataset.sparse_operator is dataset.sparse_operator
+
+        fit_dense = ag.FitImaging(
+            dataset=masked_imaging_7x7, galaxies=galaxies, settings=settings
+        )
+
+        assert fit.figure_of_merit == pytest.approx(
+            fit_dense.figure_of_merit, rel=1.0e-6
+        )

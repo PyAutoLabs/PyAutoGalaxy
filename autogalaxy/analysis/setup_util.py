@@ -16,6 +16,10 @@ designated setups. This module holds the pieces that resolution needs:
   once, outside the likelihood, so a mismatch raises before sampling.
 - `setup_banner_from` / `setup_dict_from`: the banner line logged at fit start and the
   contents of `files/setup.json`.
+- `setup_environment`: the detected hardware `aa.Setup.auto` chooses for.
+
+The resolution itself is `autogalaxy.analysis.analysis.setup.AnalysisSetupMixin`, shared by every
+analysis that takes a `setup`.
 
 The setup decides only how the likelihood is computed (backend, device, operator,
 precision, transformer, threads), never the model.
@@ -217,6 +221,19 @@ def setup_key_from(dataset, model, regime: str = "standard") -> Tuple[str, str]:
     that has a rule (see `setup_key_and_note_from`).
     """
     return setup_key_and_note_from(dataset=dataset, model=model, regime=regime)[0]
+
+
+def setup_environment():
+    """
+    The detected hardware (`autonerves.environment.Environment`), or `None` if detection fails.
+    """
+    try:
+        from autonerves.environment import Environment
+
+        return Environment.detect()
+    except Exception as e:
+        logger.debug(f"Setup: hardware detection failed: {e}")
+        return None
 
 
 def use_jax_from(use_jax: bool) -> bool:

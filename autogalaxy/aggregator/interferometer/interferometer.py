@@ -204,6 +204,12 @@ def _interferometer_from(
     This method combines all of these attributes and returns a `Interferometer` object, including having its
     settings updated to the values used by the model-fit.
 
+    If the search was given a compute `setup` it wrote `files/setup.json`, which is reapplied to a reloaded
+    in-memory dataset (`dataset.apply_setup`, see `agg_util.dataset_with_setup_from`), so a fit of it takes
+    the same transformer and operator route as the search. An array-free dataset already carries its operator
+    and is not touched. Without the file the dataset reloads exactly as before; if the setup cannot be
+    reapplied a warning is logged and the dataset reloads without it.
+
     If multiple `Interferometer` objects were fitted simultaneously via analysis summing, the `fit.child_values()`
     method is instead used to load lists of the data, noise-map, PSF and mask and combine them into a list of
     `Interferometer` objects.
@@ -254,6 +260,8 @@ def _interferometer_from(
             transformer_class=transformer_class,
             primary_beam=primary_beam,
         )
+
+        dataset = agg_util.dataset_with_setup_from(fit=fit, dataset=dataset)
 
         dataset_list.append(dataset)
 

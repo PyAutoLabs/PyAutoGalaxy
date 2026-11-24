@@ -1,4 +1,5 @@
 from __future__ import annotations
+import functools
 from typing import TYPE_CHECKING, Dict, Optional
 
 import numpy as np
@@ -71,19 +72,44 @@ class AbstractFitInversion:
 
         return self.model_obj.perform_inversion
 
-    @property
+    @functools.cached_property
     def sparse_operator(self) -> Optional[aa.ImagingSparseOperator]:
         """
-        Only call the `sparse_operator` property of a dataset used to perform efficient linear algebra calculations if
-        the Settings()` object has `use_sparse_operator=True`, to avoid unnecessary computation.
+        The sparse operator this fit's inversion uses for its linear algebra, or `None` for the dense
+        mapping-matrix route. It is the one choke point every `aa.DatasetInterface` of a fit, and the
+        interferometer profile-subtraction helpers, read the operator from, so the inversion and the
+        dirty-image correction always use the same object.
+
+        It is `dataset.sparse_operator_for(xp, needs_operator, settings)`:
+
+        - an operator attached to the dataset (by `apply_setup` / `apply_sparse_operator`) is returned
+          whatever the fit, so a fit whose light is entirely linear (linear light profiles, MGE) keeps
+          using it, as before;
+        - otherwise, with the lazy sparse operator policy on (`aa.Settings(lazy_sparse_operator="auto")`),
+          a fit with a pixelization (`total_mappers > 0`) on NumPy gets the operator the dataset builds
+          on first use and caches; a fit without a pixelization, or a JAX fit, never triggers a build;
+        - with the policy off (the default) it is the attached operator or `None`, exactly as before.
+
+        A dataset without `sparse_operator_for` (e.g. a duck-typed dataset) falls back to its
+        `sparse_operator`.
+
+        The value is cached on the fit. `register_instance_pytree` adds every `cached_property` to a
+        fit's `no_flatten` set, so JAX pytree flattening treats it as static data, never a child.
 
         Returns
         -------
-        The sparse operator used for efficient linear algebra calculations for this inversion, if enabled.
+        The sparse operator used for efficient linear algebra calculations for this inversion, if any.
         """
-        if self.dataset.sparse_operator is not None:
-            if self.total_mappers > 0:
-                return self.dataset.sparse_operator
+        sparse_operator_for = getattr(self.dataset, "sparse_operator_for", None)
+
+        if sparse_operator_for is None:
+            return getattr(self.dataset, "sparse_operator", None)
+
+        return sparse_operator_for(
+            xp=self._xp,
+            needs_operator=self.total_mappers > 0,
+            settings=self.settings,
+        )
 
     @property
     def inversion(self) -> Optional[aa.Inversion]:
