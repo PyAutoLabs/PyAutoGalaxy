@@ -330,14 +330,39 @@ _TRANSFORMER_TEXT = {"wtilde": "w-tilde", "nufft": "NUFFT", "dft": "DFT"}
 LABEL_WIDTH = len("Parallel: ")
 
 
-def setup_text_from(setup: Setup) -> str:
+def jax_fallback_reason_from(setup: Setup, use_jax: Optional[bool] = None) -> Optional[str]:
+    """
+    Why a setup designating the `jax` backend runs on numpy instead (`None` when it does not):
+    `"JAX disabled"` under `PYAUTO_DISABLE_JAX=1`, else `"JAX not installed"`.
+
+    `use_jax` is the resolved backend of the analysis (`use_jax_from`); `None` means "as
+    designated", so there is no fallback.
+    """
+    if use_jax is None or use_jax or setup.backend != "jax":
+        return None
+    if os.environ.get("PYAUTO_DISABLE_JAX") == "1":
+        return "JAX disabled"
+    return "JAX not installed"
+
+
+def setup_text_from(setup: Setup, use_jax: Optional[bool] = None) -> str:
     """
     The setup tuple in readable tokens, e.g. `numba · CPU · sparse operator · fp64` or
     `numba · CPU · sparse operator · fp64 · w-tilde`.
+
+    `use_jax` is the backend the analysis actually resolved (`use_jax_from`). When the setup
+    designates `jax` but `use_jax` is `False` (`PYAUTO_DISABLE_JAX=1` or JAX not installed),
+    the text reports what runs, `numpy · CPU`, not the designation. `None` (the default)
+    reports the setup as designated.
     """
+    if jax_fallback_reason_from(setup=setup, use_jax=use_jax) is not None:
+        backend, device = "numpy", "cpu"
+    else:
+        backend, device = setup.backend, setup.device
+
     tokens = [
-        _BACKEND_TEXT.get(setup.backend, setup.backend),
-        setup.device.upper(),
+        _BACKEND_TEXT.get(backend, backend),
+        device.upper(),
         _OPERATOR_TEXT.get(setup.operator, f"{setup.operator} operator"),
         _PRECISION_TEXT.get(setup.precision, setup.precision),
     ]
@@ -437,6 +462,7 @@ def setup_banner_from(
     chosen_by: str,
     environment=None,
     note: Optional[str] = None,
+    use_jax: Optional[bool] = None,
 ) -> str:
     """
     The `Setup:` line logged at fit start (after `setup_header_from`), e.g.
@@ -448,8 +474,13 @@ def setup_banner_from(
     extrapolated, why (`extrapolated_reason_from`); `note` (e.g. that a fallback rule was
     used) is appended inside the parentheses. An explicit or `PYAUTO_SETUP` setup has
     only the note, if any.
+
+    `use_jax` is the backend the analysis resolved (`use_jax_from`). When a `jax` setup
+    falls back to numpy, the line reports what runs and names the designation and why, e.g.
+
+    `Setup:    numpy · CPU · dense · fp64   (rule imaging/mge · designated JAX; JAX disabled)`
     """
-    line = f"{'Setup:':<{LABEL_WIDTH}}{setup_text_from(setup)}"
+    line = f"{'Setup:':<{LABEL_WIDTH}}{setup_text_from(setup, use_jax=use_jax)}"
 
     details = []
     if chosen_by == CHOSEN_BY_AUTO:
@@ -458,6 +489,12 @@ def setup_banner_from(
         reason = extrapolated_reason_from(setup=setup, environment=environment)
         if reason:
             details.append(f"extrapolated: {reason}")
+    fallback = jax_fallback_reason_from(setup=setup, use_jax=use_jax)
+    if fallback:
+        designated = _BACKEND_TEXT.get(setup.backend, setup.backend)
+        if setup.device != "cpu":
+            designated += f" on {setup.device.upper()}"
+        details.append(f"designated {designated}; {fallback}")
     if note:
         details.append(note)
 
@@ -472,16 +509,22 @@ def setup_banner_lines_from(
     chosen_by: str,
     environment=None,
     note: Optional[str] = None,
+    use_jax: Optional[bool] = None,
 ) -> list:
     """
     The header and `Setup:` lines logged at fit start, as two lines logged as two
     consecutive records (so each carries the log prefix and the labels align with the
-    `Parallel:` / `Estimate:` lines that follow).
+    `Parallel:` / `Estimate:` lines that follow). `use_jax` is the resolved backend (see
+    `setup_banner_from`).
     """
     return [
         setup_header_from(setup=setup, chosen_by=chosen_by),
         setup_banner_from(
-            setup=setup, chosen_by=chosen_by, environment=environment, note=note
+            setup=setup,
+            chosen_by=chosen_by,
+            environment=environment,
+            note=note,
+            use_jax=use_jax,
         ),
     ]
 
