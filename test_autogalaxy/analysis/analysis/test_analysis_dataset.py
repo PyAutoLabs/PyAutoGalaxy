@@ -340,9 +340,11 @@ def test__no_setup__dataset_and_backend_unchanged__would_choose_logged(
     would_choose = [r.message for r in caplog.records if "auto would choose" in r.message]
 
     assert would_choose == [
-        "Setup: auto would choose numba_cpu_sparse_fp64 "
-        "(rule imaging-rectangular-standard-cpu-many-core); pass setup=\"auto\" to use it"
+        "Compute setup: not set (auto would choose numba · CPU · sparse operator · fp64; "
+        'pass setup="auto")'
     ]
+    # Nothing else of the setup block is logged when no setup was given.
+    assert not [r for r in caplog.records if r.message.startswith(("Setup:", "Automatic"))]
 
 
 def test__no_setup__save_attributes_writes_no_setup_json(
@@ -404,16 +406,13 @@ def test__setup_banner_from():
         environment=_environment(gpu=True, gpu_name="NVIDIA A100-SXM4-80GB"),
     )
 
-    assert banner == (
-        "Setup: jax/gpu/dense/fp64 (NVIDIA A100-SXM4-80GB) · rule "
-        "imaging-rectangular-standard-gpu-a100 · optimal (decision "
-        "imaging-rectangular-standard-gpu-a100) · override: PYAUTO_SETUP"
-    )
+    assert banner == "Setup:    JAX · GPU · dense · fp64   (rule imaging/rectangular)"
 
     extrapolated = aa.Setup.from_setup_id(
         "numba_cpu_sparse_fp64_wtilde",
-        rule_id="r",
-        decision_id="r",
+        rule_id="interferometer-rectangular-standard-cpu-many-core",
+        hardware_class="cpu_many_core",
+        decision_id="interferometer-rectangular-standard-cpu-many-core",
         extrapolated=True,
     )
 
@@ -421,5 +420,174 @@ def test__setup_banner_from():
         setup=extrapolated, chosen_by="auto", environment=_environment(cores=8)
     )
 
-    assert banner.startswith("Setup: numba/cpu/sparse/fp64/wtilde (8 CPU cores)")
-    assert "extrapolated (decision r)" in banner
+    assert banner == (
+        "Setup:    numba · CPU · sparse operator · fp64 · w-tilde   "
+        "(rule interferometer/rectangular · extrapolated: 8 cores, rules measured on "
+        "≥16-core nodes)"
+    )
+
+
+def test__setup_banner_from__extrapolated_reasons(monkeypatch):
+    monkeypatch.delenv("PYAUTO_SETUP", raising=False)
+
+    gpu_setup = aa.Setup.from_setup_id(
+        "jax_gpu_dense_fp64",
+        rule_id="imaging-rectangular-standard-gpu-a100",
+        hardware_class="gpu_a100",
+        decision_id="imaging-rectangular-standard-gpu-a100",
+        extrapolated=True,
+    )
+
+    banner = setup_util.setup_banner_from(
+        setup=gpu_setup,
+        chosen_by="auto",
+        environment=_environment(gpu=True, gpu_name="NVIDIA RTX 2060"),
+    )
+
+    assert banner == (
+        "Setup:    JAX · GPU · dense · fp64   (rule imaging/rectangular · "
+        "extrapolated: NVIDIA RTX 2060, rules measured on A100)"
+    )
+
+    # PYAUTO_SETUP=gpu on a machine with no GPU.
+    monkeypatch.setenv("PYAUTO_SETUP", "gpu")
+    banner = setup_util.setup_banner_from(
+        setup=gpu_setup, chosen_by="auto", environment=_environment(cores=8)
+    )
+    assert banner.endswith("(rule imaging/rectangular · extrapolated: no GPU detected, "
+                           "rules measured on A100)")
+    monkeypatch.delenv("PYAUTO_SETUP")
+
+    # A GPU machine whose likelihood has only a CPU rule.
+    cpu_only = aa.Setup.from_setup_id(
+        "numba_cpu_sparse_fp64",
+        rule_id="datacube-delaunay-standard-cpu-many-core",
+        hardware_class="cpu_many_core",
+        decision_id="datacube-delaunay-standard-cpu-many-core",
+        extrapolated=True,
+    )
+    banner = setup_util.setup_banner_from(
+        setup=cpu_only,
+        chosen_by="auto",
+        environment=_environment(gpu=True, gpu_name="NVIDIA A100-SXM4-80GB"),
+    )
+    assert banner.endswith(
+        "(rule datacube/delaunay · extrapolated: no GPU rule for this likelihood, "
+        "the CPU rule is used)"
+    )
+
+    # Not extrapolated: no clause; a note is appended inside the parentheses.
+    optimal = aa.Setup.from_setup_id(
+        "numba_cpu_sparse_fp64",
+        rule_id="imaging-rectangular-standard-cpu-many-core",
+        hardware_class="cpu_many_core",
+        decision_id="imaging-rectangular-standard-cpu-many-core",
+        extrapolated=False,
+    )
+    banner = setup_util.setup_banner_from(
+        setup=optimal,
+        chosen_by="auto",
+        environment=_environment(cores=64),
+        note="no rule for imaging/delaunay_nn, using the nearest rule imaging/rectangular",
+    )
+    assert banner == (
+        "Setup:    numba · CPU · sparse operator · fp64   (rule imaging/rectangular · "
+        "no rule for imaging/delaunay_nn, using the nearest rule imaging/rectangular)"
+    )
+
+
+def test__setup_header_from__auto_explicit_and_env():
+    setup = aa.Setup.from_setup_id("numba_cpu_sparse_fp64")
+
+    assert setup_util.setup_header_from(setup=setup, chosen_by="auto") == (
+        'Automatic compute setup (CPU/GPU choice from setup="auto"; override with '
+        "PYAUTO_SETUP or setup=...):"
+    )
+    assert setup_util.setup_header_from(setup=setup, chosen_by="explicit") == (
+        "Compute setup (set explicitly by setup=...):"
+    )
+    assert setup_util.setup_header_from(setup=setup, chosen_by="PYAUTO_SETUP") == (
+        "Compute setup (set by PYAUTO_SETUP=numba_cpu_sparse_fp64):"
+    )
+
+    # Explicit and PYAUTO_SETUP setups name no rule.
+    assert setup_util.setup_banner_from(setup=setup, chosen_by="explicit") == (
+        "Setup:    numba · CPU · sparse operator · fp64"
+    )
+
+
+def test__setup_text_from__readable_tokens():
+    text = setup_util.setup_text_from
+
+    assert text(aa.Setup.from_setup_id("jax_cpu_na_fp64")) == "JAX · CPU · no operator · fp64"
+    assert text(aa.Setup.from_setup_id("numpy_cpu_dense_mp")) == (
+        "numpy · CPU · dense · mixed precision"
+    )
+    assert text(aa.Setup.from_setup_id("jax_gpu_sparse_fp32_nufft")) == (
+        "JAX · GPU · sparse operator · fp32 · NUFFT"
+    )
+
+
+def _setup_block(caplog):
+    messages = [r.message for r in caplog.records]
+    start = next(
+        i for i, m in enumerate(messages) if "ompute setup (" in m
+    )
+    return messages[start : start + 2]
+
+
+def test__setup_header_and_line__logged_consecutively__auto_explicit_env(
+    masked_imaging_7x7, many_core, caplog, monkeypatch
+):
+    model = _model_with_mesh(ag.mesh.RectangularUniform(shape=(3, 3)))
+
+    analysis = ag.AnalysisImaging(dataset=masked_imaging_7x7, setup="auto", use_jax=False)
+    with caplog.at_level(logging.INFO):
+        analysis.modify_before_fit(paths=af.DirectoryPaths(), model=model)
+    assert _setup_block(caplog) == [
+        'Automatic compute setup (CPU/GPU choice from setup="auto"; override with '
+        "PYAUTO_SETUP or setup=...):",
+        "Setup:    numba · CPU · sparse operator · fp64   (rule imaging/rectangular)",
+    ]
+    caplog.clear()
+
+    analysis = ag.AnalysisImaging(
+        dataset=masked_imaging_7x7, setup="numba_cpu_dense_fp64", use_jax=False
+    )
+    with caplog.at_level(logging.INFO):
+        analysis.modify_before_fit(paths=af.DirectoryPaths(), model=model)
+    assert _setup_block(caplog) == [
+        "Compute setup (set explicitly by setup=...):",
+        "Setup:    numba · CPU · dense · fp64",
+    ]
+    caplog.clear()
+
+    monkeypatch.setenv("PYAUTO_SETUP", "numba_cpu_dense_fp64")
+    analysis = ag.AnalysisImaging(dataset=masked_imaging_7x7, setup="auto", use_jax=False)
+    with caplog.at_level(logging.INFO):
+        analysis.modify_before_fit(paths=af.DirectoryPaths(), model=model)
+    assert _setup_block(caplog) == [
+        "Compute setup (set by PYAUTO_SETUP=numba_cpu_dense_fp64):",
+        "Setup:    numba · CPU · dense · fp64",
+    ]
+
+
+def test__resolve_setup__log_banner_false__lines_kept_for_log_setup_banner(
+    masked_imaging_7x7, many_core, caplog
+):
+    model = _model_with_mesh(ag.mesh.RectangularUniform(shape=(3, 3)))
+
+    analysis = ag.AnalysisImaging(dataset=masked_imaging_7x7, setup="auto", use_jax=False)
+
+    with caplog.at_level(logging.INFO):
+        analysis.resolve_setup(model=model, log_banner=False)
+
+    assert not [r for r in caplog.records if "ompute setup" in r.message]
+
+    with caplog.at_level(logging.INFO):
+        analysis.log_setup_banner()
+        analysis.log_setup_banner()  # logged once only
+
+    messages = [r.message for r in caplog.records]
+    assert len([m for m in messages if m.startswith("Automatic compute setup (")]) == 1
+    assert len([m for m in messages if m.startswith("Setup:")]) == 1
