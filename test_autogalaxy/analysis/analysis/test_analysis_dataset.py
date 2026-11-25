@@ -591,3 +591,147 @@ def test__resolve_setup__log_banner_false__lines_kept_for_log_setup_banner(
     messages = [r.message for r in caplog.records]
     assert len([m for m in messages if m.startswith("Automatic compute setup (")]) == 1
     assert len([m for m in messages if m.startswith("Setup:")]) == 1
+
+
+def _setup_lines(caplog):
+    return [
+        r.message
+        for r in caplog.records
+        if r.message.startswith(("Automatic compute setup (", "Setup:"))
+    ]
+
+
+def test__print_vram_use__resolves_auto_setup_and_logs_banner_once(
+    masked_imaging_7x7, many_core, caplog, monkeypatch, capsys
+):
+    monkeypatch.delenv("PYAUTO_SKIP_FIT_OUTPUT", raising=False)
+
+    model = _model_with_mesh(ag.mesh.RectangularUniform(shape=(3, 3)))
+
+    analysis = ag.AnalysisImaging(dataset=masked_imaging_7x7, setup="auto", use_jax=True)
+
+    assert analysis.setup is None
+
+    with caplog.at_level(logging.INFO):
+        analysis.print_vram_use(model=model, batch_size=2)
+
+    # Resolved from the model before `is_jax` was read: a numba CPU setup, so no VRAM.
+    assert analysis.setup.setup_id == "numba_cpu_sparse_fp64"
+    assert analysis.is_jax is False
+    assert "use_jax=False" in capsys.readouterr().out
+    assert _setup_lines(caplog) == [
+        'Automatic compute setup (CPU/GPU choice from setup="auto"; override with '
+        "PYAUTO_SETUP or setup=...):",
+        "Setup:    numba · CPU · sparse operator · fp64   (rule imaging/rectangular)",
+    ]
+    caplog.clear()
+
+    # The fit then re-applies the same setup without logging it again.
+    with caplog.at_level(logging.INFO):
+        analysis.modify_before_fit(paths=af.DirectoryPaths(), model=model)
+
+    assert analysis.setup.setup_id == "numba_cpu_sparse_fp64"
+    assert analysis.dataset.setup.setup_id == "numba_cpu_sparse_fp64"
+    assert _setup_lines(caplog) == []
+
+
+def test__prepare_for_model__no_setup_input_is_a_no_op(masked_imaging_7x7, many_core):
+    analysis = ag.AnalysisImaging(dataset=masked_imaging_7x7, use_jax=False)
+
+    analysis.prepare_for_model(_parametric_model())
+
+    assert analysis.setup is None
+    assert analysis.dataset is masked_imaging_7x7
+
+
+def test__resolve_setup__different_setup_is_logged_again(
+    masked_imaging_7x7, many_core, caplog
+):
+    analysis = ag.AnalysisImaging(dataset=masked_imaging_7x7, setup="auto", use_jax=False)
+
+    analysis.prepare_for_model(_model_with_mesh(ag.mesh.RectangularUniform(shape=(3, 3))))
+    assert analysis.setup.setup_id == "numba_cpu_sparse_fp64"
+    caplog.clear()
+
+    with caplog.at_level(logging.INFO):
+        analysis.modify_before_fit(paths=af.DirectoryPaths(), model=_parametric_model())
+
+    assert analysis.setup.setup_id == "jax_cpu_dense_fp64"
+    assert len([m for m in _setup_lines(caplog) if m.startswith("Setup:")]) == 1
+
+
+def test__model_analysis__modify_before_fit_resolves_inner_setup(
+    masked_imaging_7x7, many_core
+):
+    model = _model_with_mesh(ag.mesh.RectangularUniform(shape=(3, 3)))
+
+    analysis = ag.AnalysisImaging(dataset=masked_imaging_7x7, setup="auto", use_jax=True)
+    wrapper = analysis.with_model(model)
+
+    returned = wrapper.modify_before_fit(paths=af.DirectoryPaths(), model=model)
+
+    assert returned is wrapper
+    assert wrapper.analysis.setup.setup_id == "numba_cpu_sparse_fp64"
+    assert wrapper.is_jax is False
+
+
+@pytest.mark.parametrize(
+    "disable, reason", [(True, "JAX disabled"), (False, "JAX not installed")]
+)
+def test__setup_banner_from__jax_fallback_reports_numpy(monkeypatch, disable, reason):
+    if disable:
+        monkeypatch.setenv("PYAUTO_DISABLE_JAX", "1")
+    else:
+        monkeypatch.delenv("PYAUTO_DISABLE_JAX", raising=False)
+
+    setup = aa.Setup.from_setup_id(
+        "jax_gpu_dense_fp64",
+        rule_id="imaging-mge-standard-gpu-a100",
+        hardware_class="gpu_a100",
+        decision_id="imaging-mge-standard-gpu-a100",
+        extrapolated=False,
+    )
+
+    banner = setup_util.setup_banner_from(
+        setup=setup,
+        chosen_by="auto",
+        environment=_environment(gpu=True, gpu_name="NVIDIA A100-SXM4-80GB"),
+        use_jax=False,
+    )
+
+    assert banner == (
+        "Setup:    numpy · CPU · dense · fp64   "
+        f"(rule imaging/mge · designated JAX on GPU; {reason})"
+    )
+
+    # As designated when the backend resolved to JAX, or is not given.
+    assert setup_util.setup_banner_from(
+        setup=setup, chosen_by="explicit", use_jax=True
+    ) == "Setup:    JAX · GPU · dense · fp64"
+    assert setup_util.setup_text_from(setup) == "JAX · GPU · dense · fp64"
+
+
+def test__disable_jax__setup_and_parallel_lines_report_numpy(
+    masked_imaging_7x7, many_core, caplog, monkeypatch
+):
+    from autofit.non_linear.parallel.pool import resolve_number_of_cores
+
+    monkeypatch.setenv("PYAUTO_DISABLE_JAX", "1")
+
+    analysis = ag.AnalysisImaging(dataset=masked_imaging_7x7, setup="auto", use_jax=False)
+
+    with caplog.at_level(logging.INFO):
+        analysis.modify_before_fit(paths=af.DirectoryPaths(), model=_parametric_model())
+
+    assert analysis.setup.setup_id == "jax_cpu_dense_fp64"
+    assert analysis.is_jax is False
+    assert _setup_lines(caplog)[-1] == (
+        "Setup:    numpy · CPU · dense · fp64   "
+        "(rule imaging/mge · designated JAX; JAX disabled)"
+    )
+
+    resolution = resolve_number_of_cores(requested="auto", analysis=analysis)
+
+    assert resolution.is_jax is False
+    assert resolution.reason != "jax"
+    assert "JAX" not in resolution.banner

@@ -70,6 +70,22 @@ class AnalysisSetupMixin:
         default does nothing.
         """
 
+    def prepare_for_model(self, model: af.Collection):
+        """
+        Resolve the setup from `model` before the fit starts, when the analysis has a `setup` input
+        that is not yet resolved (`af.Analysis.prepare_for_model`).
+
+        Pre-fit likelihood use, such as `print_vram_use(model=...)`, calls this so a `setup="auto"`
+        analysis knows its backend before its likelihood is evaluated. The banner is logged now; the
+        `modify_before_fit` of a later fit with the same model re-applies the same setup without
+        logging it again (see `resolve_setup`).
+        """
+        if getattr(self, "setup_input", None) is None:
+            return
+        if getattr(self, "setup", None) is not None:
+            return
+        self.resolve_setup(model=model)
+
     def resolve_setup(self, model: af.Collection, log_banner: bool = True):
         """
         Resolve the `setup` input of the analysis against the model and apply it.
@@ -88,6 +104,11 @@ class AnalysisSetupMixin:
           every sample);
         - pins the thread pools (`setup.apply_threads()`);
         - is logged as the header and `Setup:` lines (two records) and stored as `self.setup`.
+
+        It is safe to call more than once (e.g. by `prepare_for_model` before the fit and by
+        `modify_before_fit` when it starts): the setup is re-resolved and re-applied each time, but when
+        it is the one already resolved (same `setup_id`, chosen the same way) the banner is not logged a
+        second time. A different setup is applied and logged.
 
         Parameters
         ----------
@@ -120,8 +141,16 @@ class AnalysisSetupMixin:
             setup = setup_input
             chosen_by = setup_util.chosen_by_from(setup=setup, auto=False)
 
+        previous = getattr(self, "setup", None)
+        already_logged = (
+            previous is not None
+            and previous.setup_id == setup.setup_id
+            and getattr(self, "setup_chosen_by", None) == chosen_by
+        )
+
         self._use_jax = setup_util.use_jax_from(setup.backend == "jax")
 
+        # `apply_setup` is idempotent, so re-applying the same setup rebuilds nothing.
         self._apply_resolved_setup(setup)
 
         setup.apply_threads()
@@ -129,13 +158,19 @@ class AnalysisSetupMixin:
         self.setup = setup
         self.setup_chosen_by = chosen_by
 
+        if already_logged:
+            return
+
         # The header and `Setup:` line are logged after the operator build and checks above (or
         # later still, by `log_setup_banner`), so they sit with the fit's `Parallel:` / `Estimate:` lines.
+        # They report the backend that runs (`_use_jax`), which differs from the designated one when
+        # JAX is disabled or not installed.
         self._setup_banner_lines = setup_util.setup_banner_lines_from(
             setup=setup,
             chosen_by=chosen_by,
             environment=environment,
             note=note,
+            use_jax=self._use_jax,
         )
 
         if log_banner:
