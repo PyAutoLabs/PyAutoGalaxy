@@ -206,12 +206,10 @@ def test__setup_auto__cpu_many_core_rectangular__numba_sparse_operator(
     assert analysis.dataset.setup == analysis.setup
     assert isinstance(analysis.dataset.sparse_operator, SparseLinAlgImagingNumba)
 
-    banners = [r.message for r in caplog.records if r.message.startswith("Setup: ")]
+    banners = [r.message for r in caplog.records if r.message.startswith("Setup:")]
 
     assert banners == [
-        "Setup: numba/cpu/sparse/fp64 (64 CPU cores) · rule "
-        "imaging-rectangular-standard-cpu-many-core · optimal (decision "
-        "imaging-rectangular-standard-cpu-many-core) · override: PYAUTO_SETUP"
+        "Setup:    numba · CPU · sparse operator · fp64   (rule imaging/rectangular)"
     ]
 
 

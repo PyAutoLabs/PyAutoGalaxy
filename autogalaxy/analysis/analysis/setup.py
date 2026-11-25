@@ -70,7 +70,7 @@ class AnalysisSetupMixin:
         default does nothing.
         """
 
-    def resolve_setup(self, model: af.Collection):
+    def resolve_setup(self, model: af.Collection, log_banner: bool = True):
         """
         Resolve the `setup` input of the analysis against the model and apply it.
 
@@ -87,17 +87,25 @@ class AnalysisSetupMixin:
           the dataset and checks it against the backend, so a mismatch raises here rather than rejecting
           every sample);
         - pins the thread pools (`setup.apply_threads()`);
-        - is logged as the setup banner line and stored as `self.setup`.
+        - is logged as the header and `Setup:` lines (two records) and stored as `self.setup`.
 
         Parameters
         ----------
         model
             The model fitted by the search, which decides the rule variant (e.g. pixelization mesh or MGE).
+        log_banner
+            Whether to log the setup lines now. `False` keeps them for `log_setup_banner`, so a caller that
+            does more work after resolving (e.g. `AnalysisDataset` preloading its grids, which can warn) logs
+            them last, next to the fit's `Parallel:` / `Estimate:` lines.
         """
         setup_input = getattr(self, "setup_input", None)
 
+        self._setup_banner_lines = []
+
         if setup_input is None:
             self._log_setup_auto_would_choose(model=model)
+            if log_banner:
+                self.log_setup_banner()
             return
 
         note = None
@@ -121,18 +129,31 @@ class AnalysisSetupMixin:
         self.setup = setup
         self.setup_chosen_by = chosen_by
 
-        logger.info(
-            setup_util.setup_banner_from(
-                setup=setup,
-                chosen_by=chosen_by,
-                environment=environment,
-                note=note,
-            )
+        # The header and `Setup:` line are logged after the operator build and checks above (or
+        # later still, by `log_setup_banner`), so they sit with the fit's `Parallel:` / `Estimate:` lines.
+        self._setup_banner_lines = setup_util.setup_banner_lines_from(
+            setup=setup,
+            chosen_by=chosen_by,
+            environment=environment,
+            note=note,
         )
+
+        if log_banner:
+            self.log_setup_banner()
+
+    def log_setup_banner(self):
+        """
+        Log the setup lines `resolve_setup` prepared (the header and `Setup:` line, or the one "not set"
+        line), each as its own record, once.
+        """
+        for line in getattr(self, "_setup_banner_lines", None) or []:
+            logger.info(line)
+        self._setup_banner_lines = []
 
     def _log_setup_auto_would_choose(self, model: af.Collection):
         """
-        Log one line reporting the setup `setup="auto"` would choose, applying nothing.
+        Prepare the one line reporting the setup `setup="auto"` would choose (logged by
+        `log_setup_banner`), applying nothing.
         """
         try:
             key, _ = self.setup_key_and_note_from(model)
@@ -143,10 +164,7 @@ class AnalysisSetupMixin:
             )
             return
 
-        logger.info(
-            f"Setup: auto would choose {setup.setup_id} (rule {setup.rule_id}); "
-            f'pass setup="auto" to use it'
-        )
+        self._setup_banner_lines = [setup_util.setup_not_set_line_from(setup)]
 
     def save_setup(self, paths: af.DirectoryPaths):
         """

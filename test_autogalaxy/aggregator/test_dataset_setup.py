@@ -58,16 +58,22 @@ def test__imaging_from__no_setup_json__reloads_unchanged(masked_imaging_7x7, mon
     assert (dataset.data.array == masked_imaging_7x7.data.array).all()
 
 
-def test__imaging_from__setup_json__reapplied(masked_imaging_7x7, monkeypatch):
+def test__imaging_from__setup_json__reapplied(masked_imaging_7x7, monkeypatch, caplog):
     pytest.importorskip("numba")
 
     hdu_list = _imaging_hdu_list_from(masked_imaging_7x7, monkeypatch)
 
-    dataset = _imaging_from(
-        fit=_fake_fit(
-            {"dataset": hdu_list, "setup": _setup_dict("numba_cpu_sparse_fp64")}
-        )
-    )[0]
+    with caplog.at_level(logging.INFO, logger=agg_util.__name__):
+        dataset = _imaging_from(
+            fit=_fake_fit(
+                {"dataset": hdu_list, "setup": _setup_dict("numba_cpu_sparse_fp64")}
+            )
+        )[0]
+
+    notices = [r.message for r in caplog.records if r.name == agg_util.__name__]
+    assert notices == [
+        "Compute setup: reapplied numba_cpu_sparse_fp64 from the search's setup.json"
+    ]
 
     assert dataset.setup.setup_id == "numba_cpu_sparse_fp64"
     assert dataset.sparse_operator is not None
@@ -106,6 +112,7 @@ def test__imaging_from__setup_reapply_fails__one_warning_and_unapplied(
     warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
 
     assert len(warnings) == 1
+    assert not [r for r in caplog.records if r.message.startswith("Compute setup: reapplied")]
     assert "jax_cpu_sparse_fp64" in warnings[0].message
     assert "no JAX here" in warnings[0].message
 

@@ -250,6 +250,8 @@ def dataset_with_setup_from(fit: af.Fit, dataset):
     - a search with no ``setup.json`` (no ``setup`` was given) returns the dataset unchanged;
     - an array-free dataset (``dataset.data is None``, rebuilt by ``Interferometer.from_sparse_terms``)
       already carries its operator and is returned unchanged;
+    - on success one INFO line says so (`Compute setup: reapplied <setup_id> from the search's setup.json`;
+      ``apply_setup`` itself logs nothing);
     - if the setup cannot be applied here (e.g. a JAX sparse setup reloaded without JAX installed, or an
       unreadable file), one warning is logged and the dataset is returned unapplied.
 
@@ -278,7 +280,7 @@ def dataset_with_setup_from(fit: af.Fit, dataset):
     setup_id = setup_dict.get("setup_id") if isinstance(setup_dict, dict) else setup_dict
 
     try:
-        return dataset.apply_setup(setup_id)
+        dataset = dataset.apply_setup(setup_id)
     except Exception as e:
         logger.warning(
             f"Aggregator: the search's compute setup {setup_id!r} could not be reapplied to the "
@@ -286,3 +288,7 @@ def dataset_with_setup_from(fit: af.Fit, dataset):
             f"of it may take a different operator route from the search."
         )
         return dataset
+
+    logger.info(f"Compute setup: reapplied {setup_id} from the search's setup.json")
+
+    return dataset

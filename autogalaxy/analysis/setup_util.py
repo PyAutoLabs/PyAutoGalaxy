@@ -14,8 +14,10 @@ designated setups. This module holds the pieces that resolution needs:
   `use_jax` (honouring `PYAUTO_DISABLE_JAX` and a missing JAX install).
 - `check_setup_consistency`: run the inversion factory's operator / setup / backend check
   once, outside the likelihood, so a mismatch raises before sampling.
-- `setup_banner_from` / `setup_dict_from`: the banner line logged at fit start and the
-  contents of `files/setup.json`.
+- `setup_header_from` / `setup_banner_from` / `setup_dict_from`: the header and `Setup:`
+  lines logged at fit start, and the contents of `files/setup.json`.
+- `setup_text_from`: the readable setup (`numba · CPU · sparse operator · fp64`) those
+  lines, the "not set" line and the aggregator notice share.
 - `setup_environment`: the detected hardware `aa.Setup.auto` chooses for.
 
 The resolution itself is `autogalaxy.analysis.analysis.setup.AnalysisSetupMixin`, shared by every
@@ -33,7 +35,16 @@ from typing import Optional, Tuple, Union
 
 import autoarray as aa
 
-from autoarray.setup.setup import EXPLICIT_RULE_ID, Setup, rules, setup_from
+from autoarray.setup.setup import (
+    EXPLICIT_RULE_ID,
+    GPU_A100_NAME,
+    HARDWARE_CLASS_CPU,
+    HARDWARE_CLASS_GPU,
+    MANY_CORE_MIN_CORES,
+    Setup,
+    rules,
+    setup_from,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -299,8 +310,8 @@ def chosen_by_from(setup: Setup, auto: bool) -> str:
 
 def hardware_description_from(setup: Setup, environment=None) -> Optional[str]:
     """
-    A short description of the hardware a setup runs on, for the banner: the GPU name for
-    a GPU setup, the core count for a CPU setup, or `None` if unknown.
+    A short description of the hardware a setup runs on: the GPU name for a GPU setup,
+    the core count for a CPU setup, or `None` if unknown.
     """
     if environment is None:
         return None
@@ -310,6 +321,117 @@ def hardware_description_from(setup: Setup, environment=None) -> Optional[str]:
     return f"{cores} CPU cores" if cores else None
 
 
+_BACKEND_TEXT = {"numba": "numba", "jax": "JAX", "numpy": "numpy"}
+_OPERATOR_TEXT = {"sparse": "sparse operator", "dense": "dense", "na": "no operator"}
+_PRECISION_TEXT = {"mp": "mixed precision"}
+_TRANSFORMER_TEXT = {"wtilde": "w-tilde", "nufft": "NUFFT", "dft": "DFT"}
+
+# The `Setup:` / `Parallel:` / `Estimate:` labels of the fit-start block share one width.
+LABEL_WIDTH = len("Parallel: ")
+
+
+def setup_text_from(setup: Setup) -> str:
+    """
+    The setup tuple in readable tokens, e.g. `numba · CPU · sparse operator · fp64` or
+    `numba · CPU · sparse operator · fp64 · w-tilde`.
+    """
+    tokens = [
+        _BACKEND_TEXT.get(setup.backend, setup.backend),
+        setup.device.upper(),
+        _OPERATOR_TEXT.get(setup.operator, f"{setup.operator} operator"),
+        _PRECISION_TEXT.get(setup.precision, setup.precision),
+    ]
+    if setup.transformer is not None:
+        tokens.append(_TRANSFORMER_TEXT.get(setup.transformer, setup.transformer))
+    return " · ".join(tokens)
+
+
+def rule_likelihood_from(setup: Setup) -> Optional[str]:
+    """
+    The `<dataset_type>/<variant>` likelihood of the rule that chose a setup (looked up
+    by its `decision_id` in the rule table), or `None` when it was not chosen by a rule.
+    """
+    decision_id = setup.decision_id or setup.rule_id
+    if not decision_id or decision_id == EXPLICIT_RULE_ID:
+        return None
+    for row in rules():
+        if row.get("decision_id") == decision_id:
+            return row["likelihood"]
+    return None
+
+
+def _intended_hardware_class(environment) -> str:
+    """
+    The hardware class `aa.Setup.auto` aimed for: `gpu_a100` when `PYAUTO_SETUP=gpu`, or
+    when it is unset / `auto` and a GPU is detected; otherwise `cpu_many_core`.
+    """
+    value = (os.environ.get("PYAUTO_SETUP") or "auto").strip().lower()
+    if value == "gpu":
+        return HARDWARE_CLASS_GPU
+    if value == "cpu":
+        return HARDWARE_CLASS_CPU
+    return HARDWARE_CLASS_GPU if getattr(environment, "gpu", False) else HARDWARE_CLASS_CPU
+
+
+_CLASS_TEXT = {HARDWARE_CLASS_CPU: "CPU", HARDWARE_CLASS_GPU: "GPU"}
+
+
+def extrapolated_reason_from(setup: Setup, environment=None) -> Optional[str]:
+    """
+    Why an automatically chosen setup is marked extrapolated (`None` when it is not):
+
+    - a CPU rule on fewer than `MANY_CORE_MIN_CORES` cores:
+      `8 cores, rules measured on ≥16-core nodes`;
+    - an A100 rule on another GPU: `<GPU name>, rules measured on A100`, or on a machine
+      with no GPU: `no GPU detected, rules measured on A100`;
+    - no rule for the intended hardware class:
+      `no GPU rule for this likelihood, the CPU rule is used`.
+    """
+    if not setup.extrapolated:
+        return None
+
+    if environment is not None and setup.hardware_class is not None:
+        intended = _intended_hardware_class(environment)
+        if intended != setup.hardware_class:
+            return (
+                f"no {_CLASS_TEXT.get(intended, intended)} rule for this likelihood, "
+                f"the {_CLASS_TEXT.get(setup.hardware_class, setup.hardware_class)} "
+                f"rule is used"
+            )
+
+    if setup.hardware_class == HARDWARE_CLASS_GPU:
+        if environment is None:
+            return f"rules measured on {GPU_A100_NAME}"
+        gpu_name = getattr(environment, "gpu_name", None)
+        if not getattr(environment, "gpu", False):
+            return f"no GPU detected, rules measured on {GPU_A100_NAME}"
+        return f"{gpu_name or 'GPU'}, rules measured on {GPU_A100_NAME}"
+
+    cores = getattr(environment, "cores", None) if environment is not None else None
+    measured = f"rules measured on ≥{MANY_CORE_MIN_CORES}-core nodes"
+    return f"{cores} cores, {measured}" if cores else measured
+
+
+def setup_header_from(setup: Setup, chosen_by: str) -> str:
+    """
+    The header line logged before the `Setup:` line at fit start, saying how the setup
+    was chosen:
+
+    - `"auto"`: `Automatic compute setup (CPU/GPU choice from setup="auto"; override with
+      PYAUTO_SETUP or setup=...):`
+    - `"PYAUTO_SETUP"`: `Compute setup (set by PYAUTO_SETUP=<setup_id>):`
+    - `"explicit"`: `Compute setup (set explicitly by setup=...):`
+    """
+    if chosen_by == CHOSEN_BY_AUTO:
+        return (
+            'Automatic compute setup (CPU/GPU choice from setup="auto"; '
+            "override with PYAUTO_SETUP or setup=...):"
+        )
+    if chosen_by == CHOSEN_BY_ENV:
+        return f"Compute setup (set by PYAUTO_SETUP={setup.setup_id}):"
+    return "Compute setup (set explicitly by setup=...):"
+
+
 def setup_banner_from(
     setup: Setup,
     chosen_by: str,
@@ -317,35 +439,64 @@ def setup_banner_from(
     note: Optional[str] = None,
 ) -> str:
     """
-    The setup banner line logged at fit start, e.g.
+    The `Setup:` line logged at fit start (after `setup_header_from`), e.g.
 
-    `Setup: jax/gpu/dense/fp64 (NVIDIA A100-SXM4-80GB) · rule imaging-rectangular-standard-gpu-a100 ·
-    optimal (decision imaging-rectangular-standard-gpu-a100) · override: PYAUTO_SETUP`
+    `Setup:    numba · CPU · sparse operator · fp64   (rule imaging/rectangular ·
+    extrapolated: 8 cores, rules measured on ≥16-core nodes)`
+
+    An automatically chosen setup names its rule (`<dataset_type>/<variant>`) and, when
+    extrapolated, why (`extrapolated_reason_from`); `note` (e.g. that a fallback rule was
+    used) is appended inside the parentheses. An explicit or `PYAUTO_SETUP` setup has
+    only the note, if any.
     """
-    tokens = [setup.backend, setup.device, setup.operator, setup.precision]
-    if setup.transformer is not None:
-        tokens.append(setup.transformer)
+    line = f"{'Setup:':<{LABEL_WIDTH}}{setup_text_from(setup)}"
 
-    line = f"Setup: {'/'.join(tokens)}"
-
-    hardware = hardware_description_from(setup=setup, environment=environment)
-    if hardware:
-        line += f" ({hardware})"
-
+    details = []
     if chosen_by == CHOSEN_BY_AUTO:
-        line += f" · rule {setup.rule_id}"
-        quality = "extrapolated" if setup.extrapolated else "optimal"
-        line += f" · {quality} (decision {setup.decision_id})"
-        line += " · override: PYAUTO_SETUP"
-    elif chosen_by == CHOSEN_BY_ENV:
-        line += " · rule explicit (PYAUTO_SETUP)"
-    else:
-        line += " · rule explicit (setup passed to the analysis)"
-
+        likelihood = rule_likelihood_from(setup)
+        details.append(f"rule {likelihood or setup.rule_id}")
+        reason = extrapolated_reason_from(setup=setup, environment=environment)
+        if reason:
+            details.append(f"extrapolated: {reason}")
     if note:
-        line += f" · {note}"
+        details.append(note)
+
+    if details:
+        line += f"   ({' · '.join(details)})"
 
     return line
+
+
+def setup_banner_lines_from(
+    setup: Setup,
+    chosen_by: str,
+    environment=None,
+    note: Optional[str] = None,
+) -> list:
+    """
+    The header and `Setup:` lines logged at fit start, as two lines logged as two
+    consecutive records (so each carries the log prefix and the labels align with the
+    `Parallel:` / `Estimate:` lines that follow).
+    """
+    return [
+        setup_header_from(setup=setup, chosen_by=chosen_by),
+        setup_banner_from(
+            setup=setup, chosen_by=chosen_by, environment=environment, note=note
+        ),
+    ]
+
+
+def setup_not_set_line_from(setup: Setup) -> str:
+    """
+    The one line logged when an analysis has no `setup`, e.g.
+
+    `Compute setup: not set (auto would choose numba · CPU · sparse operator · fp64;
+    pass setup="auto")`
+    """
+    return (
+        f"Compute setup: not set (auto would choose {setup_text_from(setup)}; "
+        f'pass setup="auto")'
+    )
 
 
 def setup_dict_from(setup: Setup, chosen_by: str) -> dict:

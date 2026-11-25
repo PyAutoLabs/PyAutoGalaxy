@@ -116,9 +116,11 @@ class AnalysisDataset(AnalysisSetupMixin, Analysis):
         """
 
         # The setup is resolved first: applying it may rebuild the dataset, so the grids below are
-        # preloaded on the dataset the likelihood will use.
+        # preloaded on the dataset the likelihood will use. Its log lines are kept until the end, so
+        # anything the preloading warns comes before them and they sit with the fit's `Parallel:` /
+        # `Estimate:` lines.
 
-        self.resolve_setup(model=model)
+        self.resolve_setup(model=model, log_banner=False)
 
         # Ensures preloaded in memory so repeated calls are fast
 
@@ -140,6 +142,8 @@ class AnalysisDataset(AnalysisSetupMixin, Analysis):
         self.dataset.grids.border_relocator
 
         super().modify_before_fit(paths=paths, model=model)
+
+        self.log_setup_banner()
 
         return self
 
