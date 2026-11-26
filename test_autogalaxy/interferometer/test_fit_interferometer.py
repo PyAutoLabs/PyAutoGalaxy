@@ -4,6 +4,9 @@ import pytest
 import autoarray as aa
 import autogalaxy as ag
 
+# The dense mapping-matrix reference fits switch the lazy sparse operator (on by default) off.
+LAZY_OFF = aa.Settings(lazy_sparse_operator="off")
+
 
 def test__model_visibilities__real_component__correct_value(interferometer_7):
     g0 = ag.Galaxy(redshift=0.5, bulge=ag.m.MockLightProfile(image_2d=np.ones(9)))
@@ -513,7 +516,7 @@ def test__model_visibilities_of_galaxies_list__matches_galaxy_model_visibilities
 
 
 def _assert_sparse_fit_matches_dense(dataset, dataset_sparse, galaxies):
-    fit = ag.FitInterferometer(dataset=dataset, galaxies=galaxies)
+    fit = ag.FitInterferometer(dataset=dataset, galaxies=galaxies, settings=LAZY_OFF)
     fit_sparse = ag.FitInterferometer(dataset=dataset_sparse, galaxies=galaxies)
 
     assert isinstance(fit.inversion, aa.InversionInterferometerMapping)
@@ -786,7 +789,9 @@ def test__fit_figure_of_merit__sparse_operator__pixelization_only__data_term_sca
     )
 
     # The dense fit's inversion already carries its data, so it is returned unchanged.
-    fit = ag.FitInterferometer(dataset=interferometer_7, galaxies=galaxies)
+    fit = ag.FitInterferometer(
+        dataset=interferometer_7, galaxies=galaxies, settings=LAZY_OFF
+    )
 
     assert fit.inversion_with_data is fit.inversion
 
@@ -985,7 +990,7 @@ def _assert_array_free_fit_matches_dense(dataset, dataset_array_free, galaxies):
     The fit on the array-free dataset reproduces the in-memory dense fit (which forms and subtracts the light
     profile visibilities `F i_p`) at rel 1e-8, without ever forming visibilities.
     """
-    fit = ag.FitInterferometer(dataset=dataset, galaxies=galaxies)
+    fit = ag.FitInterferometer(dataset=dataset, galaxies=galaxies, settings=LAZY_OFF)
     fit_array_free = ag.FitInterferometer(dataset=dataset_array_free, galaxies=galaxies)
 
     assert fit_array_free._uses_precomputed_data_term
@@ -1708,7 +1713,9 @@ def test__sparse_operator__lazy_policy_off__dense_and_nothing_built(
     interferometer_7, no_ambient_setup
 ):
     fit = ag.FitInterferometer(
-        dataset=interferometer_7, galaxies=_pixelization_only_galaxies()
+        dataset=interferometer_7,
+        galaxies=_pixelization_only_galaxies(),
+        settings=LAZY_OFF,
     )
 
     assert fit.sparse_operator is None
@@ -1723,7 +1730,9 @@ def test__sparse_operator__lazy_policy_on__pixelization_only__matches_dense_buil
 
     galaxies = _pixelization_only_galaxies()
 
-    fit_dense = ag.FitInterferometer(dataset=interferometer_7, galaxies=galaxies)
+    fit_dense = ag.FitInterferometer(
+        dataset=interferometer_7, galaxies=galaxies, settings=LAZY_OFF
+    )
 
     fit = ag.FitInterferometer(
         dataset=interferometer_7, galaxies=galaxies, settings=LAZY_ON
@@ -1759,7 +1768,9 @@ def test__sparse_operator__lazy_policy_on__pixelization_and_light_profile__dirty
 
     galaxies = _pixelization_and_light_profile_galaxies()
 
-    fit_dense = ag.FitInterferometer(dataset=interferometer_7, galaxies=galaxies)
+    fit_dense = ag.FitInterferometer(
+        dataset=interferometer_7, galaxies=galaxies, settings=LAZY_OFF
+    )
 
     fit = ag.FitInterferometer(
         dataset=interferometer_7, galaxies=galaxies, settings=LAZY_ON

@@ -45,12 +45,16 @@ class AnalysisSetupMixin:
     changes its dataset.
     """
 
-    def _init_setup(self, setup):
+    def _init_setup(self, setup, setup_defaulted: bool = False):
         """
         Store the normalised `setup` input (`None`, `"auto"` or an `aa.Setup`, see
         `setup_util.setup_input_from`); the resolved setup is set by `resolve_setup`.
+
+        `setup_defaulted` records that the input is the implicit default `"auto"` (neither `setup` nor
+        `use_jax` was passed, see `setup_util.setup_and_use_jax_from`).
         """
         self.setup_input = setup_util.setup_input_from(setup)
+        self.setup_defaulted = bool(setup_defaulted) and self.setup_input is not None
         self.setup = None
         self.setup_chosen_by = None
 
@@ -90,12 +94,13 @@ class AnalysisSetupMixin:
         """
         Resolve the `setup` input of the analysis against the model and apply it.
 
-        With no `setup` input nothing changes: one log line reports what `setup="auto"` would choose (any
-        error working that out is ignored).
+        With no `setup` input (`setup=None`, or an explicit `use_jax` with no `setup`) nothing changes: one
+        log line reports what `setup="auto"` would choose (any error working that out is ignored).
 
         With `setup="auto"` the setup is chosen by `aa.Setup.auto` from the rule key of the analysis and
-        model (`setup_key_and_note_from`); `PYAUTO_SETUP=<setup_id>` overrides it. An explicit `aa.Setup`
-        or setup_id is used as given. The resolved setup then:
+        model (`setup_key_and_note_from`); `PYAUTO_SETUP=<setup_id>` overrides it. When `"auto"` is the
+        implicit default and no setup can be chosen (e.g. no rule for the dataset), a warning is logged and
+        the constructor backend is kept. An explicit `aa.Setup` or setup_id is used as given. The resolved setup then:
 
         - sets the analysis backend (`_use_jax = setup.backend == "jax"`, falling back to numpy when JAX is
           disabled or not installed, as `af.Analysis` does);
@@ -134,8 +139,19 @@ class AnalysisSetupMixin:
         environment = setup_util.setup_environment()
 
         if setup_input == setup_util.SETUP_AUTO:
-            key, note = self.setup_key_and_note_from(model)
-            setup = aa.Setup.auto(*key, environment=environment)
+            try:
+                key, note = self.setup_key_and_note_from(model)
+                setup = aa.Setup.auto(*key, environment=environment)
+            except Exception as e:
+                if not getattr(self, "setup_defaulted", False):
+                    raise
+                # The default `"auto"` never stops a fit that ran before it was the default: when no
+                # setup can be chosen, the analysis keeps its constructor backend (as `setup=None`).
+                logger.warning(
+                    f"Setup: setup='auto' (the default) could not choose a setup ({e}); the fit "
+                    f"runs with the constructor backend (use_jax={bool(self._use_jax)})."
+                )
+                return
             chosen_by = setup_util.chosen_by_from(setup=setup, auto=True)
         else:
             setup = setup_input

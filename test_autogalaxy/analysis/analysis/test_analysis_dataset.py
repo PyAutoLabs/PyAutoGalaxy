@@ -735,3 +735,113 @@ def test__disable_jax__setup_and_parallel_lines_report_numpy(
     assert resolution.is_jax is False
     assert resolution.reason != "jax"
     assert "JAX" not in resolution.banner
+
+
+# The default `setup="auto"` and its opt-outs (likelihood-lifecycle R6).
+
+
+def test__default__neither_setup_nor_use_jax__auto_resolved_at_fit_start(
+    masked_imaging_7x7, many_core, caplog
+):
+    analysis = ag.AnalysisImaging(dataset=masked_imaging_7x7)
+
+    assert analysis.setup_input == "auto"
+    assert analysis.setup_defaulted is True
+    assert analysis.setup is None
+
+    with caplog.at_level(logging.INFO):
+        analysis.modify_before_fit(
+            paths=af.DirectoryPaths(),
+            model=_model_with_mesh(ag.mesh.RectangularUniform(shape=(3, 3))),
+        )
+
+    assert analysis.setup.setup_id == "numba_cpu_sparse_fp64"
+    assert analysis.setup_chosen_by == "auto"
+    assert analysis._use_jax is False
+    assert analysis.dataset.sparse_operator is not None
+    assert _setup_block(caplog)[0].startswith("Automatic compute setup (")
+
+
+def test__default__explicit_use_jax_false_opts_out(
+    masked_imaging_7x7, many_core, caplog
+):
+    analysis = ag.AnalysisImaging(dataset=masked_imaging_7x7, use_jax=False)
+
+    assert analysis.setup_input is None
+    assert analysis.setup_defaulted is False
+
+    with caplog.at_level(logging.INFO):
+        analysis.modify_before_fit(
+            paths=af.DirectoryPaths(),
+            model=_model_with_mesh(ag.mesh.RectangularUniform(shape=(3, 3))),
+        )
+
+    assert analysis.setup is None
+    assert analysis._use_jax is False
+    assert analysis.dataset is masked_imaging_7x7
+    assert [r.message for r in caplog.records if "auto would choose" in r.message]
+    assert not [r for r in caplog.records if r.message.startswith("Automatic")]
+
+
+def test__default__explicit_setup_none_opts_out_with_old_default_backend(
+    masked_imaging_7x7,
+):
+    import importlib.util
+
+    analysis = ag.AnalysisImaging(dataset=masked_imaging_7x7, setup=None)
+
+    assert analysis.setup_input is None
+    assert analysis.setup_defaulted is False
+    assert analysis._use_jax is (importlib.util.find_spec("jax") is not None)
+
+
+def test__default__explicit_setup_wins_over_use_jax(masked_imaging_7x7):
+    analysis = ag.AnalysisImaging(
+        dataset=masked_imaging_7x7, setup="auto", use_jax=False
+    )
+
+    assert analysis.setup_input == "auto"
+    assert analysis.setup_defaulted is False
+
+
+def test__default__no_rule__falls_back_to_constructor_backend(
+    masked_imaging_7x7, many_core, monkeypatch, caplog
+):
+    def raise_key(self, model):
+        raise ValueError("no rule")
+
+    monkeypatch.setattr(ag.AnalysisImaging, "setup_key_and_note_from", raise_key)
+
+    analysis = ag.AnalysisImaging(dataset=masked_imaging_7x7)
+
+    with caplog.at_level(logging.WARNING):
+        analysis.resolve_setup(model=_parametric_model())
+
+    assert analysis.setup is None
+    assert any("could not choose a setup" in r.message for r in caplog.records)
+
+    # An explicit `setup="auto"` still raises.
+    analysis = ag.AnalysisImaging(dataset=masked_imaging_7x7, setup="auto")
+
+    with pytest.raises(ValueError, match="no rule"):
+        analysis.resolve_setup(model=_parametric_model())
+
+
+def test__default__sentinel_reads_as_auto_and_pickles():
+    import inspect
+    import pickle
+
+    default = inspect.signature(ag.AnalysisImaging.__init__).parameters["setup"].default
+
+    assert default == "auto"
+    assert default is setup_util.SETUP_DEFAULT
+    assert pickle.loads(pickle.dumps(default)) is setup_util.SETUP_DEFAULT
+
+
+def test__default__analysis_pickles(masked_imaging_7x7):
+    import pickle
+
+    analysis = pickle.loads(pickle.dumps(ag.AnalysisImaging(dataset=masked_imaging_7x7)))
+
+    assert analysis.setup_input == "auto"
+    assert analysis.setup_defaulted is True
