@@ -128,8 +128,18 @@ class AnalysisDataset(AnalysisSetupMixin, Analysis):
 
         self.resolve_setup(model=model, log_banner=False)
 
-        # Ensures preloaded in memory so repeated calls are fast
+        self._preload_grids()
 
+        super().modify_before_fit(paths=paths, model=model)
+
+        self.log_setup_banner()
+
+        return self
+
+    def _preload_grids(self):
+        """
+        Compute the dataset's grids once, before the fit, so repeated likelihood calls are fast.
+        """
         self.dataset.grids.lp
         self.dataset.grids.lp.over_sampled
         self.dataset.grids.lp.over_sampler
@@ -146,12 +156,6 @@ class AnalysisDataset(AnalysisSetupMixin, Analysis):
             self.dataset.grids.blurring.over_sampler
 
         self.dataset.grids.border_relocator
-
-        super().modify_before_fit(paths=paths, model=model)
-
-        self.log_setup_banner()
-
-        return self
 
     @staticmethod
     def _setup_environment():
@@ -175,9 +179,29 @@ class AnalysisDataset(AnalysisSetupMixin, Analysis):
         factory's check, so a mismatch raises an `InversionException` here rather than rejecting every
         sample. Called by `resolve_setup` (`AnalysisSetupMixin`) after `_use_jax` is set.
         """
+        # The dataset as given, before any setup is applied, so `_undo_resolved_setup` can restore it.
+        if "_dataset_before_setup" not in self.__dict__:
+            self._dataset_before_setup = self.dataset
+
         self.dataset = self.dataset.apply_setup(setup)
 
         setup_util.check_setup_consistency(dataset=self.dataset, use_jax=self._use_jax)
+
+    def _undo_resolved_setup(self):
+        """
+        Restore the dataset as it was given, before `_apply_resolved_setup` attached the operator the
+        resolved setup named (`adopt_backend`, when a `FactorGraphModel` moves this analysis onto its shared
+        backend), check it against the new backend and preload its grids.
+        """
+        original = self.__dict__.pop("_dataset_before_setup", None)
+        if original is None:
+            return
+
+        self.dataset = original
+
+        setup_util.check_setup_consistency(dataset=self.dataset, use_jax=self._use_jax)
+
+        self._preload_grids()
 
     @staticmethod
     def _save_dataset_fits(paths: af.AbstractPaths, hdu_list: HDUList) -> None:
