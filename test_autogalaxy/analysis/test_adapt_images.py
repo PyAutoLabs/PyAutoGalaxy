@@ -2,6 +2,7 @@ import pytest
 import numpy as np
 
 import autofit as af
+import autoarray as aa
 import autogalaxy as ag
 
 
@@ -293,3 +294,153 @@ def test__galaxy_name_image_dict_via_result_from__stale_cache_is_recomputed(tmp_
     unchanged.mask = mask
 
     assert galaxy_name_image_dict_via_result_from(result=unchanged) is not None
+
+
+def _snr_test_image_dict():
+    """A lens and a source S/N map with negatives, noise-level values and a bright peak (S/N 250)."""
+    mask = ag.Mask2D.circular(shape_native=(7, 7), pixel_scales=0.1, radius=0.3)
+    n = int((~np.asarray(mask)).sum())
+    source = np.linspace(-3.0, 40.0, n)
+    source[-1] = 250.0
+    lens = np.linspace(-1.0, 10.0, n)
+    return {
+        "('galaxies', 'lens')": ag.Array2D(values=lens, mask=mask),
+        "('galaxies', 'source')": ag.Array2D(values=source, mask=mask),
+    }
+
+
+@pytest.mark.parametrize("cached", [False, True])
+def test__galaxy_name_image_dict_via_result_from__minimum_percent(tmp_path, cached):
+    from autogalaxy.analysis.adapt_images.adapt_images import (
+        galaxy_name_image_dict_via_result_from,
+    )
+
+    image_dict = _snr_test_image_dict()
+    raw = {name: np.asarray(image.array).copy() for name, image in image_dict.items()}
+
+    result = _StubCacheResult(tmp_path if cached else None, image_dict)
+    if not cached:
+        result.paths = None
+
+    floored = galaxy_name_image_dict_via_result_from(result=result)
+    unfloored = galaxy_name_image_dict_via_result_from(result=result, minimum_percent=0.0)
+    floored_again = galaxy_name_image_dict_via_result_from(result=result)
+
+    for name in raw:
+        floor = 0.01 * raw[name].max()
+        assert floored[name].array == pytest.approx(np.maximum(raw[name], floor), 1.0e-8)
+        assert unfloored[name].array == pytest.approx(np.clip(raw[name], 0.0, None), 1.0e-8)
+        assert floored_again[name].array == pytest.approx(floored[name].array, 1.0e-8)
+        # The result's own arrays are not floored in place.
+        assert np.asarray(image_dict[name].array) == pytest.approx(raw[name], 1.0e-8)
+
+
+def test__soft_snr_maps_from():
+    image_dict = _snr_test_image_dict()
+
+    soft = ag.soft_snr_maps_from(image_dict)
+
+    for name, image in image_dict.items():
+        expected = aa.image_mesh.soft_snr_map_from(np.asarray(image.array))
+        assert soft[name].array == pytest.approx(expected, 1.0e-10)
+        assert (soft[name].mask == image.mask).all()
+
+    source_only = ag.soft_snr_maps_from(image_dict, galaxy_names=["source"])
+
+    assert source_only["('galaxies', 'lens')"] is image_dict["('galaxies', 'lens')"]
+    assert source_only["('galaxies', 'source')"].array == pytest.approx(
+        soft["('galaxies', 'source')"].array, 1.0e-10
+    )
+
+    # Sky below S/N 2 sits on the floor; the bright peak saturates rather than dominating.
+    values = soft["('galaxies', 'source')"].array
+    assert values.min() == pytest.approx(0.01 * values.max(), 1.0e-10)
+    assert values.max() == pytest.approx((248.0 / 251.0) ** 2, 1.0e-10)
+
+
+def test__galaxy_snr_maps_from__is_unfloored(tmp_path):
+    image_dict = _snr_test_image_dict()
+    raw = {name: np.asarray(image.array).copy() for name, image in image_dict.items()}
+
+    snr_maps = ag.galaxy_snr_maps_from(result=_StubCacheResult(tmp_path, image_dict))
+
+    for name in raw:
+        assert snr_maps[name].array == pytest.approx(np.clip(raw[name], 0.0, None), 1.0e-8)
+
+
+def test__galaxy_name_key_from():
+    from autogalaxy.analysis.adapt_images.adapt_images import galaxy_name_key_from
+
+    keys = ["('galaxies', 'lens')", "('galaxies', 'source')", "('extra_galaxies', 'source')"]
+
+    assert galaxy_name_key_from("('galaxies', 'lens')", keys) == "('galaxies', 'lens')"
+    assert galaxy_name_key_from("lens", keys) == "('galaxies', 'lens')"
+    assert galaxy_name_key_from("galaxies.source", keys) == "('galaxies', 'source')"
+
+    with pytest.raises(KeyError, match="more than one galaxy"):
+        galaxy_name_key_from("source", keys)
+    with pytest.raises(KeyError, match="No galaxy"):
+        galaxy_name_key_from("subhalo", keys)
+
+
+def test__updated_via_instance_from__short_keys_and_unknown_keys():
+    galaxies = af.ModelInstance()
+    galaxies.lens = ag.Galaxy(redshift=0.5)
+    galaxies.source = ag.Galaxy(redshift=1.0)
+    instance = af.ModelInstance()
+    instance.galaxies = galaxies
+
+    image = ag.Array2D.ones(shape_native=(3, 3), pixel_scales=1.0)
+    grid = ag.Grid2DIrregular(values=[(0.0, 0.0), (1.0, 1.0)])
+
+    adapt_images = ag.AdaptImages(
+        galaxy_name_image_dict={"source": 2.0 * image, "('galaxies', 'lens')": image, "subhalo": 3.0 * image},
+        galaxy_name_image_plane_mesh_grid_dict={"galaxies.source": grid},
+    )
+
+    updated = adapt_images.updated_via_instance_from(instance=instance)
+
+    assert updated.galaxy_image_dict[galaxies.source] == pytest.approx(2.0 * np.ones(9))
+    assert updated.galaxy_image_dict[galaxies.lens] == pytest.approx(np.ones(9))
+    assert len(updated.galaxy_image_dict) == 2
+    assert updated.galaxy_image_plane_mesh_grid_dict[galaxies.source] == pytest.approx(np.asarray(grid))
+    assert "('galaxies', 'source')" in updated.galaxy_name_image_dict
+
+
+class _StubFromResult(_StubCacheResult):
+    """A stub result that also has the mask `AdaptImages.from_result` draws mesh grids on."""
+
+    @property
+    def mask(self):
+        return next(iter(self._image_dict.values())).mask
+
+
+def test__adapt_images_from_result(tmp_path):
+    mask = ag.Mask2D.circular(shape_native=(30, 30), pixel_scales=0.1, radius=1.2)
+    y, x = np.indices(mask.shape_native)
+    radius = np.sqrt(((14.5 - y) * 0.1) ** 2 + ((x - 14.5) * 0.1) ** 2)
+    source = 20.0 * np.exp(-0.5 * ((radius - 0.8) / 0.1) ** 2) - 0.5
+    lens = 5.0 * np.exp(-0.5 * (radius / 0.2) ** 2)
+    image_dict = {
+        "('galaxies', 'lens')": ag.Array2D(values=lens[~np.asarray(mask)], mask=mask),
+        "('galaxies', 'source')": ag.Array2D(values=source[~np.asarray(mask)], mask=mask),
+    }
+    raw_source = np.asarray(image_dict["('galaxies', 'source')"].array).copy()
+
+    image_mesh = ag.image_mesh.HilbertSNR(pixels=40, edge_pixels=10)
+
+    adapt_images = ag.AdaptImages.from_result(
+        result=_StubFromResult(tmp_path, image_dict), image_mesh={"source": image_mesh}
+    )
+
+    unfloored = ag.Array2D(values=np.clip(raw_source, 0.0, None), mask=mask)
+    expected_grid = image_mesh.image_plane_mesh_grid_from(mask=mask, adapt_data=unfloored)
+
+    grid = adapt_images.galaxy_name_image_plane_mesh_grid_dict["('galaxies', 'source')"]
+    assert np.asarray(grid).shape == (50, 2)
+    assert np.asarray(grid) == pytest.approx(np.asarray(expected_grid), 1.0e-12)
+
+    assert adapt_images.galaxy_name_image_dict["('galaxies', 'source')"].array == pytest.approx(
+        aa.image_mesh.soft_snr_map_from(np.clip(raw_source, 0.0, None)), 1.0e-12
+    )
+    assert set(adapt_images.galaxy_name_image_dict) == set(image_dict)

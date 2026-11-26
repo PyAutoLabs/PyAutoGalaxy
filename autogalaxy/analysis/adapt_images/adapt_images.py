@@ -164,7 +164,7 @@ def _galaxy_image_dict_to_cache(cache_path, galaxy_name_image_dict: Dict, paths)
 
 
 def galaxy_name_image_dict_via_result_from(
-    result, use_model_images: bool = False
+    result, use_model_images: bool = False, minimum_percent: Optional[float] = None
 ) -> "AdaptImages":
     """
     Returns per-galaxy subtracted signal-to-noise maps by default, or model images.
@@ -186,6 +186,12 @@ def galaxy_name_image_dict_via_result_from(
     numerical issues with the adaptive schemes. To prevent this, we set a minimum value for each
     galaxy-image, which is a fraction of its maximum value defined via a config file. This flooring applies
     to both signal-to-noise maps and model images.
+
+    The `HilbertSNR` image mesh and the soft maps of `soft_snr_maps_from` need the
+    signal-to-noise maps *before* that floor: they work in absolute S/N, and above a peak S/N of 200 the default
+    1% floor lifts empty sky over their noise threshold of S/N 2 (sky reads 2.5 at a peak of 250), which is then
+    weighted as source. Pass ``minimum_percent=0.0`` for those: negative values are set to 0 and nothing else
+    changes.
 
     The raw per-galaxy images are cached to the result's own ``files/`` folder on first computation
     (``galaxy_images_model.fits`` / ``galaxy_images_snr.fits``) and loaded from there on every later call —
@@ -214,13 +220,20 @@ def galaxy_name_image_dict_via_result_from(
     use_model_images
         If True, use the model images of the galaxies. If False (the default), use their subtracted
         signal-to-noise maps, which have already been divided by the noise map.
+    minimum_percent
+        The fraction of each image's maximum it is floored at. None (the default) uses the config value
+        ``general.adapt.adapt_minimum_percent`` (0.01). ``0.0`` gives the images before the floor, with negative
+        values set to 0: the input for `HilbertSNR` and `soft_snr_maps_from` (see also `galaxy_snr_maps_from`).
 
     Returns
     -------
     A dictionary mapping galaxy paths to subtracted signal-to-noise maps by default, or model images when
-    use_model_images is True, with the configured minimum-value flooring applied in either mode.
+    use_model_images is True, floored at ``minimum_percent`` of each image's maximum in either mode.
     """
-    adapt_minimum_percent = conf.instance["general"]["adapt"]["adapt_minimum_percent"]
+    if minimum_percent is None:
+        adapt_minimum_percent = conf.instance["general"]["adapt"]["adapt_minimum_percent"]
+    else:
+        adapt_minimum_percent = minimum_percent
 
     cache_path = _galaxy_images_cache_path(result, use_model_images=use_model_images)
     raw_image_dict = _galaxy_image_dict_from_cache(
@@ -244,12 +257,151 @@ def galaxy_name_image_dict_via_result_from(
     galaxy_name_image_dict = {}
 
     for path, galaxy_image in raw_image_dict.items():
+        # Floor a copy: computed without a cache, these arrays are the result's own, and flooring them in place
+        # would change what every later call on the same result returns (e.g. a later ``minimum_percent=0.0``).
+        galaxy_image = galaxy_image.copy()
+
         minimum_galaxy_value = adapt_minimum_percent * np.max(galaxy_image.array)
         galaxy_image[galaxy_image < minimum_galaxy_value] = minimum_galaxy_value
 
         galaxy_name_image_dict[path] = galaxy_image
 
     return galaxy_name_image_dict
+
+
+def galaxy_snr_maps_from(result) -> Dict[str, aa.Array2D]:
+    """
+    Returns each galaxy's signal-to-noise (S/N) map from a previous fit: the data minus the model images of every
+    other galaxy, divided by the noise map, with negative values set to 0 and no other floor.
+
+    This is the input the `HilbertSNR` image mesh and `soft_snr_maps_from` expect. It is
+    ``galaxy_name_image_dict_via_result_from(result=result, minimum_percent=0.0)``: the same maps the default adapt
+    images are built from (and cached as ``files/galaxy_images_snr.fits``), before the 1% minimum-percent floor,
+    which above a peak S/N of 200 lifts empty sky over S/N 2.
+
+    Parameters
+    ----------
+    result
+        The result of a previous model-fit.
+
+    Returns
+    -------
+    A dictionary mapping each galaxy's path name (e.g. ``"('galaxies', 'source')"``) to its S/N map.
+    """
+    return galaxy_name_image_dict_via_result_from(result=result, minimum_percent=0.0)
+
+
+def soft_snr_maps_from(
+    snr_maps: Dict[str, aa.Array2D],
+    galaxy_names: Optional[List[str]] = None,
+) -> Dict[str, aa.Array2D]:
+    """
+    Returns the maps to give adaptive regularizations (e.g. `AdaptSplit`) so they adapt to the same signal as the
+    `HilbertSNR` image mesh: each S/N map passed through `aa.image_mesh.soft_snr_map_from`
+    (``(x / (x + 3)) ** 2`` with ``x = max(S/N - 2, 0)``, floored at 1% of its maximum).
+
+    The regularization schemes are unchanged; only the map they are given changes. `AdaptImages.from_result` does
+    this (and builds the meshes) in one call:
+
+        image_mesh = ag.image_mesh.HilbertSNR(pixels=1000, edge_pixels=30)
+        adapt_images = ag.AdaptImages.from_result(result=result, image_mesh={"source": image_mesh})
+
+    Parameters
+    ----------
+    snr_maps
+        Galaxy path name -> S/N map, e.g. from `galaxy_snr_maps_from`.
+    galaxy_names
+        The galaxies to transform, as full path names or short names (e.g. ``"source"``); the others are returned
+        unchanged. None (the default) transforms every galaxy.
+
+    Returns
+    -------
+    A new dictionary with the same keys.
+    """
+    selected = None
+    if galaxy_names is not None:
+        selected = {galaxy_name_key_from(name, list(snr_maps)) for name in galaxy_names}
+
+    soft_maps = {}
+
+    for name, snr_map in snr_maps.items():
+        if selected is not None and name not in selected:
+            soft_maps[name] = snr_map
+            continue
+
+        soft_maps[name] = aa.Array2D(
+            values=aa.image_mesh.soft_snr_map_from(np.asarray(snr_map.array)),
+            mask=snr_map.mask,
+        )
+
+    return soft_maps
+
+
+def _galaxy_path_forms(key: str) -> List[str]:
+    """
+    The names a galaxy path key can be written as: the full key (``"('galaxies', 'source')"``), the dotted path
+    (``"galaxies.source"``) and the galaxy's own name (``"source"``).
+    """
+    import ast
+
+    forms = [key]
+    try:
+        path = ast.literal_eval(key)
+    except (ValueError, SyntaxError):
+        return forms
+    if isinstance(path, tuple) and path and all(isinstance(part, str) for part in path):
+        forms += [".".join(path), path[-1]]
+    return forms
+
+
+def galaxy_name_key_from(name: str, keys: List[str]) -> str:
+    """
+    Returns the full galaxy path key in ``keys`` that ``name`` refers to.
+
+    ``name`` may be the full key (``"('galaxies', 'source')"``), the dotted path (``"galaxies.source"``) or the
+    galaxy's own name (``"source"``). A short name that matches more than one galaxy (e.g. two galaxies called
+    ``"source"`` in different collections) raises an error; use the full or dotted form then.
+
+    Parameters
+    ----------
+    name
+        The name as written by the user.
+    keys
+        The full path keys to resolve against (e.g. ``str(path)`` of every galaxy in the model).
+    """
+    keys = [str(key) for key in keys]
+    if name in keys:
+        return name
+
+    matches = [key for key in keys if name in _galaxy_path_forms(key)]
+    if len(matches) == 1:
+        return matches[0]
+    if not matches:
+        raise KeyError(f"No galaxy called {name!r}; the galaxies are {keys}.")
+    raise KeyError(
+        f"{name!r} matches more than one galaxy ({matches}); use the full or dotted path name."
+    )
+
+
+def _resolved_name_dict(name_dict: Optional[Dict], keys: List[str]) -> Optional[Dict]:
+    """
+    ``name_dict`` with every short key (``"source"``, ``"galaxies.source"``) replaced by the full galaxy path key it
+    refers to. A key that names no galaxy in ``keys`` is kept as it is (and, as before short keys existed, simply
+    matches nothing); a short key naming more than one galaxy raises.
+    """
+    if name_dict is None:
+        return None
+
+    resolved = {}
+    for name, value in name_dict.items():
+        name = str(name)
+        try:
+            name = galaxy_name_key_from(name, keys)
+        except KeyError as exc:
+            if "more than one galaxy" in str(exc):
+                raise
+        resolved[name] = value
+    return resolved
 
 
 class AdaptImages:
@@ -283,7 +435,7 @@ class AdaptImages:
         an `AdaptImages` instance cannot be passed directly to an `Analysis` class, as the galaxy instances need to be
         updated for every iteration of the non-linear search.
 
-        A dictionary mapping the path name of each galaxy (e.g. "galaxies.lens") to its model-image is therefore used
+        A dictionary mapping the path name of each galaxy (e.g. "('galaxies', 'lens')", or in short "lens") to its model-image is therefore used
         which is called inside the `log_likelihood_function` o map the model-image of each galaxy to the galaxy
         instance of that iteration's specific model.
 
@@ -293,7 +445,8 @@ class AdaptImages:
             A dictionary associating each galaxy instance to an image of only that galaxy (e.g. for a strong lens
             one entry will map an instance of the source galaxy entry to an image of the lensed source.
         galaxy_name_image_dict
-            A dictionary associating each galaxy path name (e.g. "galaxies.source") to an image of only that
+            A dictionary associating each galaxy path name (e.g. "('galaxies', 'source')", or in short "source"
+            or "galaxies.source") to an image of only that
             galaxy (e.g. for a strong lens the `source` entry is an image of the lensed source, without the lens light).
         """
 
@@ -312,6 +465,57 @@ class AdaptImages:
         # fresh ``Galaxy`` objects whose hashes no longer match
         # ``galaxy_image_dict`` keys.
         self.galaxy_path_list = galaxy_path_list
+
+    @classmethod
+    def from_result(
+        cls,
+        result,
+        image_mesh: Optional[Dict[str, "aa.AbstractImageMesh"]] = None,
+        mask: Optional[aa.Mask2D] = None,
+    ) -> "AdaptImages":
+        """
+        Returns the adapt images for the next model-fit of a pipeline, in one call, from the result of the previous
+        one: each galaxy's S/N map (`galaxy_snr_maps_from`), the image-plane mesh grid of every galaxy listed in
+        ``image_mesh`` drawn from its S/N map, and the soft S/N maps (`soft_snr_maps_from`) the adaptive
+        regularizations (e.g. `AdaptSplit`) adapt to.
+
+            image_mesh = ag.image_mesh.HilbertSNR(pixels=1000, edge_pixels=30)
+            adapt_images = ag.AdaptImages.from_result(result=result, image_mesh={"source": image_mesh})
+
+            mesh = ag.mesh.Delaunay(pixels=image_mesh.pixels, zeroed_pixels=image_mesh.edge_pixels)
+
+        This is the recommended set-up with `HilbertSNR`. For the older peak-normalised set-up (`Hilbert` with
+        ``weight_power`` / ``weight_floor`` on the floored S/N map), build `AdaptImages` directly from
+        `galaxy_name_image_dict_via_result_from`.
+
+        Parameters
+        ----------
+        result
+            The result of the previous model-fit.
+        image_mesh
+            Galaxy name -> the image mesh to draw that galaxy's mesh grid with. Names may be short (``"source"``),
+            dotted (``"galaxies.source"``) or full (``"('galaxies', 'source')"``). Edge points are appended when the
+            image mesh has ``edge_pixels``. None draws no mesh grids.
+        mask
+            The mask the mesh grids are drawn on; defaults to the result's mask.
+        """
+        snr_maps = galaxy_snr_maps_from(result=result)
+
+        mesh_grid_dict = None
+        if image_mesh is not None:
+            mask = mask if mask is not None else result.mask
+            keys = list(snr_maps)
+            mesh_grid_dict = {}
+            for name, mesh in image_mesh.items():
+                key = galaxy_name_key_from(name, keys)
+                mesh_grid_dict[key] = mesh.image_plane_mesh_grid_from(
+                    mask=mask, adapt_data=snr_maps[key]
+                )
+
+        return cls(
+            galaxy_name_image_dict=soft_snr_maps_from(snr_maps),
+            galaxy_name_image_plane_mesh_grid_dict=mesh_grid_dict,
+        )
 
     @property
     def mask(self) -> aa.Mask2D:
@@ -359,7 +563,7 @@ class AdaptImages:
         an `AdaptImages` instance cannot be passed directly to an `Analysis` class, as the galaxy instances need to be
         updated for every iteration of the non-linear search.
 
-        A dictionary mapping the path name of each galaxy (e.g. "galaxies.lens") to its model-image is therefore used
+        A dictionary mapping the path name of each galaxy (e.g. "('galaxies', 'lens')", or in short "lens") to its model-image is therefore used
         which is called inside the `log_likelihood_function` o map the model-image of each galaxy to the galaxy
         instance of that iteration's specific model.
 
@@ -404,17 +608,28 @@ class AdaptImages:
             for galaxy_name, galaxy in instance.path_instance_tuples_for_class(Galaxy)
         }
 
+        # Keys may be written short ("source", "galaxies.source"); resolve them to the full path keys once.
+        galaxy_keys = list(path_by_id.values())
+        resolved = AdaptImages(
+            galaxy_name_image_dict=_resolved_name_dict(
+                self.galaxy_name_image_dict, galaxy_keys
+            ),
+            galaxy_name_image_plane_mesh_grid_dict=_resolved_name_dict(
+                self.galaxy_name_image_plane_mesh_grid_dict, galaxy_keys
+            ),
+        )
+
         galaxy_image_dict = None
 
-        if self.galaxy_name_image_dict is not None:
+        if resolved.galaxy_name_image_dict is not None:
 
             galaxy_image_dict = {}
 
             for galaxy_name, galaxy in instance.path_instance_tuples_for_class(Galaxy):
                 galaxy_name = str(galaxy_name)
 
-                if galaxy_name in self.galaxy_name_image_dict:
-                    galaxy_image_dict[galaxy] = self.galaxy_name_image_dict[galaxy_name]
+                if galaxy_name in resolved.galaxy_name_image_dict:
+                    galaxy_image_dict[galaxy] = resolved.galaxy_name_image_dict[galaxy_name]
 
             if mask is not None:
                 for key, image in galaxy_image_dict.items():
@@ -422,15 +637,15 @@ class AdaptImages:
 
         galaxy_image_plane_mesh_grid_dict = None
 
-        if self.galaxy_name_image_plane_mesh_grid_dict is not None:
+        if resolved.galaxy_name_image_plane_mesh_grid_dict is not None:
 
             galaxy_image_plane_mesh_grid_dict = {}
 
             for galaxy_name, galaxy in instance.path_instance_tuples_for_class(Galaxy):
                 galaxy_name = str(galaxy_name)
 
-                if galaxy_name in self.galaxy_name_image_plane_mesh_grid_dict:
-                    cached_mesh = self.galaxy_name_image_plane_mesh_grid_dict[galaxy_name]
+                if galaxy_name in resolved.galaxy_name_image_plane_mesh_grid_dict:
+                    cached_mesh = resolved.galaxy_name_image_plane_mesh_grid_dict[galaxy_name]
                     if dataset_model is not None:
                         cached_mesh = cached_mesh.subtracted_and_rotated_from(
                             offset=dataset_model.grid_offset,
@@ -450,8 +665,8 @@ class AdaptImages:
         return AdaptImages(
             galaxy_image_dict=galaxy_image_dict,
             galaxy_image_plane_mesh_grid_dict=galaxy_image_plane_mesh_grid_dict,
-            galaxy_name_image_dict=self.galaxy_name_image_dict,
-            galaxy_name_image_plane_mesh_grid_dict=self.galaxy_name_image_plane_mesh_grid_dict,
+            galaxy_name_image_dict=resolved.galaxy_name_image_dict,
+            galaxy_name_image_plane_mesh_grid_dict=resolved.galaxy_name_image_plane_mesh_grid_dict,
             galaxy_path_list=galaxy_path_list,
         )
 

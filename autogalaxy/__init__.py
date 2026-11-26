@@ -59,6 +59,8 @@ from autoarray.inversion.mesh.mesh_geometry.rectangular import (
 from .analysis import model_util
 from .analysis.adapt_images.adapt_images import AdaptImages
 from .analysis.adapt_images.adapt_images import galaxy_name_image_dict_via_result_from
+from .analysis.adapt_images.adapt_images import galaxy_snr_maps_from
+from .analysis.adapt_images.adapt_images import soft_snr_maps_from
 from . import aggregator as agg
 from . import exc
 from . import util
