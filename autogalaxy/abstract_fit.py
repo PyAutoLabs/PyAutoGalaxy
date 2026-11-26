@@ -85,10 +85,11 @@ class AbstractFitInversion:
         - an operator attached to the dataset (by `apply_setup` / `apply_sparse_operator`) is returned
           whatever the fit, so a fit whose light is entirely linear (linear light profiles, MGE) keeps
           using it, as before;
-        - otherwise, with the lazy sparse operator policy on (`aa.Settings(lazy_sparse_operator="auto")`),
+        - otherwise, with the lazy sparse operator policy on (`aa.Settings(lazy_sparse_operator="auto")`,
+          the default),
           a fit with a pixelization (`total_mappers > 0`) on NumPy gets the operator the dataset builds
           on first use and caches; a fit without a pixelization, or a JAX fit, never triggers a build;
-        - with the policy off (the default) it is the attached operator or `None`, exactly as before.
+        - with the policy off (`lazy_sparse_operator="off"`) it is the attached operator or `None`.
 
         A dataset without `sparse_operator_for` (e.g. a duck-typed dataset) falls back to its
         `sparse_operator`.

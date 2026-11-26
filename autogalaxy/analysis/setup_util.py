@@ -7,6 +7,8 @@ A dataset analysis (`AnalysisImaging`, `AnalysisInterferometer`) accepts
 model: a pixelized source (and its mesh) and a parametric / MGE fit have different
 designated setups. This module holds the pieces that resolution needs:
 
+- `SETUP_DEFAULT` / `setup_and_use_jax_from`: the default `setup` of an analysis and the precedence
+  between `setup` and `use_jax` (an explicit `use_jax` with no `setup` opts out of `"auto"`).
 - `setup_input_from`: normalise the `setup` input of an analysis.
 - `setup_key_from`: map a dataset and a model to the `(dataset_type, variant)` rule key of
   `aa.Setup.auto`.
@@ -49,6 +51,58 @@ from autoarray.setup.setup import (
 logger = logging.getLogger(__name__)
 
 SETUP_AUTO = "auto"
+
+
+class _SetupDefault(str):
+    """
+    The default `setup` of the analyses: a `str` equal to `"auto"` (so it reads as `setup="auto"` in
+    signatures and help), told apart from an explicit `setup="auto"` by identity (`is SETUP_DEFAULT`).
+    """
+
+    def __reduce__(self):
+        return (_setup_default, ())
+
+
+def _setup_default():
+    return SETUP_DEFAULT
+
+
+SETUP_DEFAULT = _SetupDefault(SETUP_AUTO)
+
+
+def setup_and_use_jax_from(
+    setup, use_jax: Optional[bool], default_use_jax: bool = True
+) -> Tuple[Union[None, str, Setup], bool, bool]:
+    """
+    The `setup` and `use_jax` an analysis is constructed with, after the precedence between them.
+
+    - `setup` passed (an `aa.Setup`, a setup_id string, `"auto"` or `None`): it is used as given.
+      `setup=None` is the manual opt-out: the backend is `use_jax`.
+    - `setup` not passed and `use_jax` passed (`True` / `False`): the manual opt-out, as `setup=None`.
+    - Neither passed: `setup="auto"`.
+
+    A `use_jax` of `None` becomes `default_use_jax`, the backend the analysis used before `"auto"` was the
+    default (`False` for `AnalysisWeak`, `True` for the others). For the default `"auto"` it is `True` only
+    when JAX is installed, so a JAX-free install does not warn about a backend nobody asked for; the
+    resolved setup sets the backend at fit start.
+
+    Returns
+    -------
+    `(setup, use_jax, setup_defaulted)`: the setup input (with the default replaced by the plain
+    `"auto"`), the constructor backend passed to `af.Analysis.__init__` (a `bool`) and whether the setup is
+    the implicit default (an unresolved default setup does not stop a pre-fit likelihood evaluation, see
+    `autolens.analysis.analysis.setup.raise_if_setup_unresolved`).
+    """
+    if setup is not SETUP_DEFAULT:
+        return setup, default_use_jax if use_jax is None else bool(use_jax), False
+
+    if use_jax is not None:
+        return None, bool(use_jax), False
+
+    if default_use_jax:
+        default_use_jax = importlib.util.find_spec("jax") is not None
+
+    return SETUP_AUTO, default_use_jax, True
 
 CHOSEN_BY_AUTO = "auto"
 CHOSEN_BY_EXPLICIT = "explicit"

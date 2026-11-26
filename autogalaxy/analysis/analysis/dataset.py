@@ -38,8 +38,8 @@ class AnalysisDataset(AnalysisSetupMixin, Analysis):
         cosmology: LensingCosmology = None,
         settings: aa.Settings = None,
         title_prefix: str = None,
-        use_jax: bool = True,
-        setup=None,
+        use_jax: Optional[bool] = None,
+        setup=setup_util.SETUP_DEFAULT,
         **kwargs,
     ):
         """
@@ -65,29 +65,35 @@ class AnalysisDataset(AnalysisSetupMixin, Analysis):
             A string that is added before the title of all figures output by visualization, for example to
             put the name of the dataset and galaxy in the title.
         use_jax
-            Whether the likelihood is evaluated with JAX. It is honoured as given when `setup` is `None`; a
-            resolved `setup` sets the backend instead.
+            Whether the likelihood is evaluated with JAX. Passing it with no `setup` opts out of `setup="auto"`:
+            the backend is `use_jax`, as with `setup=None`. With a `setup` it is only the backend before the
+            setup is resolved, which then sets the backend.
         setup
-            The compute setup of the likelihood (backend, device, operator, precision, transformer): `None`,
-            `"auto"`, an `aa.Setup` or a setup_id string such as `"numba_cpu_sparse_fp64"`. It is resolved in
+            The compute setup of the likelihood (backend, device, operator, precision, transformer): `"auto"`,
+            `None`, an `aa.Setup` or a setup_id string such as `"numba_cpu_sparse_fp64"`. It is resolved in
             `modify_before_fit`, because the rule key needs the model (pixelization mesh or MGE):
 
-            - `None` (the default): nothing changes; one log line reports what `"auto"` would choose.
-            - `"auto"`: `aa.Setup.auto` chooses the designated setup for the likelihood and hardware
-              (`PYAUTO_SETUP=<setup_id>` overrides it).
+            - `"auto"` (the default when neither `setup` nor `use_jax` is passed): `aa.Setup.auto` chooses the
+              designated setup for the likelihood and hardware (`PYAUTO_SETUP=<setup_id>` overrides it).
+            - `None`, or an explicit `use_jax` with no `setup`: the manual opt-out; nothing changes and one log
+              line reports what `"auto"` would choose.
             - An `aa.Setup` or setup_id string: that setup is used as given.
 
             A resolved setup sets the analysis backend, is applied to the dataset (`dataset.apply_setup`),
             checked for an operator / backend mismatch, pins the thread pools, is logged as a banner line and
             is written to `files/setup.json`.
         """
+        setup, use_jax, setup_defaulted = setup_util.setup_and_use_jax_from(
+            setup=setup, use_jax=use_jax
+        )
+
         super().__init__(
             cosmology=cosmology,
             use_jax=use_jax,
             **kwargs,
         )
 
-        self._init_setup(setup)
+        self._init_setup(setup, setup_defaulted=setup_defaulted)
 
         self.dataset = dataset
         self.adapt_images = adapt_images

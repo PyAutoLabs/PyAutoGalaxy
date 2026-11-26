@@ -20,6 +20,7 @@ from autonerves.fitsable import hdu_list_for_output_from
 import autofit as af
 import autoarray as aa
 
+from autogalaxy.analysis import setup_util
 from autogalaxy.analysis.adapt_images.adapt_images import AdaptImages
 from autogalaxy.analysis.analysis.dataset import AnalysisDataset
 from autogalaxy.cosmology.model import LensingCosmology
@@ -271,8 +272,8 @@ class AnalysisInterferometer(AnalysisDataset):
         cosmology: LensingCosmology = None,
         settings: aa.Settings = None,
         title_prefix: str = None,
-        use_jax: bool = True,
-        setup=None,
+        use_jax: Optional[bool] = None,
+        setup=setup_util.SETUP_DEFAULT,
         **kwargs,
     ):
         """
@@ -305,11 +306,12 @@ class AnalysisInterferometer(AnalysisDataset):
             A string that is added before the title of all figures output by visualization, for example to
             put the name of the dataset and galaxy in the title.
         use_jax
-            Whether the likelihood is evaluated with JAX; honoured as given when `setup` is `None`.
+            Whether the likelihood is evaluated with JAX. Passing it with no `setup` opts out of `"auto"` (the
+            manual backend, as `setup=None`); with a `setup`, the resolved setup sets the backend.
         setup
-            The compute setup of the likelihood: `None` (default, nothing changes), `"auto"` (the designated
-            setup for the likelihood and hardware, chosen at fit start from the model), an `aa.Setup` or a
-            setup_id string. See `AnalysisDataset`.
+            The compute setup of the likelihood: `"auto"` (the default: the designated setup for the likelihood
+            and hardware, chosen at fit start from the model), `None` (the manual opt-out, backend `use_jax`),
+            an `aa.Setup` or a setup_id string. See `AnalysisDataset`.
         """
         super().__init__(
             dataset=dataset,

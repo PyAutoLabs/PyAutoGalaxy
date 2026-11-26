@@ -847,6 +847,7 @@ def test__galaxy_image_dicts__add_ordinary_and_linear_light(masked_imaging_7x7):
 # The lazy sparse operator (`dataset.sparse_operator_for`) reached through `fit.sparse_operator`.
 
 LAZY_ON = aa.Settings(lazy_sparse_operator="auto")
+LAZY_OFF = aa.Settings(lazy_sparse_operator="off")
 
 
 @pytest.fixture(name="no_ambient_setup")
@@ -874,7 +875,9 @@ def test__sparse_operator__lazy_policy_on__matches_dense_built_once_and_reused(
 
     galaxies = _pixelization_galaxies()
 
-    fit_dense = ag.FitImaging(dataset=masked_imaging_7x7, galaxies=galaxies)
+    fit_dense = ag.FitImaging(
+        dataset=masked_imaging_7x7, galaxies=galaxies, settings=LAZY_OFF
+    )
 
     assert fit_dense.sparse_operator is None
     assert isinstance(fit_dense.inversion, aa.InversionImagingMapping)
@@ -1010,3 +1013,24 @@ def test__sparse_operator__linear_light_only__attached_operator_unchanged(
         assert fit.figure_of_merit == pytest.approx(
             fit_dense.figure_of_merit, rel=1.0e-6
         )
+
+
+def test__sparse_operator__lazy_policy_default_auto__numpy_pixelized_fit_builds_lazily(
+    masked_imaging_7x7, no_ambient_setup
+):
+    pytest.importorskip("numba")
+
+    masked_imaging_7x7._lazy_sparse_operator = None
+
+    fit = ag.FitImaging(dataset=masked_imaging_7x7, galaxies=_pixelization_galaxies())
+
+    assert aa.Settings().lazy_sparse_operator == "auto"
+    assert fit.sparse_operator is not None
+    assert masked_imaging_7x7.sparse_operator is None
+    assert masked_imaging_7x7._lazy_sparse_operator is fit.sparse_operator
+
+    fit_dense = ag.FitImaging(
+        dataset=masked_imaging_7x7, galaxies=_pixelization_galaxies(), settings=LAZY_OFF
+    )
+
+    assert fit.figure_of_merit == pytest.approx(fit_dense.figure_of_merit, rel=1.0e-8)
