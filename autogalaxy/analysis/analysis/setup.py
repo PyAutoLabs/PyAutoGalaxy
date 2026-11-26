@@ -58,6 +58,65 @@ class AnalysisSetupMixin:
         self.setup = None
         self.setup_chosen_by = None
 
+    @property
+    def setup_is_default(self) -> bool:
+        """
+        Whether the setup of this analysis is the implicit default `setup="auto"` (neither `setup` nor
+        `use_jax` was passed), which a `FactorGraphModel` may replace by its shared backend
+        (`af.Analysis.setup_is_default`, `adopt_backend`). It stays `True` after `adopt_backend`, so a graph
+        that forwards `modify_before_fit` again treats the analysis the same way.
+        """
+        return bool(getattr(self, "setup_defaulted", False))
+
+    def adopt_backend(self, use_jax: bool):
+        """
+        Drop the default setup and run on the backend `use_jax` a `FactorGraphModel` chose for its factors
+        (`af.Analysis.adopt_backend`), because the factors' default setups disagree.
+
+        The analysis moves to the manual opt-out path, as if constructed with `use_jax=use_jax`: the setup
+        input and resolved setup are cleared (no `files/setup.json` is written), the backend is `use_jax`
+        (falling back to NumPy when JAX is disabled or not installed) and anything the resolved setup applied
+        to the dataset, such as an operator, is undone (`_undo_resolved_setup`). One log line names the
+        backend and what `setup="auto"` had chosen for this analysis alone. Analyses whose setup the user
+        passed are never changed.
+
+        Parameters
+        ----------
+        use_jax
+            The backend of the factor graph: `True` for JAX.
+        """
+        if not self.setup_is_default:
+            return
+
+        previous = getattr(self, "setup", None)
+
+        self.setup_input = None
+        self.setup = None
+        self.setup_chosen_by = None
+        self._setup_banner_lines = []
+
+        self._use_jax = setup_util.use_jax_from(use_jax)
+
+        self._undo_resolved_setup()
+
+        backend = "JAX" if self._use_jax else "numpy"
+        chose = (
+            f'; setup="auto" chose {setup_util.setup_text_from(previous)} for it alone'
+            if previous is not None
+            else ""
+        )
+        logger.info(
+            f"Compute setup: not set (the factor graph runs every factor left on the default setup on "
+            f"{backend}, as their default setups disagree{chose}; pass the same setup= to every "
+            f"factor to choose one)"
+        )
+
+    def _undo_resolved_setup(self):
+        """
+        Undo what `_apply_resolved_setup` applied beyond the backend and threads, for `adopt_backend`.
+        The default does nothing.
+        """
+
     def setup_key_and_note_from(
         self, model: af.Collection
     ) -> Tuple[Tuple[str, str], Optional[str]]:
