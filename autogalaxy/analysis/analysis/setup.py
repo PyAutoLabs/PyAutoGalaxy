@@ -71,7 +71,8 @@ class AnalysisSetupMixin:
     def adopt_backend(self, use_jax: bool):
         """
         Drop the default setup and run on the backend `use_jax` a `FactorGraphModel` chose for its factors
-        (`af.Analysis.adopt_backend`), because the factors' default setups disagree.
+        (`af.Analysis.adopt_backend`), because the factors' default setups disagree or the graph's own
+        `use_jax` (or a factor the user configured) sets the backend.
 
         The analysis moves to the manual opt-out path, as if constructed with `use_jax=use_jax`: the setup
         input and resolved setup are cleared (no `files/setup.json` is written), the backend is `use_jax`
@@ -107,7 +108,7 @@ class AnalysisSetupMixin:
         )
         logger.info(
             f"Compute setup: not set (the factor graph runs every factor left on the default setup on "
-            f"{backend}, as their default setups disagree{chose}; pass the same setup= to every "
+            f"{backend}, so all its factors share one backend{chose}; pass the same setup= to every "
             f"factor to choose one)"
         )
 
