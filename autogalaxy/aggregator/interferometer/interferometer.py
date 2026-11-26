@@ -94,6 +94,10 @@ def _sparse_terms_from(hdu_list, real_space_mask: aa.Mask2D) -> aa.SparseTerms:
     `oversample` / `oversample_pad` from the scalars, when the file has them (they are written only on
     request, see `interferometer_hdu_list_from(include_fine_grids=True)`). A file without them -- written
     without opting in, or before they existed -- reloads all four as `None`.
+
+    The mask fingerprint (`SparseTerms.mask_fingerprint`) is read from the `MASKFP` header card; a file
+    written before it was persisted reloads it as `None` (not recorded), which skips the masked-pixel check
+    of `Interferometer.from_sparse_terms` and `SparseTerms.__add__`.
     """
     header = hdu_list[0].header
 
@@ -120,6 +124,7 @@ def _sparse_terms_from(hdu_list, real_space_mask: aa.Mask2D) -> aa.SparseTerms:
 
     eps = header_value("eps")
     transformer_class_name = header_value("transformer_class_name")
+    mask_fingerprint = header_value("mask_fingerprint")
     phase_centre_y = header_value("phase_centre_y")
     phase_centre_x = header_value("phase_centre_x")
 
@@ -170,6 +175,7 @@ def _sparse_terms_from(hdu_list, real_space_mask: aa.Mask2D) -> aa.SparseTerms:
             None if transformer_class_name is None else str(transformer_class_name)
         ),
         phase_centre=phase_centre,
+        mask_fingerprint=None if mask_fingerprint is None else str(mask_fingerprint),
         **fine_grids,
     )
 
