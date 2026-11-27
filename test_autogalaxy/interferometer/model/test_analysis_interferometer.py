@@ -143,6 +143,7 @@ def test__interferometer_hdu_list_from__array_free_dataset__writes_sparse_terms(
     assert header["EPS"] == terms.eps
     assert header["TRNSFRMR"] == terms.transformer_class_name
     assert (header["PHCENTY"], header["PHCENTX"]) == terms.phase_centre
+    assert header["MASKFP"] == terms.mask_fingerprint
     assert header["PIXSCAY"] == dataset.real_space_mask.pixel_scales[0]
 
 
@@ -217,6 +218,8 @@ def test__save_attributes__array_free_dataset__aggregator_round_trip(
     terms = dataset.sparse_terms
     terms_reloaded = dataset_reloaded.sparse_terms
 
+    assert terms.mask_fingerprint is not None
+
     for name in (
         "sum_weights",
         "data_term",
@@ -225,6 +228,7 @@ def test__save_attributes__array_free_dataset__aggregator_round_trip(
         "shape_native",
         "pixel_scales",
         "origin",
+        "mask_fingerprint",
         "eps",
         "transformer_class_name",
         "phase_centre",
@@ -410,6 +414,58 @@ def test__sparse_terms_from__no_scalars_hdu__falls_back_to_header_cards(
         "phase_centre",
     ):
         assert getattr(terms_reloaded, name) == getattr(terms, name), name
+
+
+def test__save_attributes__array_free_dataset__mask_with_different_masked_pixels_refused_on_reload(
+    interferometer_7, tmp_path
+):
+    """
+    The mask fingerprint survives the `dataset.fits` round trip (PyAutoArray#707): a saved mask edited to mask
+    one more pixel (same shape, pixel scales and origin) no longer matches the terms, so the reload raises
+    instead of rebuilding the dataset on the wrong pixels.
+    """
+    import autoarray as aa
+    import numpy as np
+    import pytest
+    from astropy.io import fits
+
+    from autogalaxy.aggregator.interferometer.interferometer import (
+        _interferometer_from,
+    )
+
+    dataset = _array_free_dataset_from(interferometer_7)
+
+    paths = af.DirectoryPaths(name="mask_fingerprint", path_prefix=str(tmp_path))
+    ag.AnalysisInterferometer(dataset=dataset, use_jax=False).save_attributes(
+        paths=paths
+    )
+
+    with fits.open(paths.image_path / "dataset.fits", mode="update") as hdu_list:
+        mask_values = np.asarray(hdu_list[0].data).copy()
+        row, column = np.argwhere(mask_values == 0.0)[0]
+        mask_values[row, column] = 1.0
+        hdu_list[0].data = mask_values
+
+    with pytest.raises(aa.exc.DatasetException, match="fingerprint"):
+        _interferometer_from(fit=_FitStub(paths=paths))
+
+
+def test__sparse_terms_from__file_predating_mask_fingerprint__reloads_none(
+    interferometer_7,
+):
+    from autogalaxy.aggregator.interferometer.interferometer import _sparse_terms_from
+    from autogalaxy.interferometer.model.analysis import interferometer_hdu_list_from
+
+    dataset = _array_free_dataset_from(interferometer_7)
+
+    hdu_list = interferometer_hdu_list_from(dataset=dataset)
+    del hdu_list[0].header["MASKFP"]
+
+    terms_reloaded = _sparse_terms_from(
+        hdu_list, real_space_mask=dataset.real_space_mask
+    )
+
+    assert terms_reloaded.mask_fingerprint is None
 
 
 def test__interferometer_hdu_list_from__array_free_dataset__phase_centre_round_trips_through_disk(

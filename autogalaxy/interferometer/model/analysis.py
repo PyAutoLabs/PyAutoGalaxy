@@ -50,6 +50,7 @@ SPARSE_TERMS_HEADER_KEYS = {
     "phase_centre_x": "PHCENTX",
     "oversample": "OVERSAMP",
     "oversample_pad": "OVERSPAD",
+    "mask_fingerprint": "MASKFP",
 }
 
 # The order of the float64 1-D array in the `SPARSE_TERMS_SCALARS` HDU, the lossless store of the numeric
@@ -191,6 +192,16 @@ def interferometer_hdu_list_from(
     if terms.transformer_class_name is not None:
         header_dict[SPARSE_TERMS_HEADER_KEYS["transformer_class_name"]] = str(
             terms.transformer_class_name
+        )
+
+    # The fingerprint of the mask the terms were accumulated on (`aa.util.inversion_interferometer
+    # .mask_fingerprint_from`), a 16-character string kept as a header card only, so a reload can still
+    # refuse terms summed with, or rebuilt on, a mask of the same geometry but different masked pixels.
+    mask_fingerprint = getattr(terms, "mask_fingerprint", None)
+
+    if mask_fingerprint is not None:
+        header_dict[SPARSE_TERMS_HEADER_KEYS["mask_fingerprint"]] = str(
+            mask_fingerprint
         )
 
     if terms.phase_centre is not None:
